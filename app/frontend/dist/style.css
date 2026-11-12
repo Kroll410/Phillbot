@@ -909,7 +909,7 @@ tr[draggable="true"] input{cursor:text}
 
 /* «Новий аукціон» у верхній смузі — затисканням */
 .winbtn.newaubtn{min-width:0;height:32px;padding:0 14px;border-radius:8px;font-size:13px}
-#authLogin .changecid{margin-top:40px!important}
+#authLogin .changecid{margin-top:20px!important;margin-bottom:0}
 /* перший запуск: поле Client ID і «Далі» в один рядок, кнопка нормальної ширини */
 #clientIdInput{flex:1 1 auto;min-width:0;height:44px}
 button.cidnext{flex:0 0 auto;min-width:110px;height:44px;padding:0 22px;font-weight:600;border-radius:8px}

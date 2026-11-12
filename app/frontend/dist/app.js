@@ -1011,7 +1011,7 @@ function renderAuList(){
   $("auList").innerHTML = `<table class="autable"><thead><tr><th class="gripcol"></th><th class="num">#</th><th>Лот</th><th class="num">Сума</th><th class="num">Шанс</th><th>Хто ставив</th><th class="acts"><button class="small editbtn${auEdit ? " on" : ""}" data-lotedit>${auEdit ? "Готово" : "Редагувати"}</button></th></tr></thead><tbody>`
     + lots.map((l, i) => {
       const who = [...l.users].sort((a, b) => b.amount - a.amount);
-      const users = who.slice(0, 6).map(u => `${userTag(u)}<span class="muted uam">${fmtN(u.amount)}</span>`).join(" ") + (who.length > 6 ? ` <span class="muted">+${who.length - 6}</span>` : "");
+      const users = who.slice(0, 6).map(u => `<span title="${fmtN(u.amount)} балів">${userTag(u)}</span>`).join(" ") + (who.length > 6 ? ` <span class="muted">+${who.length - 6}</span>` : "");
       const pct = `${(chanceOf(l) * 100).toFixed(1)}%`;
       const st = l.hidden ? `<span class="muted">приховано</span>` : au.winner === l.id ? `<span class="lwin">Переміг із ${pct}</span>` : pct;
       return `<tr data-lot="${esc(l.id)}"${au.winner ? "" : ' draggable="true"'} class="${l.hidden ? "off " : ""}${l.out ? "out" : ""}${au.winner === l.id ? " win" : ""}${auFresh.has(l.id) ? " fresh" : ""}">

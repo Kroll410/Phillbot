@@ -32,6 +32,13 @@ async function withLoading(els, work){
   try{ return await work(); }
   finally{ list.forEach(el => el.classList.remove("is-loading")); }
 }
+// нове замовлення, коли відкрито «Підсумок» чи «Замовлення» — коротко показуємо індикатор завантаження навколо таблиці
+let flashT = 0;
+function flashTable(){
+  if(mode !== "subday" || !D().live || (tab !== "summary" && tab !== "entries")) return;
+  const f = $("tableFrame"); f.classList.add("is-loading");
+  clearTimeout(flashT); flashT = setTimeout(() => f.classList.remove("is-loading"), 1400);
+}
 function setState(snap){ if(snap && snap.settings) { S = snap; renderAll(); } }
 
 /* ---------- дані: поточний збір або збір, вибраний для перегляду ---------- */
@@ -830,7 +837,7 @@ setInterval(renderExportBtn, 500); // таймер може завершитис
 function boot(){
   if(!window.go || !window.runtime){ setTimeout(boot, 50); return; }
   window.runtime.EventsOn("state", snap => setState(snap));
-  window.runtime.EventsOn("redeem", d => { const id = d && d.id; if(!id) return; freshIds.add(id); setTimeout(()=>freshIds.delete(id), 3000); });
+  window.runtime.EventsOn("redeem", d => { const id = d && d.id; if(!id) return; freshIds.add(id); setTimeout(()=>freshIds.delete(id), 3000); flashTable(); });
   window.runtime.EventsOn("chat", m => chatPending.push(m));
   window.runtime.EventsOn("chatdel", chatDelete);
   window.runtime.EventsOn("chatters", list => { chatters = list || []; renderChatters(); });

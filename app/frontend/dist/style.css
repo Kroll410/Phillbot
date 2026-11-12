@@ -528,11 +528,18 @@ header h1 span{color:transparent}
 /* збори стріму: однакова ширина, з'єднані градієнтним шнурочком */
 .cchips{gap:0;align-items:center;padding:4px 2px}
 .cchip{width:156px;flex:0 0 156px;position:relative}
-.cchip + .cchip{margin-left:26px}
-.cchip + .cchip::before{content:"";position:absolute;right:100%;top:50%;width:28px;height:3px;margin-right:-1px;transform:translateY(-50%);
-  border-radius:3px;background:var(--grad);box-shadow:0 0 6px rgba(145,71,255,.45);pointer-events:none}
-.cchip + .cchip::after{content:"";position:absolute;right:calc(100% + 11px);top:50%;width:7px;height:7px;border-radius:50%;transform:translateY(-50%);
-  background:#5fb98a;box-shadow:0 0 0 2px var(--bg);pointer-events:none}
+/* зв'язок між зборами — «стрілка часу»: градієнтні крапки + шеврон до новішого збору */
+.cchip + .cchip{margin-left:40px}
+.cchip + .cchip::before{content:"";position:absolute;right:calc(100% + 9px);top:50%;width:28px;height:6px;transform:translateY(-50%);pointer-events:none;
+  background:var(--grad);opacity:.75;
+  -webkit-mask:radial-gradient(circle,#000 1.6px,transparent 2.1px) 0 50%/7px 6px repeat-x;mask:radial-gradient(circle,#000 1.6px,transparent 2.1px) 0 50%/7px 6px repeat-x}
+.cchip + .cchip::after{content:"";position:absolute;right:calc(100% + 4px);top:50%;width:7px;height:7px;transform:translateY(-50%) rotate(45deg);pointer-events:none;
+  border-top:2px solid #9147ff;border-right:2px solid #9147ff;border-radius:1px;opacity:.85}
+/* перед поточним збором крапки «течуть» уперед; коли збір іде — ще й світяться */
+.cchip.live::before{opacity:1;animation:flow 1s linear infinite}
+.cchip.live.on::before{filter:drop-shadow(0 0 3px rgba(0,230,118,.7))}
+.cchip.live::after{border-color:#b98cff;opacity:1}
+@keyframes flow{from{-webkit-mask-position:0 50%;mask-position:0 50%}to{-webkit-mask-position:7px 50%;mask-position:7px 50%}}
 .cchip b,.cchip span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* hover кнопок — градієнтна рамка; основні кнопки — градієнтна заливка */
@@ -584,3 +591,9 @@ button.icon:not(:disabled):hover{color:var(--text)}
 /* товстіша рамка в усіх кнопках (2px); вкладки лишаються без рамки */
 button,.winbtn,.cchip,.mbtn:disabled{border-width:2px}
 .tab,.mode-tab,.mbtn:not(:disabled){border-width:0}
+/* рамка таблиці — для індикатора завантаження при нових замовленнях */
+.tableframe{flex:1;min-height:0;display:flex;flex-direction:column;border-radius:var(--r,12px)}
+.tableframe>.tablewrap{flex:1}
+/* «Завершити» — під «Старт» і «Пауза», на всю ширину */
+.tctl{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
+#stopBtn{grid-column:1 / -1}

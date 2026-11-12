@@ -669,6 +669,11 @@ async function holdDone(){
   setLevel(btn, 1); btn.classList.remove("pressed","near"); btn.classList.add("full");
   await new Promise(r => setTimeout(r, 380)); // «вистрибнула» і спалахнула
   const action = btn.dataset.hold;
+  if(action === "newauction"){
+    holding = null;
+    try{ setState(await call("AuctionNew")); toast("Почато новий аукціон"); } catch(e){} finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); }, 500); }
+    return;
+  }
   if(action === "logout"){ holding = null; call("Logout"); return; }
   if(action === "dellot"){ // видалити лот
     holding = null;
@@ -1252,6 +1257,7 @@ function placeWins(){
 document.querySelectorAll("[data-swap]").forEach(b => b.onclick = () => {
   if(wAnim) return; // під час оберту колесо не мінімізується
   const wins = [$("auListWin"), $("auWheelWin")], before = wins.map(w => w.getBoundingClientRect());
+  const feed = document.querySelector(".aufeedcard"), fb = feed.getBoundingClientRect(); // стрічка «Ставки» під верхнім вікном
   auSwapped = !auSwapped; try{ localStorage.setItem("phillbot-auswap", auSwapped ? "1" : "0"); }catch(e){}
   placeWins(); renderAuList(); wheelDraw(); renderSpinBtn();
   wins.forEach((w, i) => {
@@ -1261,6 +1267,9 @@ document.querySelectorAll("[data-swap]").forEach(b => b.onclick = () => {
     const inner = w.querySelector(".aulist, .wheelbox");
     if(inner) inner.animate([{opacity: .3}, {opacity: 1}], {duration: 180, easing: "ease-out"}); // коротке згасання вмісту, без паузи
   });
+  // «Ставки» плавно переповзають на нове місце (верхнє вікно в колонці змінило висоту), а не стрибають
+  const fa = feed.getBoundingClientRect(), dy = fb.top - fa.top;
+  if(Math.abs(dy) > 1) feed.animate([{transform: `translateY(${dy}px)`}, {transform: "none"}], {duration: 560, easing: "cubic-bezier(.2,.9,.25,1)"});
 });
 placeWins();
 
@@ -1375,11 +1384,8 @@ $("auPause").onclick = async () => setState(await call("AuctionPause"));
 $("auStop").onclick = async () => { setState(await call("AuctionFinish")); toast("Прийом ставок завершено — можна крутити колесо"); };
 $("auPlus").onclick = async () => setState(await call("AuctionAddTime", 60000));
 $("auMinus").onclick = async () => setState(await call("AuctionAddTime", -60000));
-$("auNew").onclick = async () => {
-  const t = AU().timer.status;
-  if(!(await confirmBox((t === "running" || t === "paused" ? "Прийом ставок ще йде.\n\n" : "") + "Почати новий аукціон? Поточні лоти й ставки буде збережено в історію.", "Новий аукціон"))) return;
-  setState(await call("AuctionNew")); toast("Почато новий аукціон");
-};
+// «Новий аукціон» — затисканням з червоною «фарбою» (поточний аукціон зберігається в історію)
+$("auNew").insertAdjacentHTML("afterbegin", LIQUID_RED);
 
 function renderAuction(){
   const au = AU();

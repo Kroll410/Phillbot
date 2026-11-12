@@ -906,3 +906,6 @@ tr[draggable="true"] input{cursor:text}
 .auside .wheelbox{height:340px;flex-basis:340px}
 /* кнопки, які треба затискати (Переможець, Крутити, Скинути колесо, Завершити гру, Вийти, кошик): без ободка взагалі */
 .winbtn,.winbtn:hover,.winbtn:not(:disabled):hover,.winbtn.pressed,.winbtn.full,.winbtn.near,.winbtn.drain{border-color:transparent!important}
+
+/* «Новий аукціон» у верхній смузі — затисканням */
+.winbtn.newaubtn{min-width:0;height:32px;padding:0 14px;border-radius:8px;font-size:13px}

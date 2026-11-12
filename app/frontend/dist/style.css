@@ -308,3 +308,7 @@ header > #generalBtn{width:38px;height:38px;border-radius:10px;background:var(--
 .rgrid .rtitle{font-weight:600;font-size:13px;letter-spacing:0}
 .rgrid .rcost{font-weight:600;font-size:12.5px}
 .settings h3.twitchfont{text-transform:none;letter-spacing:0;font-size:15px;font-weight:700;color:var(--text)}
+/* ліва колонка: місце під смугу прокрутки зарезервоване — розгортання OBS не зсуває таймер */
+aside{min-width:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;padding-right:4px}
+details.fold{min-width:0;overflow:hidden}
+.obsrow,.obsrow>span{min-width:0}

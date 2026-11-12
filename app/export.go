@@ -4,6 +4,7 @@ package main
 
 import (
 	"errors"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,7 +12,6 @@ import (
 	"runtime"
 	"strings"
 	"time"
-	"unicode/utf16"
 )
 
 const marblesAppID = "1170970"
@@ -24,45 +24,55 @@ type MarblesResult struct {
 	Launched       bool   `json:"launched"`
 }
 
-func encodeLines(lines []string, enc string) []byte {
+const marbleNameMax = 15 // довші назви обрізаються і закінчуються на "..."
+
+// Файл для Marbles — завжди UTF-8 з BOM (кирилиця).
+func encodeLines(lines []string) []byte {
 	text := strings.Join(lines, "\r\n") + "\r\n"
-	if enc == "utf16" {
-		u := utf16.Encode([]rune(text))
-		data := make([]byte, 0, 2+len(u)*2)
-		data = append(data, 0xFF, 0xFE)
-		for _, c := range u {
-			data = append(data, byte(c), byte(c>>8))
-		}
-		return data
-	}
 	return append([]byte{0xEF, 0xBB, 0xBF}, []byte(text)...)
 }
 
-func cleanMarbleName(s string, max int) string {
+// Назва кулі = назва замовлення: без , ; " і переносів, максимум 15 символів, далі "...".
+func marbleName(s string) string {
 	s = strings.NewReplacer(",", " ", ";", " ", "\"", " ", "\t", " ", "\r", " ", "\n", " ").Replace(s)
 	s = strings.Join(strings.Fields(s), " ")
 	r := []rune(s)
-	if len(r) > max {
-		r = r[:max]
+	if len(r) > marbleNameMax {
+		return strings.TrimSpace(string(r[:marbleNameMax])) + "..."
 	}
-	return strings.TrimSpace(string(r))
+	return s
+}
+
+// Кожен бал = одна куля; сумарно не більше Settings.Cap (пропорційне зменшення, мін. 1 на замовлення). Перемішано.
+func marbleLines(s Settings, entries []Entry) []string {
+	groups := aggregate(s, entries)
+	var gs []Group
+	for _, g := range groups {
+		if g.Points > 0 && marbleName(g.Name) != "" {
+			gs = append(gs, g)
+		}
+	}
+	counts, _, _ := marbleCounts(gs, s.Cap)
+	var lines []string
+	for i, g := range gs {
+		n := marbleName(g.Name)
+		for k := 0; k < counts[i] && len(lines) < s.Cap; k++ {
+			lines = append(lines, n)
+		}
+	}
+	rand.Shuffle(len(lines), func(i, j int) { lines[i], lines[j] = lines[j], lines[i] })
+	return lines
+}
+
+func (a *App) MarbleLines() []string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return marbleLines(a.st.Settings, a.st.Entries)
 }
 
 // Записує subday_marbles.csv (+ копію з датою), кладе шлях у буфер обміну і запускає гру через Steam.
-// Список куль формує інтерфейс (та сама логіка, що й у таблиці).
-func (a *App) ExportMarbles(lines []string, launch bool) (MarblesResult, error) {
-	a.mu.Lock()
-	enc, max := a.st.Settings.Encoding, a.st.Settings.NameMax
-	a.mu.Unlock()
-	var clean []string
-	for _, l := range lines {
-		if n := cleanMarbleName(l, max+12); n != "" {
-			clean = append(clean, n)
-		}
-		if len(clean) >= 1000 {
-			break
-		}
-	}
+func (a *App) ExportMarbles(launch bool) (MarblesResult, error) {
+	clean := a.MarbleLines()
 	if len(clean) == 0 {
 		return MarblesResult{}, errors.New("немає замовлень з балами > 0")
 	}
@@ -70,7 +80,7 @@ func (a *App) ExportMarbles(lines []string, launch bool) (MarblesResult, error) 
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return MarblesResult{}, err
 	}
-	data := encodeLines(clean, enc)
+	data := encodeLines(clean)
 	p := filepath.Join(dir, "subday_marbles.csv")
 	if err := os.WriteFile(p, data, 0644); err != nil {
 		return MarblesResult{}, errors.New("не вдалося записати файл (" + err.Error() + ") — можливо, він відкритий в іншій програмі")

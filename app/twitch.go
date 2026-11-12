@@ -411,24 +411,24 @@ func (a *App) runSession(ctx context.Context, u string, subscribe bool, bc User)
 			default:
 				a.setConn("on", "Слухаю канал "+bc.DisplayName)
 			}
+			if err2 == nil { // видалення повідомлень / очищення чату (той самий скоуп user:read:chat)
+				for _, t := range []string{"channel.chat.message_delete", "channel.chat.clear_user_messages", "channel.chat.clear"} {
+					if err := a.helix("POST", "eventsub/subscriptions", map[string]any{"type": t, "version": "1",
+						"condition": map[string]string{"broadcaster_user_id": bc.ID, "user_id": bc.ID}, "transport": transport}, nil); err != nil {
+						a.logf("Підписка %s: %v", t, err)
+					}
+				}
+			}
 		case "session_keepalive":
 		case "session_reconnect":
 			return m.Payload.Session.ReconnectURL, nil
 		case "revocation":
 			a.logf("Twitch відкликав підписку: %s", m.Payload.Subscription.Status)
 		case "notification":
+			if a.handleChatNotification(m.Metadata.SubscriptionType, m.Payload.Event) {
+				continue
+			}
 			switch m.Metadata.SubscriptionType {
-			case "channel.chat.message":
-				var ev struct {
-					ChatterUserID string  `json:"chatter_user_id"`
-					Badges        []Badge `json:"badges"`
-				}
-				if json.Unmarshal(m.Payload.Event, &ev) == nil {
-					t, mo := subFromBadges(ev.Badges)
-					a.badgeMu.Lock()
-					a.badgeCache[ev.ChatterUserID] = subInfo{tier: t, months: mo, ts: time.Now()}
-					a.badgeMu.Unlock()
-				}
 			case "channel.channel_points_custom_reward_redemption.add":
 				var ev Redemption
 				if json.Unmarshal(m.Payload.Event, &ev) == nil {
@@ -465,11 +465,14 @@ func (a *App) listen(ctx context.Context, bc User) {
 }
 
 // Визначає тір (Helix — точно) і місяці (бейдж з повідомлення чату, що приходить разом з redeem-ом).
-func (a *App) lookupSub(bcID, userID string) (tier, months int, source string) {
+func (a *App) lookupSub(bcID, userID, rewardID string) (tier, months int, source string) {
 	var chat *subInfo
 	for i := 0; i < 8; i++ {
 		a.badgeMu.Lock()
-		c, ok := a.badgeCache[userID]
+		c, ok := a.badgeCache[userID+"|"+rewardID] // повідомлення, точно прив'язане до цієї нагороди
+		if !ok || time.Since(c.ts) >= 15*time.Second {
+			c, ok = a.badgeCache[userID]
+		}
 		a.badgeMu.Unlock()
 		if ok && time.Since(c.ts) < 15*time.Second {
 			chat = &c

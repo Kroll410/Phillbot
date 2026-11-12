@@ -20,10 +20,8 @@ type Settings struct {
 	NonSubPoints int            `json:"nonSubPoints"`
 	Mult         map[string]int `json:"mult"`
 	DupMode      string         `json:"dupMode"` // last | first | all
-	Cap          int            `json:"cap"`
-	NameMax      int            `json:"nameMax"`
-	NameFormat   string         `json:"nameFormat"` // order | orderPts
-	Encoding     string         `json:"encoding"`   // utf8 | utf16
+	Cap          int            `json:"cap"`     // куль сумарно у файлі для Marbles (≤ 1000)
+	ObsPort      int            `json:"obsPort"` // локальний сервер для OBS (127.0.0.1)
 }
 
 type Timer struct {
@@ -68,7 +66,7 @@ type State struct {
 
 func defaultSettings() Settings {
 	return Settings{DurationMin: 10, NonSubPoints: 0, Mult: map[string]int{"1": 1, "2": 2, "3": 3},
-		DupMode: "last", Cap: 1000, NameMax: 30, NameFormat: "order", Encoding: "utf8"}
+		DupMode: "last", Cap: 1000, ObsPort: defaultObsPort}
 }
 
 func defaultState() State {
@@ -102,14 +100,8 @@ func (s *Settings) normalize() {
 	if s.Cap < 1 || s.Cap > 1000 {
 		s.Cap = 1000
 	}
-	if s.NameMax < 5 || s.NameMax > 100 {
-		s.NameMax = d.NameMax
-	}
-	if s.NameFormat != "orderPts" {
-		s.NameFormat = "order"
-	}
-	if s.Encoding != "utf16" {
-		s.Encoding = "utf8"
+	if s.ObsPort < 1024 || s.ObsPort > 65000 {
+		s.ObsPort = defaultObsPort
 	}
 }
 

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<!-- Алерт нового замовлення. Параметри: ?duration=8&scale=1&theme=box|shadow|plain&align=center -->
+<html lang="uk"><head><meta charset="utf-8"><title>СабДей — нове замовлення</title>
+<link rel="stylesheet" href="overlay.css">
+<style>
+  #w{display:inline-block;max-width:100%;opacity:0;transform:translateY(20px);transition:opacity .4s,transform .4s}
+  #w.show{opacity:1;transform:none}
+  .who{font-size:calc(22px * var(--scale));color:var(--muted)}
+  .who b{color:var(--accent)}
+  .what{font-size:calc(34px * var(--scale));margin:calc(2px * var(--scale)) 0;overflow-wrap:anywhere}
+  .pts{font-size:calc(20px * var(--scale));color:var(--ok)}
+</style></head>
+<body class="theme-box align-center">
+<div id="w" class="box"><div class="who"><b id="u"></b> замовляє</div><div class="what" id="t"></div><div class="pts" id="p"></div></div>
+<script src="overlay.js"></script>
+<script>
+(() => {
+  const dur = Math.max(2, OV.num("duration", 8)) * 1000, queue = [];
+  let busy = false;
+  function next() {
+    if (busy || !queue.length) return;
+    busy = true;
+    const o = queue.shift(), w = document.getElementById("w");
+    document.getElementById("u").textContent = o.user;
+    document.getElementById("t").textContent = "«" + o.text + "»";
+    document.getElementById("p").textContent = "+" + o.points + " балів" + (o.tier ? ` · T${o.tier}, ${o.months} міс.` : " · не підписник");
+    w.classList.add("show");
+    setTimeout(() => { w.classList.remove("show"); setTimeout(() => { busy = false; next(); }, 500); }, dur);
+  }
+  OV.connect({ redeem: d => { if (d && d.order) { queue.push(d.order); next(); } } });
+})();
+</script>
+</body></html>

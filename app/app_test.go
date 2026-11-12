@@ -110,16 +110,65 @@ func TestManualAndArchive(t *testing.T) {
 	}
 }
 
+func TestMarbleName(t *testing.T) {
+	cases := map[string]string{
+		"Dark Souls":  "Dark Souls",
+		"Ой, \"так\"": "Ой так",
+		"Дуже довга назва замовлення тут": "Дуже довга назв...",
+		"  a\tb  ": "a b",
+	}
+	for in, want := range cases {
+		if got := marbleName(in); got != want {
+			t.Errorf("%q -> %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestAggregateAndMarbles(t *testing.T) {
+	s := defaultSettings()
+	es := []Entry{
+		{ID: "1", Ts: 1, UserID: "u1", User: "Phill", Tier: 3, Months: 46, Text: "Dark Souls"},
+		{ID: "2", Ts: 2, UserID: "u2", User: "kroll", Tier: 1, Months: 20, Text: "dark  souls!"},
+		{ID: "3", Ts: 3, UserID: "u3", User: "x", Tier: 1, Months: 5, Text: "Elden Ring"},
+		{ID: "4", Ts: 4, UserID: "u3", User: "x", Tier: 1, Months: 6, Text: "Hades"}, // замінює Elden Ring
+		{ID: "5", Ts: 5, UserID: "u4", User: "y", Tier: 0, Text: "Minecraft"},
+	}
+	g := aggregate(s, es)
+	if len(g) != 3 || g[0].Name != "Dark Souls" || g[0].Points != 158 || g[1].Name != "Hades" || g[1].Points != 6 || g[2].Points != 0 {
+		t.Fatalf("%+v", g)
+	}
+	lines := marbleLines(s, es)
+	if len(lines) != 164 {
+		t.Fatal(len(lines))
+	}
+	s.Cap = 100
+	lines = marbleLines(s, es)
+	cnt := map[string]int{}
+	for _, l := range lines {
+		cnt[l]++
+	}
+	if len(lines) != 100 || cnt["Hades"] < 1 || cnt["Dark Souls"] < 90 {
+		t.Fatal(len(lines), cnt)
+	}
+	s.DupMode = "first"
+	if g := aggregate(s, es); g[1].Name != "Elden Ring" {
+		t.Fatalf("first: %+v", g)
+	}
+}
+
 func TestExport(t *testing.T) {
 	a := newTestApp(t)
-	a.st.Settings.Encoding = "utf16"
-	r, err := a.ExportMarbles([]string{"Ой, \"так\"", "B"}, false)
+	if _, err := a.ExportMarbles(false); err == nil {
+		t.Fatal("empty export accepted")
+	}
+	a.st.Entries = []Entry{{ID: "1", UserID: "u", User: "U", Tier: 1, Months: 2, Text: "Ой, \"так\""}}
+	r, err := a.ExportMarbles(false)
 	if err != nil || r.Lines != 2 {
 		t.Fatal(r, err)
 	}
 	b, _ := os.ReadFile(r.Path)
-	if b[0] != 0xFF || b[1] != 0xFE {
-		t.Fatal("bom")
+	if b[0] != 0xEF || b[1] != 0xBB || b[2] != 0xBF || string(b[3:]) != "Ой так\r\nОй так\r\n" {
+		t.Fatalf("%q", b)
 	}
 	p, err := a.SaveExport("subday_test.csv", "a;b")
 	if err != nil {

@@ -84,9 +84,31 @@ details summary{cursor:pointer;color:var(--muted);font-size:12px;margin-top:8px}
 .modal.show{display:flex}
 .modal .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:440px;width:92%}
 .modal .box p{margin:0 0 16px;white-space:pre-wrap}
-.modal .row{justify-content:flex-end}.modal .row>*{flex:0}
+.modal .row.actions{justify-content:flex-end}.modal .row.actions>*{flex:0 0 auto}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--accent);padding:10px 16px;border-radius:8px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30;max-width:80%}
 #toast.show{opacity:1}
+.modal .box.settings{max-width:480px}
+.settings h2{font-size:16px;margin:0 0 6px}
+.settings h3{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:16px 0 4px}
+.obsrow{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px}
+.obsrow span{flex:1;min-width:0}
+.obsrow code{display:block;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* чат */
+.chatwrap{position:relative;padding:6px 4px}
+#chatList{font-size:13.5px}
+.cmsg{padding:3px 8px;border-radius:5px;line-height:1.4;overflow-wrap:anywhere}
+.cmsg:hover{background:var(--panel2)}
+.cbadge{height:16px;vertical-align:-3px;margin-right:3px}
+.cemote{height:26px;vertical-align:middle;margin:-4px 1px}
+.cname{font-weight:700}
+.cmention{color:#ffd35a}
+.ctime{color:var(--muted);font-size:11px;margin-right:6px}
+.ctag{margin-left:8px;font-size:11px;background:var(--accent);border-radius:4px;padding:0 5px}
+.cmsg.order{background:rgba(145,71,255,.18);border-left:3px solid var(--accent)}
+.cmsg.reward{border-left:3px solid #5fe3dc}
+.cmsg.hl{background:rgba(0,181,173,.15)}
+.cmsg.mention{background:rgba(255,211,90,.12)}
+#chatMore{position:sticky;bottom:8px;left:50%;transform:translateX(-50%);background:var(--accent);border-color:var(--accent);border-radius:16px;font-size:12px}
 .mode-switch{display:flex;gap:4px}
 .mode-switch button{font-size:12px}
 .mode-switch button.active{background:var(--accent);border-color:var(--accent)}

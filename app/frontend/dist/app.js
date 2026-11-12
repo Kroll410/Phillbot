@@ -1,6 +1,7 @@
 (() => {
 "use strict";
-/* Інтерфейс СабДею. Стан живе в Go (subday_state.json); тут — показ, підрахунок балів і таблиці (логіка з ui-draft.html). */
+/* Інтерфейс СабДею. Стан живе в Go (subday_state.json); тут — показ і таблиці.
+   Список куль для Marbles і дані для OBS рахує Go (aggregate.go) — тут лише попередній перегляд. */
 
 const api = () => window.go.main.App;
 let S = null;            // знімок стану з Go
@@ -15,11 +16,11 @@ const fmtTime = ms => { ms = Math.max(0, ms); const t = Math.ceil(ms/1000), m = 
 const fmtClock = ts => new Date(ts).toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
 const norm = t => String(t).toLowerCase().replace(/\s+/g," ").trim().replace(/[.!?,;:…]+$/,"").trim();
 function toast(msg, ms=2600){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),ms); }
-function confirmBox(text){ return new Promise(res=>{ $("modalText").textContent=text; $("modal").classList.add("show");
+function confirmBox(text, yes="Так", no="Скасувати"){ return new Promise(res=>{ $("modalText").textContent=text; $("modalYes").textContent=yes; $("modalNo").textContent=no; $("modal").classList.add("show");
   const done=v=>{ $("modal").classList.remove("show"); $("modalYes").onclick=$("modalNo").onclick=null; res(v); };
   $("modalYes").onclick=()=>done(true); $("modalNo").onclick=()=>done(false); }); }
 async function call(fn, ...args){
-  try{ const r = await api()[fn](...args); return r; }
+  try{ return await api()[fn](...args); }
   catch(e){ toast("Помилка: " + (e && e.message || e), 4000); throw e; }
 }
 function setState(snap){ if(snap && snap.settings) { S = snap; renderAll(); } }
@@ -56,28 +57,19 @@ function aggregate(){
     return {...g, name};
   });
 }
-
-/* ---------- Marbles ---------- */
-function cleanName(s, max){ return String(s).replace(/[,;"\r\n\t]/g," ").replace(/\s+/g," ").trim().slice(0,max).trim(); }
-function marbleLines(){
-  const st = S.settings, cap = Math.min(1000, Math.max(1, Number(st.cap)||1000)), max = Math.max(5, Number(st.nameMax)||30);
-  const groups = aggregate().filter(g=>g.points>0 && cleanName(g.name,max)).sort((a,b)=>b.points-a.points);
+// попередній перегляд кількості куль (сам файл формує Go)
+function marbleInfo(){
+  const cap = Math.min(1000, Math.max(1, Number(S.settings.cap)||1000));
+  const groups = aggregate().filter(g=>g.points>0);
   const total = groups.reduce((a,g)=>a+g.points,0);
-  let counts = groups.map(g=>g.points), scaled = false;
+  let count = total;
   if(total>cap){
-    scaled = true;
-    counts = groups.map(g=>Math.max(1, Math.round(g.points*cap/total)));
+    const counts = groups.map(g=>Math.max(1, Math.round(g.points*cap/total)));
     let sum = counts.reduce((a,b)=>a+b,0);
     while(sum>cap){ const j = counts.indexOf(Math.max(...counts)); if(counts[j]<=1) break; counts[j]--; sum--; }
+    count = Math.min(sum, cap);
   }
-  const list = [];
-  groups.forEach((g,i)=>{ const c = counts[i]||0;
-    let name = cleanName(g.name, max);
-    if(st.nameFormat==="orderPts") name = cleanName(g.name, Math.max(3,max-(String(g.points).length+3))) + ` (${g.points})`;
-    for(let k=0;k<c && list.length<cap;k++) list.push(name);
-  });
-  for(let i=list.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [list[i],list[j]]=[list[j],list[i]]; }
-  return {list, total, scaled, groups:groups.length};
+  return {count, total, scaled: total>cap, groups: groups.length};
 }
 
 /* ---------- auth / header ---------- */
@@ -137,6 +129,35 @@ function renderRewards(){
     : `<div class="hint">Погашень ще не було.</div>`;
 }
 
+/* ---------- OBS ---------- */
+const OVERLAYS = [
+  ["Таймер збору", "/overlay/timer", "600×220"],
+  ["Топ замовлень", "/overlay/top", "520×420"],
+  ["Кулі / бали", "/overlay/marbles", "620×80"],
+  ["Алерт замовлення", "/overlay/last", "800×180"],
+  ["Чат", "/overlay/chat", "420×700"],
+];
+let obsKey = "";
+function renderObs(){
+  const o = S.obs || {};
+  const key = JSON.stringify(o);
+  if(key === obsKey) return; obsKey = key;
+  if(!o.running){
+    $("obsStatus").innerHTML = `<span class="err">${esc(o.error || "Сервер для OBS не запущено.")}</span> Змініть порт у ⚙ Налаштуваннях.`;
+    $("obsList").innerHTML = ""; $("chatWindowBtn").disabled = true; return;
+  }
+  $("chatWindowBtn").disabled = false;
+  $("obsStatus").textContent = "Браузерні джерела для OBS (розмір — підказка):";
+  $("obsList").innerHTML = OVERLAYS.map(([name, p, size])=>`<div class="obsrow"><span><b>${esc(name)}</b> <span class="muted">${size}</span><code>${esc(o.url + p)}</code></span>
+    <button class="small" data-copy="${esc(o.url + p)}">Копіювати</button><button class="small" data-open="${esc(p)}" title="Відкрити в браузері">↗</button></div>`).join("")
+    + `<div class="obsrow"><span class="muted">Усі параметри й розміри</span><button class="small" data-open="/overlay/index">Усі оверлеї ↗</button></div>`;
+}
+$("obsList").addEventListener("click", async e => {
+  const c = e.target.closest("[data-copy]"), o = e.target.closest("[data-open]");
+  if(c){ const ok = await call("CopyText", c.dataset.copy); toast(ok ? "URL скопійовано — вставте в OBS → Браузер" : "Не вдалося скопіювати"); }
+  if(o) call("OpenOverlay", o.dataset.open);
+});
+
 /* ---------- статистика і таблиці ---------- */
 function renderStats(){
   const counted = countedSet(), groups = aggregate();
@@ -145,8 +166,8 @@ function renderStats(){
   $("sUsers").textContent = new Set(cEntries.map(e=>(e.userId||e.login).toLowerCase())).size;
   $("sUnique").textContent = groups.length;
   $("sPoints").textContent = groups.reduce((a,g)=>a+g.points,0);
-  const l = marbleLines();
-  $("marblePreview").textContent = l.total ? `${l.list.length} куль із ${l.groups} замовлень` + (l.scaled ? ` (зменшено пропорційно з ${l.total} балів)` : "") : "Немає замовлень із балами > 0";
+  const m = marbleInfo();
+  $("marblePreview").textContent = m.total ? `${m.count} куль із ${m.groups} замовлень` + (m.scaled ? ` (зменшено пропорційно з ${m.total} балів)` : "") : "Немає замовлень із балами > 0";
 }
 
 function sortRows(rows, [k,dir]){ return rows.sort((a,b)=>{ const x=a[k], y=b[k]; return (typeof x==="string" ? x.localeCompare(y,"uk") : (x-y))*dir; }); }
@@ -154,6 +175,11 @@ function th(label, key, cls=""){ const [k,d]=sortKey[tab]; return `<th class="${
 
 function renderTable(){
   const wrap = $("tableWrap");
+  const isChat = tab==="chat";
+  wrap.classList.toggle("hidden", isChat); $("chatWrap").classList.toggle("hidden", !isChat);
+  $("chatWindowBtn").classList.toggle("hidden", !isChat); $("search").classList.toggle("hidden", isChat || tab==="log");
+  $("tableHint").classList.toggle("hidden", tab!=="summary" && tab!=="entries");
+  if(isChat) return;
   // не перемальовувати, поки користувач редагує клітинку
   if(wrap.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)){ tableDirty = true; return; }
   tableDirty = false;
@@ -191,34 +217,65 @@ function renderTable(){
   }
 }
 
-function initInputs(){
-  const st = S.settings;
-  $("duration").value = st.durationMin;
-  $("m1").value = st.mult["1"]; $("m2").value = st.mult["2"]; $("m3").value = st.mult["3"];
-  $("nonSub").value = st.nonSubPoints; $("dupMode").value = st.dupMode;
-  $("cap").value = st.cap; $("nameMax").value = st.nameMax; $("nameFormat").value = st.nameFormat; $("encoding").value = st.encoding;
-  $("rewardIdInput").value = st.rewardId;
+/* ---------- чат ---------- */
+const CHAT_MAX = 300;
+let chatPending = [], chatStick = true, chatLoaded = false;
+const chatWrap = $("chatWrap"), chatList = $("chatList");
+chatWrap.addEventListener("scroll", () => {
+  chatStick = chatWrap.scrollTop + chatWrap.clientHeight >= chatWrap.scrollHeight - 30;
+  if(chatStick) $("chatMore").classList.add("hidden");
+});
+$("chatMore").onclick = () => { chatWrap.scrollTop = chatWrap.scrollHeight; $("chatMore").classList.add("hidden"); };
+function chatFlush(){
+  if(!chatPending.length) return;
+  const nodes = chatPending.splice(0).map(m => ChatRender.render(m, {time:true}));
+  chatList.append(...nodes);
+  while(chatList.children.length > CHAT_MAX) chatList.firstChild.remove();
+  if(chatStick) chatWrap.scrollTop = chatWrap.scrollHeight; else $("chatMore").classList.remove("hidden");
 }
+setInterval(chatFlush, 150);
+function chatDelete(d){
+  if(d.all){ chatList.replaceChildren(); chatPending = []; return; }
+  const ids = new Set(d.ids || []);
+  for(const n of [...chatList.children]) if(ids.has(n.dataset.id) || (d.userId && n.dataset.user === d.userId)) n.remove();
+  chatPending = chatPending.filter(m => !ids.has(m.id) && m.userId !== d.userId);
+}
+$("chatWindowBtn").onclick = () => call("OpenChatWindow");
+
+/* ---------- налаштування ---------- */
+function fillSettings(){
+  const st = S.settings;
+  $("m1").value = st.mult["1"]; $("m2").value = st.mult["2"]; $("m3").value = st.mult["3"];
+  $("nonSub").value = st.nonSubPoints; $("dupMode").value = st.dupMode; $("obsPort").value = st.obsPort;
+}
+function initInputs(){
+  $("duration").value = S.settings.durationMin;
+  $("cap").value = S.settings.cap;
+}
+const n = (id, d) => { const v = Number($(id).value); return Number.isFinite(v) && $(id).value !== "" ? v : d; };
+async function saveSettings(patch){ setState(await call("SaveSettings", {...S.settings, ...patch})); }
+
+$("settingsBtn").onclick = () => { fillSettings(); $("settingsModal").classList.add("show"); };
+$("settingsCancel").onclick = () => $("settingsModal").classList.remove("show");
+$("settingsReset").onclick = () => { $("m1").value = 1; $("m2").value = 2; $("m3").value = 3; $("nonSub").value = 0; $("dupMode").value = "last"; };
+$("settingsSave").onclick = async () => {
+  await saveSettings({
+    mult: {"1": Math.max(0,n("m1",1)), "2": Math.max(0,n("m2",2)), "3": Math.max(0,n("m3",3))},
+    nonSubPoints: Math.max(0, n("nonSub",0)), dupMode: $("dupMode").value, obsPort: Math.round(n("obsPort",17841)) });
+  $("settingsModal").classList.remove("show"); obsKey = ""; renderObs(); toast("Налаштування збережено");
+};
+$("duration").addEventListener("change", async () => { await saveSettings({durationMin: Math.max(1, Math.round(n("duration",10)))}); initInputs(); });
+$("cap").addEventListener("change", async () => { await saveSettings({cap: Math.min(1000, Math.max(1, Math.round(n("cap",1000))))}); initInputs(); });
 
 function renderAll(){
   if(!inited){ initInputs(); inited = true; }
   renderAuth();
-  if(S.auth && S.auth.status==="ok"){ renderStats(); renderTable(); renderRewards(); }
+  if(S.auth && S.auth.status==="ok"){
+    renderStats(); renderTable(); renderRewards(); renderObs();
+    if(!chatLoaded){ chatLoaded = true; api().GetChat().then(m => { chatPending = (m||[]).concat(chatPending); }); }
+  }
   renderTimer();
 }
-
-/* ---------- налаштування ---------- */
-function readSettings(){
-  const n = (id, d) => { const v = Number($(id).value); return Number.isFinite(v) ? v : d; };
-  return { ...S.settings,
-    durationMin: Math.max(1, Math.round(n("duration",10))),
-    mult: {"1": Math.max(0,n("m1",1)), "2": Math.max(0,n("m2",2)), "3": Math.max(0,n("m3",3))},
-    nonSubPoints: Math.max(0, n("nonSub",0)), dupMode: $("dupMode").value,
-    cap: Math.min(1000, Math.max(1, Math.round(n("cap",1000)))), nameMax: Math.min(100, Math.max(5, Math.round(n("nameMax",30)))),
-    nameFormat: $("nameFormat").value, encoding: $("encoding").value };
-}
-for(const id of ["duration","m1","m2","m3","nonSub","dupMode","cap","nameMax","nameFormat","encoding"])
-  $(id).addEventListener("change", async () => { setState(await call("SaveSettings", readSettings())); initInputs(); });
 
 /* ---------- події ---------- */
 document.addEventListener("click", e => {
@@ -251,7 +308,10 @@ $("rewardRefresh").onclick = async () => { await call("RefreshRewards"); toast("
 $("seenRewards").onclick = async e => { const b = e.target.closest("button[data-bind]"); if(!b) return; setState(await call("SelectReward", b.dataset.bind, b.dataset.title)); toast("Нагороду вибрано"); };
 $("rewardIdSave").onclick = async () => { const id = $("rewardIdInput").value.trim(); setState(await call("SelectReward", id, "")); toast(id?"ID збережено":"ID очищено"); };
 
-document.querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.tab; document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b)); renderTable(); });
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
+  tab = b.dataset.tab; document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b)); renderTable();
+  if(tab==="chat"){ chatStick = true; chatWrap.scrollTop = chatWrap.scrollHeight; }
+});
 $("search").oninput = renderTable;
 
 $("tableWrap").addEventListener("click", async e => {
@@ -276,21 +336,18 @@ $("tableWrap").addEventListener("focusout", () => setTimeout(()=>{ if(tableDirty
 
 /* ---------- експорт ---------- */
 const stamp = () => { const d=new Date(), p=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`; };
-const csvCell = v => { const s = String(v ?? ""); return /[",\n;]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
 
 $("exportMarbles").onclick = async () => {
-  const {list} = marbleLines(); if(!list.length) return toast("Немає замовлень з балами > 0");
-  const r = await call("ExportMarbles", list, true);
+  if(!marbleInfo().total) return toast("Немає замовлень з балами > 0");
+  const r = await call("ExportMarbles", true);
   let msg = `Файл для Marbles: ${r.lines} куль\n${r.path}\n\n`;
   msg += r.copied ? "✓ Шлях скопійовано в буфер обміну.\n" : "";
   msg += r.alreadyRunning ? "Marbles on Stream уже запущено.\n" : r.launched ? "Запускаю Marbles on Stream через Steam…\n" : "";
   msg += "\nУ грі: Race → Simulate → ⚙ Settings → Simulation Settings → Use Custom Names → Add Names → Open → Ctrl+V → Enter.";
-  $("modalNo").textContent = "Закрити"; $("modalYes").textContent = "Показати файл";
-  const ok = await confirmBox(msg);
-  $("modalNo").textContent = "Скасувати"; $("modalYes").textContent = "Так";
-  if(ok) call("RevealFile", r.path);
+  if(await confirmBox(msg, "Показати файл", "Закрити")) call("RevealFile", r.path);
 };
-$("copyMarbles").onclick = async () => { const {list} = marbleLines(); if(!list.length) return toast("Немає що копіювати");
+$("copyMarbles").onclick = async () => {
+  const list = await call("MarbleLines"); if(!list || !list.length) return toast("Немає що копіювати");
   const ok = await call("CopyText", list.join("\r\n")); toast(ok ? `Скопійовано ${list.length} рядків` : "Не вдалося скопіювати"); };
 $("openMarbles").onclick = () => call("OpenFolder", "marbles");
 $("openExports").onclick = () => call("OpenFolder", "exports");
@@ -329,7 +386,9 @@ $("mAdd").onclick = async () => {
 function boot(){
   if(!window.go || !window.runtime){ setTimeout(boot, 50); return; }
   window.runtime.EventsOn("state", snap => setState(snap));
-  window.runtime.EventsOn("redeem", id => { freshIds.add(id); setTimeout(()=>freshIds.delete(id), 3000); });
+  window.runtime.EventsOn("redeem", d => { const id = d && d.id; if(!id) return; freshIds.add(id); setTimeout(()=>freshIds.delete(id), 3000); });
+  window.runtime.EventsOn("chat", m => chatPending.push(m));
+  window.runtime.EventsOn("chatdel", chatDelete);
   api().GetState().then(setState);
 }
 boot();

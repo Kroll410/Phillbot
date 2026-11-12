@@ -18,8 +18,37 @@
     <span class="dot" id="connDot"></span>
     <span id="connText" class="muted">Не підключено</span>
     <span id="userBox"></span>
+    <button id="settingsBtn" class="small" title="Налаштування">⚙ Налаштування</button>
   </div>
 </header>
+
+<!-- налаштування (окреме вікно) -->
+<div class="modal" id="settingsModal"><div class="box settings">
+  <h2>Налаштування</h2>
+  <h3>Правила балів</h3>
+  <div class="row">
+    <div><label>Тір 1 ×</label><input type="number" id="m1" min="0" step="1"></div>
+    <div><label>Тір 2 ×</label><input type="number" id="m2" min="0" step="1"></div>
+    <div><label>Тір 3 ×</label><input type="number" id="m3" min="0" step="1"></div>
+  </div>
+  <label>Бали для не-підписника</label>
+  <input type="number" id="nonSub" min="0" step="1">
+  <label>Кілька замовлень від однієї людини</label>
+  <select id="dupMode">
+    <option value="last">Рахується лише останнє</option>
+    <option value="first">Рахується лише перше</option>
+    <option value="all">Рахуються всі</option>
+  </select>
+  <div class="hint">Бали = множник тіра × місяці підписки. Тір — з Twitch API, місяці — з бейджа в чаті.</div>
+  <h3>OBS</h3>
+  <label>Порт локального сервера (127.0.0.1)</label>
+  <input type="number" id="obsPort" min="1024" max="65000" step="1">
+  <div class="row actions" style="margin-top:16px">
+    <button id="settingsReset" style="margin-right:auto">Скинути правила</button>
+    <button id="settingsCancel">Скасувати</button>
+    <button id="settingsSave" class="primary">Зберегти</button>
+  </div>
+</div></div>
 
 <!-- екран входу -->
 <div id="authScreen" class="auth hidden">
@@ -89,36 +118,11 @@
     </div>
 
     <div class="card">
-      <h2>Правила балів</h2>
-      <div class="row">
-        <div><label>Тір 1 ×</label><input type="number" id="m1" min="0" step="1"></div>
-        <div><label>Тір 2 ×</label><input type="number" id="m2" min="0" step="1"></div>
-        <div><label>Тір 3 ×</label><input type="number" id="m3" min="0" step="1"></div>
-      </div>
-      <label>Бали для не-підписника</label>
-      <input type="number" id="nonSub" min="0" step="1">
-      <label>Кілька замовлень від однієї людини</label>
-      <select id="dupMode">
-        <option value="last">Рахується лише останнє</option>
-        <option value="first">Рахується лише перше</option>
-        <option value="all">Рахуються всі</option>
-      </select>
-      <div class="hint">Бали = множник тіра × місяці підписки. Тір — з Twitch API, місяці — з бейджа в чаті; можна виправити в таблиці.</div>
-    </div>
-
-    <div class="card">
       <h2>Marbles on Stream</h2>
-      <div class="row">
-        <div><label>Макс. куль</label><input type="number" id="cap" min="1" max="1000" step="1"></div>
-        <div><label>Макс. довжина назви</label><input type="number" id="nameMax" min="5" max="100" step="1"></div>
-      </div>
-      <div class="row">
-        <div><label>Назва кулі</label>
-          <select id="nameFormat"><option value="order">Назва замовлення</option><option value="orderPts">Назва + бали</option></select></div>
-        <div><label>Кодування файлу</label>
-          <select id="encoding"><option value="utf8">UTF-8</option><option value="utf16">UTF-16</option></select></div>
-      </div>
+      <label>Куль сумарно (до 1000)</label>
+      <input type="number" id="cap" min="1" max="1000" step="1">
       <div class="hint" id="marblePreview">—</div>
+      <div class="hint">Кожен бал = одна куля з назвою замовлення (до 15 символів, далі «...»). Якщо балів більше — кулі розподіляються пропорційно.</div>
       <div class="btns" style="margin-top:10px">
         <button class="primary wide" id="exportMarbles">🎱 Експорт у Marbles</button>
         <button id="copyMarbles">Копіювати список</button>
@@ -126,7 +130,17 @@
       </div>
       <details>
         <summary>Як завантажити в гру</summary>
-        <div class="hint">Шлях до файлу вже в буфері обміну. У грі: Race → Simulate → ⚙ Settings (праворуч унизу) → Simulation Settings → увімкнути <b>Use Custom Names</b> → <b>Add Names</b> → <b>Open</b> → <b>Ctrl+V</b> у полі «Ім'я файлу» → Enter. Потім Bots-гонка на стільки куль, скільки рядків. Якщо кирилиця — кракозябри, виберіть UTF-16 і експортуйте ще раз.</div>
+        <div class="hint">Шлях до файлу вже в буфері обміну. У грі: Race → Simulate → ⚙ Settings (праворуч унизу) → Simulation Settings → увімкнути <b>Use Custom Names</b> → <b>Add Names</b> → <b>Open</b> → <b>Ctrl+V</b> у полі «Ім'я файлу» → Enter. Потім Bots-гонка на стільки куль, скільки рядків.</div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>OBS</h2>
+      <div id="obsStatus" class="hint"></div>
+      <div id="obsList"></div>
+      <details>
+        <summary>Як додати в OBS</summary>
+        <div class="hint">OBS → Джерела → «+» → <b>Браузер</b> → вставити URL і вказати розмір. Фон прозорий. Розмір можна збільшити параметром <code>?scale=1.5</code>, рамку — <code>?theme=box</code>. Усі параметри — кнопка «Усі оверлеї».</div>
       </details>
     </div>
 
@@ -162,17 +176,21 @@
     <div class="tabs">
       <button class="tab active" data-tab="summary">Підсумок за замовленнями</button>
       <button class="tab" data-tab="entries">Усі замовлення</button>
+      <button class="tab" data-tab="chat">Чат</button>
       <button class="tab" data-tab="log">Журнал</button>
+      <button id="chatWindowBtn" class="hidden small">⧉ Чат в окремому вікні</button>
       <input id="search" placeholder="Пошук…">
     </div>
     <div class="tablewrap" id="tableWrap"></div>
-    <div class="hint" style="margin-top:8px">Однакові замовлення (без урахування регістру, зайвих пробілів і розділових знаків у кінці) об'єднуються. Щоб злити варіанти з помилками, виправте текст в «Усі замовлення».</div>
+    <div class="tablewrap chatwrap hidden" id="chatWrap"><div id="chatList"></div><button id="chatMore" class="hidden">↓ Нові повідомлення</button></div>
+    <div class="hint" id="tableHint" style="margin-top:8px">Однакові замовлення (без урахування регістру, зайвих пробілів і розділових знаків у кінці) об'єднуються. Щоб злити варіанти з помилками, виправте текст в «Усі замовлення».</div>
   </section>
 </main>
 
-<div class="modal" id="modal"><div class="box"><p id="modalText"></p><div class="row"><button id="modalNo">Скасувати</button><button id="modalYes" class="primary">Так</button></div></div></div>
+<div class="modal" id="modal"><div class="box"><p id="modalText"></p><div class="row actions"><button id="modalNo">Скасувати</button><button id="modalYes" class="primary">Так</button></div></div></div>
 <div id="toast"></div>
 
+<script src="chatrender.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

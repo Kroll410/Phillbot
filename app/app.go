@@ -30,14 +30,15 @@ type ConnInfo struct {
 // Snapshot — усе, що потрібно інтерфейсу.
 type Snapshot struct {
 	State
-	Auth       AuthInfo `json:"auth"`
-	Conn       ConnInfo `json:"conn"`
-	Rewards    []Reward `json:"rewards"`
-	RewardsErr string   `json:"rewardsErr"`
-	BaseDir    string   `json:"baseDir"`
-	ClientID   string   `json:"clientId"`
-	Now        int64    `json:"now"`
-	Log        []string `json:"log"`
+	Auth       AuthInfo    `json:"auth"`
+	Conn       ConnInfo    `json:"conn"`
+	Rewards    []Reward    `json:"rewards"`
+	RewardsErr string      `json:"rewardsErr"`
+	BaseDir    string      `json:"baseDir"`
+	ClientID   string      `json:"clientId"`
+	Now        int64       `json:"now"`
+	Log        []string    `json:"log"`
+	Obs        OverlayInfo `json:"obs"`
 }
 
 type App struct {
@@ -60,13 +61,20 @@ type App struct {
 
 	badgeMu    sync.Mutex
 	badgeCache map[string]subInfo
+	badgeImgs  map[string]badgeImg
+
+	chatMu sync.Mutex
+	chat   []ChatMsg
+
+	overlay *overlayServer
+	lastOrd *LastOrder
 
 	authCancel   context.CancelFunc
 	listenCancel context.CancelFunc
 }
 
 func NewApp() *App {
-	a := &App{badgeCache: map[string]subInfo{}}
+	a := &App{badgeCache: map[string]subInfo{}, badgeImgs: map[string]badgeImg{}}
 	if exe, err := os.Executable(); err == nil {
 		a.baseDir = filepath.Dir(exe)
 	} else {
@@ -93,12 +101,20 @@ func (a *App) startup(ctx context.Context) {
 		go a.authFlow(false)
 	}
 	go a.ticker(ctx)
+	a.overlay = newOverlayServer(a)
+	a.mu.Lock()
+	port := a.st.Settings.ObsPort
+	a.mu.Unlock()
+	a.overlay.start(port)
 	if low := strings.ToLower(a.baseDir); strings.Contains(low, `\temp\`) || strings.Contains(low, `\tmp\`) {
 		a.logf("⚠ Програму запущено з тимчасової папки (архіву) — налаштування й токени зникнуть. Розпакуйте SubDay.exe у звичайну папку.")
 	}
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	if a.overlay != nil {
+		a.overlay.stop()
+	}
 	a.mu.Lock()
 	a.saveLocked()
 	a.mu.Unlock()
@@ -117,8 +133,22 @@ func (a *App) snapshotLocked() Snapshot {
 	}
 	auth := a.auth
 	auth.User = user
+	var obs OverlayInfo
+	if a.overlay != nil {
+		obs = a.overlay.info()
+	}
 	return Snapshot{State: st, Auth: auth, Conn: a.conn, Rewards: append([]Reward(nil), a.rewards...), RewardsErr: a.rewErr,
-		BaseDir: a.baseDir, ClientID: a.clientID, Now: time.Now().UnixMilli(), Log: append([]string(nil), a.logLines...)}
+		BaseDir: a.baseDir, ClientID: a.clientID, Now: time.Now().UnixMilli(), Log: append([]string(nil), a.logLines...), Obs: obs}
+}
+
+// подія для головного вікна і для оверлеїв OBS
+func (a *App) emitEvent(name string, data any) {
+	if a.ctx != nil {
+		wruntime.EventsEmit(a.ctx, name, data)
+	}
+	if a.overlay != nil {
+		a.overlay.hub.broadcast(name, data)
+	}
 }
 
 func (a *App) saveLocked() {
@@ -131,6 +161,9 @@ func (a *App) saveLocked() {
 func (a *App) emitLocked() {
 	if a.ctx != nil {
 		wruntime.EventsEmit(a.ctx, "state", a.snapshotLocked())
+	}
+	if a.overlay != nil {
+		a.overlay.notify()
 	}
 }
 
@@ -247,6 +280,7 @@ func (a *App) authFlow(forceLogin bool) {
 	a.mu.Unlock()
 	a.logf("Вхід виконано: канал %s", u.DisplayName)
 	go a.listen(lctx, u)
+	go a.loadBadges(u.ID)
 	a.RefreshRewards()
 }
 
@@ -346,7 +380,9 @@ func (a *App) SelectReward(id, title string) Snapshot {
 }
 
 func (a *App) SaveSettings(s Settings) Snapshot {
-	return a.mutate(func(st *State) {
+	var oldPort int
+	snap := a.mutate(func(st *State) {
+		oldPort = st.Settings.ObsPort
 		s.RewardID, s.RewardTitle = st.Settings.RewardID, st.Settings.RewardTitle
 		s.normalize()
 		st.Settings = s
@@ -354,6 +390,15 @@ func (a *App) SaveSettings(s Settings) Snapshot {
 			st.Session.RemainingMs = int64(s.DurationMin) * 60000
 		}
 	})
+	if a.overlay != nil && s.ObsPort != oldPort {
+		a.overlay.stop()
+		a.overlay.start(s.ObsPort)
+		snap = a.GetState()
+		a.mu.Lock()
+		a.emitLocked()
+		a.mu.Unlock()
+	}
+	return snap
 }
 
 // ---------- таймер ----------
@@ -470,16 +515,19 @@ func (a *App) onRedemption(ev Redemption, bc User) {
 	if !accept {
 		return
 	}
-	tier, months, source := a.lookupSub(bc.ID, ev.UserID)
+	tier, months, source := a.lookupSub(bc.ID, ev.UserID, ev.Reward.ID)
 	login := ev.UserLogin
 	if login == "" {
 		login = strings.ToLower(ev.UserName)
 	}
 	e := Entry{ID: newID(), Ts: time.Now().UnixMilli(), User: ev.UserName, Login: login, UserID: ev.UserID,
 		Tier: tier, Months: months, Text: strings.TrimSpace(ev.UserInput), Source: source}
-	if a.ctx != nil {
-		wruntime.EventsEmit(a.ctx, "redeem", e.ID) // підсвітка нового рядка
-	}
+	a.mu.Lock()
+	pts := pointsOf(a.st.Settings, e)
+	a.lastOrd = &LastOrder{User: e.User, Text: e.Text, Points: pts, Tier: tier, Months: months, Ts: e.Ts}
+	lo := *a.lastOrd
+	a.mu.Unlock()
+	a.emitEvent("redeem", map[string]any{"id": e.ID, "order": lo}) // підсвітка рядка + алерт в OBS
 	a.mutate(func(st *State) { st.Entries = append(st.Entries, e) })
 	sub := "не підписник"
 	if tier > 0 {

@@ -12,3 +12,4 @@ app/frontend/wailsjs/
 build/bin/
 node_modules/
 frontend/dist/
+chat-window/

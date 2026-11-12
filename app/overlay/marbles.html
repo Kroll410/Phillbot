@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<!-- Лічильник: кулі / замовлення / бали. Параметри: ?hideEmpty=1&scale=1&theme=shadow|box|plain&align=left -->
+<html lang="uk"><head><meta charset="utf-8"><title>СабДей — кулі</title>
+<link rel="stylesheet" href="overlay.css">
+<style>
+  #w{display:inline-flex;gap:calc(18px * var(--scale));align-items:baseline;white-space:nowrap}
+  b{font-size:calc(34px * var(--scale));font-variant-numeric:tabular-nums;color:var(--text)}
+  span{color:var(--muted)}
+</style></head>
+<body>
+<div id="w" class="box"><div>🎱 <b id="m">0</b> <span>куль</span></div><div><b id="o">0</b> <span>замовлень</span></div><div><b id="p">0</b> <span>балів</span></div></div>
+<script src="overlay.js"></script>
+<script>
+(() => {
+  const hideEmpty = OV.flag("hideEmpty", true);
+  OV.connect({ state: S => {
+    document.getElementById("m").textContent = S.totals.marbles;
+    document.getElementById("o").textContent = S.totals.orders;
+    document.getElementById("p").textContent = S.totals.points;
+    document.getElementById("w").classList.toggle("hidden", hideEmpty && !S.totals.entries);
+  }});
+})();
+</script>
+</body></html>

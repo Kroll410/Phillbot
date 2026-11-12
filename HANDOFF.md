@@ -63,6 +63,15 @@ GitHub: `kroll44`. Мережевий доступ середовища — Trus
 - Код у GitHub: `Kroll410/Phillbot` (main), а не `kroll44/subday-bot`.
 - Наступне — `docs/PLAN-db-obs-chat.md` (БД, OBS, чат).
 
+## Зроблено: OBS + чат + спрощений UI
+- `aggregate.go` — підрахунок балів/груп/куль у Go (як у app.js); файл Marbles тепер формує Go (`MarbleLines`, `ExportMarbles`).
+- `overlay_server.go` + `overlay/*.html` — сервер 127.0.0.1:17841 (Host-check, SSE `/api/events`), оверлеї timer/top/marbles/last/chat.
+- `chat.go` — повні повідомлення чату (бейджі з Helix, емоути, видалення), точний зв'язок redeem↔повідомлення через `channel_points_custom_reward_id`.
+- Спрощення за побажанням: прибрано кодування (завжди UTF-8 BOM), формат назви (завжди назва замовлення), макс. довжину (завжди 15 + «...»);
+  правила балів і порт OBS — у вікні «⚙ Налаштування».
+- CI: гілка `build` — мердж PR у неї збирає exe; тег `v*` — реліз.
+- Не перевірено вживу: чат/оверлеї на справжньому каналі, кирилиця в Marbles.
+
 ## Де що лежить
 - ПК: `C:\dev\SubDay\` — `subday-bot\` (git-репо), `SubDayBot-test.zip`, `subday-source.zip`, `subday-bot-repo.zip`.
   У git увімкнено `core.fileMode false` (Windows-права файлів).

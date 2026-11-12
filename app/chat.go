@@ -118,6 +118,7 @@ func (a *App) onChatMessage(raw json.RawMessage) {
 	}
 	a.chatMu.Unlock()
 	a.emitEvent("chat", msg)
+	a.backfillLook(msg.UserID, msg.Color, msg.Badges)
 }
 
 // видалення: ids — конкретні повідомлення; userID — усі повідомлення людини; all — очищення чату
@@ -200,6 +201,76 @@ func (a *App) loadBadges(bcID string) {
 	a.badgeMu.Unlock()
 	a.mu.Lock()
 	a.emitLocked() // оновити значки в таблиці
+	a.mu.Unlock()
+}
+
+// Замовлення без кольору/бейджів (записані раніше або без повідомлення в чаті) отримують вигляд
+// з першого ж повідомлення цього чатерса.
+func (a *App) backfillLook(userID, color string, badges []ChatBadge) {
+	if userID == "" || (color == "" && len(badges) == 0) {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	changed := false
+	for i := range a.st.Entries {
+		e := &a.st.Entries[i]
+		if e.UserID == userID && len(e.Badges) == 0 && (e.Color == "" || e.Color == color) {
+			if color != "" {
+				e.Color = color
+			}
+			e.Badges = badges
+			changed = true
+		}
+	}
+	if changed {
+		a.saveLocked()
+		a.emitLocked()
+	}
+}
+
+// Колір ніку через Helix (GET /chat/color) для замовлень, де його ще немає.
+func (a *App) fillColors() {
+	a.mu.Lock()
+	var ids []string
+	seen := map[string]bool{}
+	for _, e := range a.st.Entries {
+		if e.Color == "" && e.UserID != "" && !seen[e.UserID] && len(ids) < 100 {
+			seen[e.UserID] = true
+			ids = append(ids, e.UserID)
+		}
+	}
+	a.mu.Unlock()
+	if len(ids) == 0 {
+		return
+	}
+	var d struct {
+		Data []struct {
+			UserID string `json:"user_id"`
+			Color  string `json:"color"`
+		} `json:"data"`
+	}
+	if err := a.helix("GET", "chat/color?user_id="+strings.Join(ids, "&user_id="), nil, &d); err != nil {
+		return
+	}
+	colors := map[string]string{}
+	for _, c := range d.Data {
+		if c.Color != "" {
+			colors[c.UserID] = c.Color
+		}
+	}
+	a.mu.Lock()
+	changed := false
+	for i := range a.st.Entries {
+		if c, ok := colors[a.st.Entries[i].UserID]; ok && a.st.Entries[i].Color == "" {
+			a.st.Entries[i].Color = c
+			changed = true
+		}
+	}
+	if changed {
+		a.saveLocked()
+		a.emitLocked()
+	}
 	a.mu.Unlock()
 }
 

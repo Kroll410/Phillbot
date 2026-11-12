@@ -518,6 +518,12 @@ func (a *App) lookupSub(bcID, userID, rewardID string) (tier, months int, source
 	source = "API: " + apiStr + "; бейдж: " + badgeStr
 	if chat != nil {
 		color, badges = chat.color, chat.badges
+	} else { // повідомлення разом із замовленням не прийшло — вигляд з останнього повідомлення чатерса
+		a.badgeMu.Lock()
+		if c, ok := a.badgeCache[userID]; ok {
+			color, badges = c.color, c.badges
+		}
+		a.badgeMu.Unlock()
 	}
 	return
 }

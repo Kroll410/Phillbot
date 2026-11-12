@@ -317,6 +317,7 @@ func (a *App) authFlow(forceLogin bool) {
 	a.logf("Вхід виконано: канал %s", u.DisplayName)
 	go a.listen(lctx, u)
 	go a.loadBadges(u.ID)
+	go a.fillColors()
 	a.RefreshRewards()
 }
 
@@ -567,6 +568,9 @@ func (a *App) onRedemption(ev Redemption, bc User) {
 	lo := *a.lastOrd
 	a.mu.Unlock()
 	a.emitEvent("redeem", map[string]any{"id": e.ID, "order": lo}) // підсвітка рядка + алерт в OBS
+	if e.Color == "" {
+		defer func() { go a.fillColors() }()
+	}
 	a.mutate(func(st *State) { st.Entries = append(st.Entries, e) })
 	sub := "не підписник"
 	if tier > 0 {

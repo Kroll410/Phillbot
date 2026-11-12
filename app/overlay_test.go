@@ -134,3 +134,16 @@ func TestChatWindowLock(t *testing.T) {
 		t.Fatal("still locked after window closed")
 	}
 }
+
+func TestBackfillLookFromChat(t *testing.T) {
+	a := newTestApp(t)
+	a.st.Entries = []Entry{{ID: "1", UserID: "9", User: "Viewer", Tier: 2, Months: 6, Text: "Hades"}}
+	a.badgeImgs["vip/1"] = badgeImg{url: "https://x/vip.png", title: "VIP"}
+	a.badgeImgs["subscriber/2006"] = badgeImg{url: "https://x/sub.png", title: "Sub"}
+	a.handleChatNotification("channel.chat.message", json.RawMessage(`{"chatter_user_id":"9","chatter_user_login":"viewer","chatter_user_name":"Viewer","message_id":"m","color":"#FF0000",
+		"badges":[{"set_id":"vip","id":"1","info":""},{"set_id":"subscriber","id":"2006","info":"6"}],"message_type":"text","message":{"text":"hi","fragments":[{"type":"text","text":"hi"}]}}`))
+	e := a.st.Entries[0]
+	if e.Color != "#FF0000" || len(e.Badges) != 2 || e.Badges[0].SetID != "vip" || e.Badges[1].SetID != "subscriber" {
+		t.Fatalf("%+v", e)
+	}
+}

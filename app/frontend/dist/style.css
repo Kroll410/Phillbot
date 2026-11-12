@@ -6,6 +6,8 @@
   --font-ui:"Segoe UI Variable Text","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
   --font-display:"Segoe UI Variable Display","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
   --font-mono:"Cascadia Mono","Cascadia Code",Consolas,monospace;
+  /* шрифти Twitch: Roobert (комерційний, лише якщо встановлений), Inter — відкрита заміна, яку використовує сам Twitch */
+  --font-twitch:"Roobert","Inter","Helvetica Neue",Helvetica,Arial,sans-serif;
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -221,3 +223,84 @@ input[type=range]{padding:0;accent-color:var(--accent);background:transparent;bo
 .subcell{display:inline-flex;align-items:center;justify-content:flex-end;gap:6px;white-space:nowrap}
 .subicon{width:18px;height:18px;object-fit:contain}
 .rwarn{margin-top:10px;padding:8px 10px;border:1px dashed #5a1a1a;border-radius:8px;color:#ff7a7a;font-size:12.5px}
+
+/* =========================================================
+   Полірування вкладки СабДей: ритм відступів, читабельність
+   ========================================================= */
+:root{ --r:12px; --gap:16px; }
+body{font-size:14px;line-height:1.5}
+.mode.subday{grid-template-columns:340px minmax(0,1fr);gap:20px;padding:20px 24px}
+aside{padding-right:6px}
+.card{border-radius:var(--r);padding:18px;margin-bottom:var(--gap)}
+.card h2{font:600 11px/1.3 var(--font-ui);letter-spacing:1.2px;margin:0 0 12px}
+
+/* таймер */
+.timerbox{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px;margin:2px 0 2px}
+.timer{font:600 68px/1 var(--font-display);letter-spacing:0;margin:0;padding:6px 0}
+.tadj{width:44px;height:44px;border-radius:50%;padding:0;font:600 14px/1 var(--font-ui);color:var(--muted);background:var(--panel2);border-color:var(--line)}
+.tadj:not(:disabled):hover{color:var(--text);border-color:#55555f}
+.status{font-size:13px;margin:4px 0 16px}
+.timerbox.live + .status{color:var(--ok)}
+.tctl{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
+.tctl button{height:40px;font-weight:600}
+.tctl button.primary{font-size:15px}
+.mexport{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.mbtn{height:48px;border-radius:10px}
+.rwarn{margin-top:12px}
+
+/* розгортна картка OBS */
+details.fold{padding:0}
+details.fold>summary{list-style:none;cursor:pointer;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;margin:0;color:var(--muted)}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary h2{margin:0}
+details.fold>summary::after{content:"";width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);transition:transform .15s}
+details.fold[open]>summary::after{transform:rotate(-135deg) translateY(-2px)}
+details.fold>summary:hover{color:var(--text)}
+details.fold[open]{padding:0 18px 16px}
+details.fold[open]>summary{padding:14px 0 10px}
+.obsrow{font-size:12.5px;padding:6px 8px;margin:4px -8px 0}
+.obsrow code{font:11.5px/1.4 var(--font-mono);margin-top:2px}
+
+/* статистика */
+.stats{gap:12px;margin-bottom:16px}
+.stat{padding:14px 18px;border-radius:var(--r);gap:10px}
+.stat b{font-size:28px}
+.stat span{font-size:13.5px}
+.stats .stat:nth-child(3) b{color:#c9a6ff}
+.icon-btn.corner{width:52px;border-radius:var(--r)}
+.stats{grid-template-columns:repeat(3,minmax(0,1fr)) 52px}
+
+/* вкладки таблиці — сегментовано, як режими вгорі */
+.tabs{gap:12px;margin-bottom:12px}
+.tabs .seg{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
+.tab{border:0;border-radius:7px;padding:6px 16px;font-weight:600;color:var(--muted)}
+.tab.active{color:#fff}
+.tabs input{max-width:280px;height:38px;border-radius:10px;padding:0 12px;background:var(--panel)}
+
+/* таблиці */
+.tablewrap{border-radius:var(--r)}
+th,td{padding:11px 14px}
+th{font:600 11px/1.3 var(--font-ui);text-transform:uppercase;letter-spacing:.8px;color:var(--muted);background:#1c1c20;border-bottom:1px solid var(--line);white-space:nowrap}
+td{font-size:14px}
+tbody tr:last-child td{border-bottom:0}
+.gripcol{width:28px;padding-left:12px;padding-right:0}
+.pts{font:700 16px/1 var(--font-display)}
+.share{display:flex;align-items:center;gap:10px}
+.share .track{flex:1;height:8px;background:#26262c;border-radius:4px;overflow:hidden}
+.share .bar{height:100%;border-radius:4px}
+.share span{width:36px;text-align:right;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.users{max-width:none;font-size:13px;line-height:1.9}
+.users .utag{margin-right:4px}
+.utag .cname{font-weight:700;font-size:14px}
+.utag .cbadge{height:18px;margin-right:4px}
+.tier{font-size:11.5px;padding:2px 7px;border-radius:5px}
+.empty{padding:60px 20px;font-size:14px}
+#tableHint{margin-top:10px;font-size:12.5px}
+.logtable td{font-size:13.5px}
+/* глобальні налаштування — окремо, одразу праворуч від вкладок-режимів */
+header > #generalBtn{width:38px;height:38px;border-radius:10px;background:var(--bg);margin-left:-8px}
+/* «Нагорода за бали каналу» — шрифтами Twitch */
+.twitchfont,.rgrid,.rgrid .rtile,.rgrid .rtitle,.rgrid .rcost,.rgrid .rtag{font-family:var(--font-twitch)}
+.rgrid .rtitle{font-weight:600;font-size:13px;letter-spacing:0}
+.rgrid .rcost{font-weight:600;font-size:12.5px}
+.settings h3.twitchfont{text-transform:none;letter-spacing:0;font-size:15px;font-weight:700;color:var(--text)}

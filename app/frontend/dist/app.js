@@ -96,10 +96,11 @@ function renderTimer(){
   el.className = "timer " + s.status + (s.status==="running" && r<=30000 ? " low" : "");
   $("statusText").textContent = {idle:"Очікування старту", running:"Збір іде — замовлення записуються", paused:"Пауза — замовлення не записуються", finished:"Збір завершено"}[s.status] || "";
   $("startBtn").disabled = s.status==="running";
-  $("startBtn").textContent = s.status==="paused" ? "Продовжити" : s.status==="finished" ? "Старт" : "Почати збір";
+  $("startBtn").textContent = s.status==="paused" ? "Продовжити" : "Старт";
   $("pauseBtn").disabled = s.status!=="running";
   $("stopBtn").disabled = !(s.status==="running"||s.status==="paused");
   $("minusBtn").disabled = s.status==="finished";
+  $("timer").parentElement.classList.toggle("live", s.status==="running");
 }
 setInterval(renderTimer, 250);
 
@@ -167,6 +168,8 @@ function renderObs(){
     <button class="small" data-copy="${esc(o.url + p)}">Копіювати</button><button class="small" data-open="${esc(p)}" title="Відкрити в браузері">↗</button></div>`).join("")
     + `<div class="obsrow"><span class="muted">Усі параметри й розміри</span><button class="small" data-open="/overlay/index">Усі оверлеї ↗</button></div>`;
 }
+try{ if(localStorage.getItem("phillbot-obs-open")==="1") $("obsCard").open = true; }catch(e){}
+$("obsCard").addEventListener("toggle", () => { try{ localStorage.setItem("phillbot-obs-open", $("obsCard").open ? "1" : "0"); }catch(e){} });
 $("obsList").addEventListener("click", async e => {
   const c = e.target.closest("[data-copy]"), o = e.target.closest("[data-open]");
   if(c){ const ok = await call("CopyText", c.dataset.copy); toast(ok ? "URL скопійовано — вставте в OBS → Браузер" : "Не вдалося скопіювати"); }
@@ -278,9 +281,9 @@ function renderTable(){
     rows = sortRows(rows, sortKey.summary);
     const max = Math.max(1,...rows.map(r=>r.points)), total = rows.reduce((a,r)=>a+r.points,0)||1;
     if(!rows.length){ wrap.innerHTML = `<div class="empty">${S.entries.length?"Нічого не знайдено":"Замовлень поки немає. Виберіть нагороду і натисніть «Почати збір»."}</div>`; return; }
-    wrap.innerHTML = `<table class="dnd"><thead><tr><th class="gripcol"></th><th style="width:40px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:140px">Частка</th>${th("Людей","count","num")}<th>Хто замовив</th></tr></thead><tbody>${
+    wrap.innerHTML = `<table class="dnd"><thead><tr><th class="gripcol"></th><th style="width:40px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:180px">Частка</th>${th("Людей","count","num")}<th>Хто замовив</th></tr></thead><tbody>${
       rows.map((g,i)=>`<tr data-key="${esc(g.key)}" data-name="${esc(g.name)}"><td class="gripcol">${GRIP}</td><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
-        <td class="num pts">${g.points}</td><td><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div><span class="muted" style="font-size:11px">${(g.points/total*100).toFixed(1)}%</span></td>
+        <td class="num pts">${g.points}</td><td><div class="share"><div class="track"><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div></div><span>${(g.points/total*100).toFixed(0)}%</span></div></td>
         <td class="num">${g.count}</td><td class="users">${g.users.map(u=>`${userTag(u)} <span class="muted">(${u.p})</span>`).join(" ")}</td></tr>`).join("")
     }</tbody></table>`;
   } else {

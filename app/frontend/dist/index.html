@@ -15,10 +15,10 @@
     <button class="mode-tab active" data-mode="subday">СабДей</button>
     <button class="mode-tab" disabled title="Механіку ще не описано — додамо пізніше">Переглядовий <small>скоро</small></button>
   </nav>
+  <button id="generalBtn" class="icon-btn" title="Загальні налаштування"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   <div class="conn">
     <span class="dot" id="connDot"></span>
     <span id="userBox"></span>
-    <button id="generalBtn" class="icon-btn" title="Загальні налаштування"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </div>
 </header>
 
@@ -43,7 +43,7 @@
 <!-- налаштування СабДею -->
 <div class="modal" id="subdayModal"><div class="box settings wide">
   <h2>Налаштування СабДею</h2>
-  <h3 class="row" style="align-items:center">Нагорода за бали каналу <button id="rewardRefresh" class="small" style="flex:0 0 auto;margin-left:auto" title="Оновити список з Twitch">Оновити</button></h3>
+  <h3 class="row twitchfont" style="align-items:center">Нагорода за бали каналу <button id="rewardRefresh" class="small" style="flex:0 0 auto;margin-left:auto" title="Оновити список з Twitch">Оновити</button></h3>
   <div class="hint" style="margin:-2px 0 8px">Виберіть нагороду, через яку глядачі надсилають замовлення (з текстом).</div>
   <div id="rewardGrid" class="rgrid"></div>
   <div id="rewardsErr" class="hint err"></div>
@@ -146,14 +146,16 @@
   <aside>
     <div class="card">
       <h2>Збір замовлень</h2>
-      <div class="timer idle" id="timer">10:00</div>
+      <div class="timerbox">
+        <button id="minusBtn" class="tadj" title="Мінус 1 хвилина">−1</button>
+        <div class="timer idle" id="timer">10:00</div>
+        <button id="plusBtn" class="tadj" title="Плюс 1 хвилина">+1</button>
+      </div>
       <div class="status" id="statusText">Очікування старту</div>
-      <div class="btns">
-        <button class="primary wide" id="startBtn">Почати збір</button>
+      <div class="tctl">
+        <button class="primary" id="startBtn">Старт</button>
         <button id="pauseBtn" disabled>Пауза</button>
         <button id="stopBtn" disabled>Завершити</button>
-        <button id="plusBtn">+1 хв</button>
-        <button id="minusBtn">−1 хв</button>
       </div>
       <div id="rewardCurrent" class="rwarn hidden"></div>
       <div class="mexport">
@@ -161,15 +163,12 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>OBS — оверлеї СабДею</h2>
+    <details class="card fold" id="obsCard">
+      <summary><h2>OBS — оверлеї</h2></summary>
       <div id="obsStatus" class="hint"></div>
       <div id="obsList"></div>
-      <details>
-        <summary>Як додати в OBS</summary>
-        <div class="hint">OBS → Джерела → «+» → <b>Браузер</b> → вставити URL і вказати розмір. Фон прозорий. Розмір можна збільшити параметром <code>?scale=1.5</code>, рамку — <code>?theme=box</code>. Усі параметри — кнопка «Усі оверлеї».</div>
-      </details>
-    </div>
+      <div class="hint" style="margin-top:10px">OBS → Джерела → «+» → <b>Браузер</b> → вставити URL. Фон прозорий. Більше — <code>?scale=1.5</code>, з рамкою — <code>?theme=box</code>.</div>
+    </details>
 
   </aside>
 
@@ -181,13 +180,15 @@
       <button id="subdaySettingsBtn" class="icon-btn corner" title="Налаштування СабДею"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
     </div>
     <div class="tabs">
-      <button class="tab active" data-tab="summary">Підсумок</button>
-      <button class="tab" data-tab="entries">Замовлення</button>
-      <button class="tab" data-tab="log">Журнал</button>
+      <div class="seg">
+        <button class="tab active" data-tab="summary">Підсумок</button>
+        <button class="tab" data-tab="entries">Замовлення</button>
+        <button class="tab" data-tab="log">Журнал</button>
+      </div>
       <input id="search" placeholder="Пошук…">
     </div>
     <div class="tablewrap" id="tableWrap"></div>
-    <div class="hint" id="tableHint" style="margin-top:8px">Однакові замовлення (без урахування регістру, зайвих пробілів і розділових знаків у кінці) об'єднуються. Щоб об'єднати схожі замовлення, перетягніть їх за ⠿ одне на одне.</div>
+    <div class="hint" id="tableHint">Однакові замовлення об'єднуються автоматично. Схожі — перетягніть за ⠿ одне на одне.</div>
   </section>
 </div>
 </main>

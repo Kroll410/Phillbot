@@ -108,7 +108,16 @@ function renderStreamBar(){
   $("streamCur").innerHTML = `<b>${esc(fmtStream(meta).replace(" (поточний)",""))}</b>${pastStream ? ' <span class="muted">· минулий</span>' : ' <span class="live-dot"></span>'}`;
   $("streamLabel").textContent = pastStream ? fmtStream(meta) : "";
   $("streamLabel").classList.toggle("hidden", !pastStream);
-  const chips = streamColls().map(c => `<button class="cchip${view&&view.n===c.n?" active":""}" data-n="${c.n}"><b>Збір ${c.n}</b><span>${fmtHM(c.startedAt)} · ${ordersOf(c)} замовл.</span></button>`);
+  // багато зборів — старші стискаються в кружечки з номером; повністю видно вибраний, поточний і два останні
+  const colls = streamColls(), keepFull = new Set(colls.slice(-2).map(c => c.n));
+  if(view) keepFull.add(view.n);
+  const compact = colls.length + (pastStream ? 0 : 1) > 4;
+  const chips = colls.map(c => {
+    const act = view && view.n === c.n, info = `${fmtHM(c.startedAt)} · ${ordersOf(c)} замовл.`;
+    return compact && !keepFull.has(c.n)
+      ? `<button class="cchip mini${act?" active":""}" data-n="${c.n}" title="Збір ${c.n} · ${esc(info)}"><b>${c.n}</b></button>`
+      : `<button class="cchip${act?" active":""}" data-n="${c.n}"><b>Збір ${c.n}</b><span>${info}</span></button>`;
+  });
   if(!pastStream){
     const st = S.session.status, n = S.collN || (S.past||[]).length + 1;
     const sub = st==="running" ? "іде зараз" : st==="paused" ? "пауза" : st==="finished" ? `${countedSet(LIVE()).size} замовл.` : "ще не почато";

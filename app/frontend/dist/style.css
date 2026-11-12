@@ -663,3 +663,18 @@ button.vstart:not(:disabled):hover{filter:brightness(1.1);box-shadow:0 6px 18px 
 /* основні кнопки (Старт, Зберегти, Продовжити гру…) — градієнт уже в спокої; при наведенні лише світлішають, фон не підміняється (не «блимає») */
 button.primary:not(.mode-tab):not(.tab){background:var(--grad) border-box no-repeat;border-color:transparent;transition:filter .2s ease,box-shadow .2s ease,transform .15s ease}
 button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--grad) border-box no-repeat;filter:brightness(1.1);box-shadow:0 6px 18px rgba(145,71,255,.35);transform:translateY(-1px)}
+
+/* шестерня налаштувань СабДею — в одному рядку зі зборами */
+.streambar{gap:12px}
+.icon-btn.sgear{flex:0 0 auto;margin-left:auto;width:42px;height:42px;border-radius:10px;background:var(--panel)}
+/* статистика збору — компактна картка під таймером */
+.mstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ms{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border-radius:10px;background:var(--panel2)}
+.ms b{font:600 24px/1 var(--font-display);font-variant-numeric:tabular-nums}
+.ms span{font-size:12px;color:var(--muted)}
+.ms.pts b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* стиснуті (старші) збори — кружечки з номером */
+.cchip.mini{width:38px;flex:0 0 38px;height:38px;padding:0;border-radius:50%;align-items:center;justify-content:center}
+.cchip.mini b{font:700 13px/1 var(--font-display)}
+.cchip.mini + .cchip,.cchip + .cchip.mini{margin-left:30px}
+.cchip.mini + .cchip::before,.cchip + .cchip.mini::before{width:16px;right:calc(100% + 9px)}

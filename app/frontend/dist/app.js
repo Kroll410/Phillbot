@@ -1120,7 +1120,7 @@ document.querySelectorAll("[data-swap]").forEach(b => b.onclick = () => {
     w.animate([{transform: `translate(${a.left - z.left}px,${a.top - z.top}px) scale(${a.width / z.width},${a.height / z.height})`, transformOrigin: "0 0"},
       {transform: "none", transformOrigin: "0 0"}], {duration: 560, easing: "cubic-bezier(.2,.9,.25,1)"});
     const inner = w.querySelector(".aulist, .wheelbox");
-    if(inner) inner.animate([{opacity: 0}, {opacity: 0, offset: .4}, {opacity: 1}], {duration: 560});
+    if(inner) inner.animate([{opacity: .3}, {opacity: 1}], {duration: 180, easing: "ease-out"}); // коротке згасання вмісту, без паузи
   });
 });
 placeWins();

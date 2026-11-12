@@ -678,3 +678,9 @@ button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--gr
 .cchip.mini b{font:700 13px/1 var(--font-display)}
 .cchip.mini + .cchip,.cchip + .cchip.mini{margin-left:30px}
 .cchip.mini + .cchip::before,.cchip + .cchip.mini::before{width:16px;right:calc(100% + 9px)}
+/* індикатор завантаження: м'яка поява і плавне згасання */
+.is-loading::after{animation:load-spin 1.1s linear infinite,load-in .35s ease both}
+.is-loading.load-fade::after{animation:load-spin 1.1s linear infinite,load-out .6s ease forwards}
+.icon-btn.is-loading.load-fade svg{animation:icon-spin .8s linear infinite;opacity:.6;transition:opacity .5s}
+@keyframes load-in{from{opacity:0}to{opacity:1}}
+@keyframes load-out{from{opacity:1}to{opacity:0}}

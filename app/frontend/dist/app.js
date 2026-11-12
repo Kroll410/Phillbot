@@ -26,18 +26,25 @@ async function call(fn, ...args){
 /* Індикатор завантаження — єдиний підхід для будь-якого завантаження:
    рамка елемента (вікна, картки) стає анімованим градієнтом зелений → фіолетовий.
    withLoading(елемент або [елементи], async () => {...}) — клас .is-loading знімається сам, навіть при помилці. */
+// увімкнути / плавно згасити індикатор (рамка з'являється й зникає м'яко, без різкого обриву)
+function loadOn(el){ clearTimeout(el._loadT); el.classList.remove("load-fade"); el.classList.add("is-loading"); }
+function loadOff(el){
+  if(!el.classList.contains("is-loading")) return;
+  el.classList.add("load-fade");
+  clearTimeout(el._loadT); el._loadT = setTimeout(() => el.classList.remove("is-loading", "load-fade"), 620);
+}
 async function withLoading(els, work){
   const list = (Array.isArray(els) ? els : [els]).filter(Boolean);
-  list.forEach(el => el.classList.add("is-loading"));
+  list.forEach(loadOn);
   try{ return await work(); }
-  finally{ list.forEach(el => el.classList.remove("is-loading")); }
+  finally{ list.forEach(loadOff); }
 }
 // нове замовлення, коли відкрито «Підсумок» чи «Замовлення» — коротко показуємо індикатор завантаження навколо таблиці
 let flashT = 0;
 function flashTable(){
   if(mode !== "subday" || !D().live || (tab !== "summary" && tab !== "entries")) return;
-  const f = $("tableFrame"); f.classList.add("is-loading");
-  clearTimeout(flashT); flashT = setTimeout(() => f.classList.remove("is-loading"), 1400);
+  const f = $("tableFrame"); loadOn(f);
+  clearTimeout(flashT); flashT = setTimeout(() => loadOff(f), 1300);
 }
 function setState(snap){ if(snap && snap.settings) { S = snap; renderAll(); } }
 

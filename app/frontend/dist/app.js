@@ -949,7 +949,7 @@ function renderAuList(){
     $("auList").innerHTML = `<div class="autop">` + top.map((l, i) => `<div class="autop-i${au.winner === l.id ? " win" : ""}" style="--c:${lotColor(l.id)}">
         <span class="rk">${i + 1}</span><span class="nm" title="${esc(l.name)}">${esc(l.name)}</span><span class="am">${POINTS_ICON}${fmtN(l.amount)}</span>
         <span class="bar"><i style="width:${(chanceOf(l) * 100).toFixed(1)}%"></i></span></div>`).join("")
-      + `</div><div class="auinfo"><span><b>${fmtN(total)}</b> балів</span><span><b>${au.lots.length}</b> лотів</span><span><b>${au.feed.length}</b> ставок</span></div>`;
+      + `</div>` + (active > 3 ? `<div class="auinfo">і ще ${active - 3} ${active - 3 === 1 ? "лот" : "лотів"} на колесі</div>` : "");
     return;
   }
   $("auList").innerHTML = `<table class="autable"><thead><tr><th class="gripcol"></th><th class="num">#</th><th>Лот</th><th class="num">Сума</th><th class="num">Шанс</th><th>Хто ставив</th><th></th></tr></thead><tbody>`

@@ -774,3 +774,18 @@ button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--gr
 .rtile.denied{animation:deny .35s linear}
 @keyframes deny{20%,60%{translate:-4px 0}40%,80%{translate:4px 0}}
 @media (max-width:1250px){.aubar{grid-template-columns:auto minmax(220px,1fr) minmax(200px,1fr) auto}.austats{display:none}}
+
+/* статистика аукціону — у шапці вікна «Лоти»; права колонка ширша для стрічки ставок */
+.aubar{grid-template-columns:auto minmax(260px,330px) minmax(220px,300px) 1fr}
+.aubar-r{justify-self:end}
+.auwrap{grid-template-columns:minmax(0,1fr) 460px}
+.austats{display:flex;align-items:baseline;gap:14px;margin-left:auto;max-width:none;width:auto;justify-self:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+.austats .ast b{font:600 16px/1 var(--font-display);font-variant-numeric:tabular-nums;color:var(--text);margin-right:2px}
+.austats .ast.pts b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.austats + .auswap{margin-left:6px}
+.auinfo{justify-content:center}
+/* у вузькій колонці (список праворуч) — лише цифри, без зайвого */
+.auside .austats{gap:10px}
+.auside .austats .ast b{font-size:14px}
+.auside #auListHint{display:none}
+@media (max-width:1250px){.austats{display:flex}}

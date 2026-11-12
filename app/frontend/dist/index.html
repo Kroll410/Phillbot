@@ -180,11 +180,6 @@
       <button id="auPause" disabled>Пауза</button>
       <button id="auStop" disabled>Завершити</button>
     </div>
-    <div class="austats">
-      <div class="ms"><b id="auLots">0</b><span>лотів</span></div>
-      <div class="ms"><b id="auBids">0</b><span>ставок</span></div>
-      <div class="ms pts"><b id="auSum">0</b><span>балів</span></div>
-    </div>
     <div class="aubar-r">
       <button id="auNew" class="icon-btn" title="Новий аукціон (поточний збережеться в історію)"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
       <button id="auSettingsBtn" class="icon-btn sgear" title="Налаштування аукціону"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -196,6 +191,11 @@
   <div class="auwrap" id="auWrap">
     <div class="auwin card" id="auListWin">
       <div class="auwin-h"><h2>Лоти</h2><span class="muted" id="auListHint"></span>
+        <div class="austats">
+          <span class="ast"><b id="auLots">0</b> лотів</span>
+          <span class="ast"><b id="auBids">0</b> ставок</span>
+          <span class="ast pts"><b id="auSum">0</b> балів</span>
+        </div>
         <button class="icon-btn auswap" data-swap title="Поміняти вікна місцями"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h13l-4-4M17 17H4l4 4"/></svg></button></div>
       <div class="aulist" id="auList"></div>
     </div>

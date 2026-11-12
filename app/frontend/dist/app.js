@@ -178,8 +178,7 @@ function renderStats(){
   $("sUsers").textContent = new Set(cEntries.map(e=>(e.userId||e.login).toLowerCase())).size;
   $("sUnique").textContent = groups.length;
   $("sPoints").textContent = groups.reduce((a,g)=>a+g.points,0);
-  const m = marbleInfo();
-  $("marblePreview").innerHTML = m.total ? `<b>${m.count}</b> куль із ${m.groups} замовлень` + (m.count>1000 ? ` <span class="err">— більше 1000: гра може не прийняти весь список</span>` : "") : "Немає замовлень із балами > 0";
+  renderExportBtn();
 }
 
 function sortRows(rows, [k,dir]){ return rows.sort((a,b)=>{ const x=a[k], y=b[k]; return (typeof x==="string" ? x.localeCompare(y,"uk") : (x-y))*dir; }); }
@@ -450,19 +449,41 @@ $("tableWrap").addEventListener("focusout", () => setTimeout(()=>{ if(tableDirty
 /* ---------- експорт ---------- */
 const stamp = () => { const d=new Date(), p=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`; };
 
-$("exportMarbles").onclick = async () => {
-  if(!marbleInfo().total) return toast("Немає замовлень з балами > 0");
-  const r = await call("ExportMarbles", true);
-  let msg = `Файл для Marbles: ${r.lines} куль\n${r.path}\n\n`;
-  msg += r.copied ? "✓ Шлях скопійовано в буфер обміну.\n" : "";
-  msg += r.alreadyRunning ? "Marbles on Stream уже запущено.\n" : r.launched ? "Запускаю Marbles on Stream через Steam…\n" : "";
-  msg += "\nУ грі: Race → Simulate → ⚙ Settings → Simulation Settings → Use Custom Names → Add Names → Open → Ctrl+V → Enter.";
-  if(await confirmBox(msg, "Показати файл", "Закрити")) call("RevealFile", r.path);
-};
-$("copyMarbles").onclick = async () => {
-  const list = await call("MarbleLines"); if(!list || !list.length) return toast("Немає що копіювати");
-  const ok = await call("CopyText", list.join("\r\n")); toast(ok ? `Скопійовано ${list.length} рядків` : "Не вдалося скопіювати"); };
-$("openMarbles").onclick = () => call("OpenFolder", "marbles");
+/* ---------- експорт у Marbles: одна кнопка під таймером, анімація замість модалки ---------- */
+let mBusy = false;
+function renderExportBtn(){
+  if(!S || mBusy) return;
+  const m = marbleInfo(), st = S.session.status, collecting = st === "running" || st === "paused";
+  const btn = $("exportMarbles");
+  btn.disabled = collecting || !m.total;
+  btn.className = "mbtn" + (m.count > 1000 ? " warn" : "");
+  $("mLabel").textContent = "🎱 Експорт у Marbles";
+  $("mCount").textContent = m.total ? `${m.count} ${m.count%10===1&&m.count%100!==11?"куля":[2,3,4].includes(m.count%10)&&![12,13,14].includes(m.count%100)?"кулі":"куль"}` : "";
+  btn.title = collecting ? "Йде збір — завершіть таймер, щоб експортувати" : !m.total ? "Немає замовлень з балами" : m.count > 1000 ? "Більше 1000 куль — гра може не прийняти весь список" : "Створити файл, скопіювати шлях і запустити гру";
+  $("finishExport").classList.toggle("hidden", !(collecting && m.total));
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function exportMarbles(){
+  if(mBusy || !marbleInfo().total) return;
+  const btn = $("exportMarbles"), label = $("mLabel");
+  mBusy = true; btn.disabled = true; $("finishExport").classList.add("hidden");
+  btn.className = "mbtn busy"; label.textContent = "Створюю файл…"; $("mCount").textContent = "";
+  try{
+    const r = await api().ExportMarbles(true);
+    await sleep(350);
+    btn.className = "mbtn ok"; label.textContent = r.copied ? "✓ Шлях скопійовано" : "✓ Файл створено";
+    await sleep(1300);
+    btn.className = "mbtn ok go"; label.textContent = r.alreadyRunning ? "🎮 Гра вже запущена — Ctrl+V" : "🚀 Запускаю гру…";
+    await sleep(1800);
+  }catch(e){
+    btn.className = "mbtn fail"; label.textContent = "✕ " + (e && e.message || e);
+    await sleep(2500);
+  }
+  mBusy = false; renderExportBtn();
+}
+$("exportMarbles").onclick = exportMarbles;
+$("finishExport").onclick = async () => { setState(await call("FinishTimer")); exportMarbles(); };
+setInterval(renderExportBtn, 500); // таймер може завершитися сам
 $("openExports").onclick = () => call("OpenFolder", "exports");
 $("openHistory").onclick = () => call("OpenFolder", "history");
 

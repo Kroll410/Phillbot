@@ -153,6 +153,10 @@
         <button id="plusBtn">+1 хв</button>
         <button id="minusBtn">−1 хв</button>
       </div>
+      <div class="mexport">
+        <button id="exportMarbles" class="mbtn"><span class="mfill"></span><span class="mlabel" id="mLabel">🎱 Експорт у Marbles</span><span class="mcount" id="mCount"></span></button>
+        <button id="finishExport" class="linkbtn hidden">⏹ Завершити збір достроково й експортувати</button>
+      </div>
       <label>Тривалість збору (хв)</label>
       <input type="number" id="duration" min="1" step="1" value="10">
       <div class="hint">Замовлення записуються лише поки йде таймер.</div>
@@ -161,21 +165,6 @@
     <div class="card">
       <h2 class="row" style="align-items:center">Нагорода<button id="subdaySettingsBtn" class="small" style="flex:0 0 auto;margin-left:auto">⚙ Налаштування СабДею</button></h2>
       <div id="rewardCurrent"></div>
-    </div>
-
-    <div class="card">
-      <h2>Marbles on Stream</h2>
-      <div class="hint" id="marblePreview">—</div>
-      <div class="hint">Кожен бал = одна куля з назвою замовлення (до 15 символів, далі «...»). Куль завжди стільки, скільки балів.</div>
-      <div class="btns" style="margin-top:10px">
-        <button class="primary wide" id="exportMarbles">🎱 Експорт у Marbles</button>
-        <button id="copyMarbles">Копіювати список</button>
-        <button id="openMarbles">Папка marbles</button>
-      </div>
-      <details>
-        <summary>Як завантажити в гру</summary>
-        <div class="hint">Шлях до файлу вже в буфері обміну. У грі: Race → Simulate → ⚙ Settings (праворуч унизу) → Simulation Settings → увімкнути <b>Use Custom Names</b> → <b>Add Names</b> → <b>Open</b> → <b>Ctrl+V</b> у полі «Ім'я файлу» → Enter. Потім Bots-гонка на стільки куль, скільки рядків.</div>
-      </details>
     </div>
 
     <div class="card">

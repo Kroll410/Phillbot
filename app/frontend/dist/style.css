@@ -894,3 +894,10 @@ tr[draggable="true"] input{cursor:text}
   background:conic-gradient(from var(--load-angle),#00c853,#4fd27a 18%,#9147ff 48%,rgba(145,71,255,0) 62%,rgba(0,200,83,0) 82%,#00c853);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
   animation:load-spin 3.2s linear infinite,win-pulse 1.8s ease-in-out infinite}
+/* кнопки-затискання з червоною «фарбою»: без червоного ободка — звичайна нейтральна рамка */
+.winbtn.holdend{border-color:var(--line)}
+.winbtn.holdend:not(:disabled):hover{border-color:#55555f}
+.winbtn.holdend.pressed{border-color:#55555f;box-shadow:inset 0 3px 10px rgba(0,0,0,.55)}
+.winbtn.holdend.full{border-color:#55555f;box-shadow:0 0 22px rgba(0,200,83,.35),0 0 40px rgba(145,71,255,.4)}
+.winbtn.iconhold,.winbtn.iconhold:hover,.winbtn.iconhold.pressed{border-color:transparent}
+.winbtn.iconhold:hover{color:var(--text)}

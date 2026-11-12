@@ -936,7 +936,10 @@ function chanceOf(lot){
 
 // ----- вікно 1: лоти -----
 const auFresh = new Set();
+let auDrag = null, auListDirty = false; // id лота, який перетягують
 function renderAuList(){
+  if(auDrag){ auListDirty = true; return; } // не перемальовуємо таблицю посеред перетягування
+  auListDirty = false;
   const au = AU(), lots = [...au.lots].sort((a, b) => (a.out ? 1 : 0) - (b.out ? 1 : 0) || b.amount - a.amount);
   const total = au.lots.reduce((a, l) => a + l.amount, 0), active = au.lots.filter(l => !l.out).length;
   $("auListHint").textContent = au.lots.length ? `${active} на колесі` + (au.lots.length > active ? ` · ${au.lots.length - active} вибуло` : "") : "";
@@ -949,12 +952,13 @@ function renderAuList(){
       + `</div><div class="auinfo"><span><b>${fmtN(total)}</b> балів</span><span><b>${au.lots.length}</b> лотів</span><span><b>${au.feed.length}</b> ставок</span></div>`;
     return;
   }
-  $("auList").innerHTML = `<table class="autable"><thead><tr><th class="num">#</th><th>Лот</th><th class="num">Сума</th><th class="num">Шанс</th><th>Хто ставив</th><th></th></tr></thead><tbody>`
+  $("auList").innerHTML = `<table class="autable"><thead><tr><th class="gripcol"></th><th class="num">#</th><th>Лот</th><th class="num">Сума</th><th class="num">Шанс</th><th>Хто ставив</th><th></th></tr></thead><tbody>`
     + lots.map((l, i) => {
       const who = [...l.users].sort((a, b) => b.amount - a.amount);
       const users = who.slice(0, 6).map(u => `${userTag(u)}<span class="muted uam">${fmtN(u.amount)}</span>`).join(" ") + (who.length > 6 ? ` <span class="muted">+${who.length - 6}</span>` : "");
       const st = au.winner === l.id ? `<span class="lwin">Переможець</span>` : l.out ? `<span class="lout">вибув · ${l.out}-й оберт</span>` : `${(chanceOf(l) * 100).toFixed(1)}%`;
       return `<tr data-lot="${esc(l.id)}" class="${l.out ? "out" : ""}${au.winner === l.id ? " win" : ""}${auFresh.has(l.id) ? " fresh" : ""}">
+        <td class="gripcol"><span class="grip" draggable="true" title="Перетягніть на інший лот, щоб об'єднати їх">⠿</span></td>
         <td class="num">${l.out ? "" : i + 1}</td>
         <td><span class="ldot" style="background:${lotColor(l.id)}"></span><b class="lname">${esc(l.name)}</b>${l.bids > 1 ? ` <span class="muted">× ${l.bids}</span>` : ""}</td>
         <td class="num lamt">${fmtN(l.amount)}</td><td class="num">${st}</td>
@@ -967,6 +971,36 @@ $("auList").addEventListener("click", async e => {
   const l = lotById(b.dataset.lotdel); if(!l) return;
   if(!(await confirmBox(`Видалити лот «${l.name}» (${fmtN(l.amount)} балів)?`, "Видалити"))) return;
   setState(await call("AuctionRemoveLot", l.id));
+});
+
+/* drag-n-drop: перетягніть лот на інший, щоб об'єднати (як замовлення в СабДеї) */
+const auListEl = $("auList");
+auListEl.addEventListener("dragstart", ev => {
+  const g = ev.target.closest && ev.target.closest(".grip"); if(!g){ ev.preventDefault(); return; }
+  const tr = g.closest("tr[data-lot]"); if(!tr) return;
+  auDrag = tr.dataset.lot; tr.classList.add("dragging"); ev.dataTransfer.effectAllowed = "move";
+  try{ ev.dataTransfer.setData("text/plain", (lotById(auDrag) || {}).name || ""); ev.dataTransfer.setDragImage(tr, 20, 16); }catch(e){}
+});
+auListEl.addEventListener("dragover", ev => {
+  if(!auDrag) return;
+  const tr = ev.target.closest("tr[data-lot]"); if(!tr || tr.dataset.lot === auDrag) return;
+  ev.preventDefault(); ev.dataTransfer.dropEffect = "move";
+  auListEl.querySelectorAll("tr.drop").forEach(x => x !== tr && x.classList.remove("drop")); tr.classList.add("drop");
+});
+auListEl.addEventListener("dragleave", ev => { const tr = ev.target.closest && ev.target.closest("tr[data-lot]"); if(tr && !tr.contains(ev.relatedTarget)) tr.classList.remove("drop"); });
+function auDragEnd(){ auDrag = null; auListEl.querySelectorAll("tr.drop,tr.dragging").forEach(x => x.classList.remove("drop", "dragging")); if(auListDirty) renderAuList(); }
+auListEl.addEventListener("dragend", auDragEnd);
+auListEl.addEventListener("drop", async ev => {
+  ev.preventDefault();
+  const from = lotById(auDrag), tr = ev.target.closest("tr[data-lot]"), to = tr && lotById(tr.dataset.lot);
+  auDragEnd();
+  if(!from || !to || from.id === to.id) return;
+  const ok = await confirmBox(`Об'єднати «${from.name}» з «${to.name}»?
+
+Ставки лота «${from.name}» (${fmtN(from.amount)} балів) перейдуть до «${to.name}», суми складуться.`, "Об'єднати", "Скасувати");
+  if(!ok) return;
+  setState(await call("AuctionMergeLots", from.id, to.id));
+  toast("Лоти об'єднано");
 });
 
 // ----- стрічка ставок -----

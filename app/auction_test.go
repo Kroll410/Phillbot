@@ -27,8 +27,8 @@ func TestAuctionFlow(t *testing.T) {
 		t.Fatal("timer 10 min")
 	}
 	a.onRedemption(bid("2", "q", "Квиток", "u1", "Elden Ring", 1000), User{})
-	a.onRedemption(bid("3", "m", "Мегаквиток", "u2", "elden  ring", 10000), User{}) // та сама назва → додати
-	a.onRedemption(bid("3", "m", "Мегаквиток", "u2", "elden  ring", 10000), User{}) // дубль події
+	a.onRedemption(bid("3", "m", "Мегаквиток", "u2", "elden  ring", 10000), User{})   // та сама назва → додати
+	a.onRedemption(bid("3", "m", "Мегаквиток", "u2", "elden  ring", 10000), User{})   // дубль події
 	a.onRedemption(bid("4", "s", "Середній квиток", "u3", "Elden Rng", 5000), User{}) // схоже → питання
 	a.onRedemption(bid("5", "s", "Середній квиток", "u3", "Hades", 5000), User{})
 	au := &a.st.Auction
@@ -91,5 +91,27 @@ func TestSimilarity(t *testing.T) {
 		if got := similarity(c.a, c.b) >= similarThreshold; got != c.sim {
 			t.Errorf("%q~%q = %v (%.2f)", c.a, c.b, got, similarity(c.a, c.b))
 		}
+	}
+}
+
+func TestAuctionMerge(t *testing.T) {
+	a := newTestApp(t)
+	a.AuctionSaveSettings(AuctionSettings{RewardIDs: []string{"q"}})
+	a.AuctionStart()
+	a.onRedemption(bid("1", "q", "Квиток", "u1", "Elden Ring", 1000), User{})
+	a.onRedemption(bid("2", "q", "Квиток", "u2", "Elden Ring", 1000), User{})
+	a.onRedemption(bid("3", "q", "Квиток", "u1", "Shadow of Erdtree", 5000), User{})
+	a.onRedemption(bid("4", "q", "Квиток", "u3", "Shadow of Erdtre", 1000), User{}) // схоже → питання
+	au := &a.st.Auction
+	er, eld := au.Lots[1].ID, au.Lots[0].ID
+	a.AuctionMergeLots(er, eld)
+	if len(au.Lots) != 1 || au.Lots[0].Amount != 7000 || au.Lots[0].Bids != 3 || len(au.Lots[0].Users) != 2 {
+		t.Fatalf("merged %+v", au.Lots)
+	}
+	if au.Feed[0].Status != "pending" || au.Feed[0].SuggestID != eld || au.Feed[0].SuggestName != "Elden Ring" {
+		t.Fatalf("pending suggestion %+v", au.Feed[0])
+	}
+	if au.Feed[1].LotID != eld {
+		t.Fatal("feed lot id")
 	}
 }

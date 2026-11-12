@@ -465,6 +465,12 @@ func (a *App) AuctionMergeLots(from, to string) Snapshot {
 			if au.Feed[k].LotID == from {
 				au.Feed[k].LotID = to
 			}
+			if au.Feed[k].SuggestID == from { // пропозиція «Додати до X?» тепер про об'єднаний лот
+				au.Feed[k].SuggestID, au.Feed[k].SuggestName = to, au.Lots[j].Name
+			}
+		}
+		if au.Winner == from {
+			au.Winner = to
 		}
 		au.Lots = append(au.Lots[:i], au.Lots[i+1:]...)
 	})

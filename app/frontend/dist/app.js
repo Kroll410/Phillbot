@@ -192,7 +192,8 @@ function renderTimer(){
   $("startBtn").textContent = s.status==="paused" ? "Продовжити" : "Старт";
   $("pauseBtn").disabled = s.status!=="running";
   $("stopBtn").disabled = !(s.status==="running"||s.status==="paused");
-  $("minusBtn").disabled = s.status==="finished";
+  const going = s.status==="running" || s.status==="paused"; // ±1 хв — лише коли збір іде або на паузі
+  $("minusBtn").disabled = !going; $("plusBtn").disabled = !going;
   $("timer").parentElement.classList.toggle("live", s.status==="running");
 }
 setInterval(renderTimer, 250);

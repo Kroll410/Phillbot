@@ -511,13 +511,9 @@ func (a *App) AddTime(ms int64) Snapshot {
 		switch s.Status {
 		case "running":
 			s.EndsAt = max64(now+1000, s.EndsAt+ms)
-		case "paused", "idle":
+		case "paused":
 			s.RemainingMs = max64(1000, s.RemainingMs+ms)
-		case "finished":
-			if ms > 0 {
-				s.EndsAt, s.Status = now+ms, "running"
-			}
-		}
+		} // до старту й після завершення ±1 хв не діє — збір не йде
 	})
 }
 

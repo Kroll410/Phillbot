@@ -65,10 +65,10 @@ func TestTimerAndRedeems(t *testing.T) {
 	if a.st.Session.Status != "finished" {
 		t.Fatal("finish")
 	}
-	// після завершення +1 хв відновлює збір
+	// після завершення ±1 хв не діє — збір не йде
 	a.AddTime(60000)
-	if a.st.Session.Status != "running" {
-		t.Fatal("resume via +1")
+	if a.st.Session.Status != "finished" {
+		t.Fatal("+1 must not resume a finished collection")
 	}
 	// повторний redeem з тим самим id ігнорується; інша нагорода — теж
 	a.st.Session.Status = "running"
@@ -223,11 +223,10 @@ func TestEachStartIsNewCollection(t *testing.T) {
 	if !strings.HasPrefix(txt, "\xEF\xBB\xBFsep=;\r\n") || !strings.Contains(txt, "Dark Souls;158;2;") {
 		t.Fatalf("%q", txt)
 	}
-	s := a.AddTime(60000) // +1 хв після завершення — той самий збір
-	if s.Session.Status != "running" || len(s.Entries) != 2 {
+	s := a.AddTime(60000) // +1 хв після завершення не діє
+	if s.Session.Status != "finished" || len(s.Entries) != 2 {
 		t.Fatal("+1 after finish")
 	}
-	a.FinishTimer()
 	s = a.StartTimer() // наступний збір того ж стріму
 	if len(s.Entries) != 0 || s.CollN != 2 || len(s.Past) != 1 || s.Stream.ID != streamID {
 		t.Fatalf("second collection: coll=%d past=%d stream=%s", s.CollN, len(s.Past), s.Stream.ID)

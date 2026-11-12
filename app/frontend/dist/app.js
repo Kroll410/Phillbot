@@ -988,7 +988,7 @@ function renderAuList(){
     const before = {};
     auListEl.querySelectorAll(".autop-i[data-lot]").forEach(el => before[el.dataset.lot] = el.getBoundingClientRect().top);
     $("auList").innerHTML = `<div class="autop">` + top.map((l, i) => `<div class="autop-i${au.winner === l.id ? " win wglow" : ""}${gone(l) && au.winner !== l.id ? " out" : ""}" data-lot="${esc(l.id)}" style="--c:${lotColor(l.id)}">
-        <span class="rk">${i + 1}</span><span class="nm" title="${esc(l.name)}">${esc(l.name)}</span><span class="am">${POINTS_ICON}${fmtN(l.amount)}</span>
+        <span class="rk">${i + 1}</span><span class="nm" title="${esc(l.name)}">${esc(l.name)}</span><span class="am" title="${fmtN(l.amount)} балів">${l.hidden ? "приховано" : au.winner === l.id ? `Переміг із ${(chanceOf(l) * 100).toFixed(1)}%` : `${(chanceOf(l) * 100).toFixed(1)}%`}</span>
         <span class="bar"><i style="width:${(chanceOf(l) * 100).toFixed(1)}%"></i></span></div>`).join("")
       + `</div>` + (au.lots.length > 3 ? `<div class="auinfo">і ще ${au.lots.length - 3} ${au.lots.length - 3 === 1 ? "лот" : "лотів"}</div>` : "");
     auListEl.querySelectorAll(".autop-i[data-lot]").forEach(el => {

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>СабДей</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>Саб<span>Дей</span></h1>
+  <div class="mode-switch">
+    <button class="active" title="Поточний івент">СабДей</button>
+    <button disabled title="Механіку ще не описано — додамо пізніше">Переглядовий (скоро)</button>
+  </div>
+  <div class="conn">
+    <span class="dot" id="connDot"></span>
+    <span id="connText" class="muted">Не підключено</span>
+    <span id="userBox"></span>
+  </div>
+</header>
+
+<!-- екран входу -->
+<div id="authScreen" class="auth hidden">
+  <div class="card authcard">
+    <div id="authNoClient" class="hidden">
+      <h2>Перший запуск</h2>
+      <p>Потрібен <b>Client ID</b> застосунку Twitch (тип <b>Public</b>).</p>
+      <ol class="hint">
+        <li>Відкрийте <a href="#" data-url="https://dev.twitch.tv/console/apps">dev.twitch.tv/console/apps</a> → Register Your Application.</li>
+        <li>OAuth Redirect URL: <code>http://localhost</code>, Category: <i>Application Integration</i>, Client Type: <b>Public</b>.</li>
+        <li>Скопіюйте Client ID сюди.</li>
+      </ol>
+      <div class="row"><input id="clientIdInput" placeholder="Client ID"><button id="clientIdSave" class="primary" style="flex:0">Далі</button></div>
+    </div>
+    <div id="authLogin" class="hidden">
+      <h2>Вхід у Twitch</h2>
+      <p>Увійдіть під акаунтом <b>каналу</b>, щоб програма бачила погашення нагород і підписки.</p>
+      <p id="authMsg" class="err hidden"></p>
+      <div class="row"><button id="loginBtn" class="primary">Увійти через Twitch</button></div>
+      <p class="hint"><a href="#" id="changeClient">Змінити Client ID</a></p>
+    </div>
+    <div id="authPending" class="hidden">
+      <h2>Підтвердіть вхід у браузері</h2>
+      <p>Браузер відкрито. Якщо Twitch попросить код, введіть:</p>
+      <div class="code" id="authCode">—</div>
+      <p class="hint">Сторінка: <a href="#" id="authUri"></a></p>
+      <div class="row"><button id="cancelLogin">Скасувати</button></div>
+    </div>
+    <div id="authChecking" class="hidden"><h2>Перевірка входу…</h2></div>
+  </div>
+</div>
+
+<main id="mainScreen">
+  <aside>
+    <div class="card">
+      <h2>Збір замовлень</h2>
+      <div class="timer idle" id="timer">10:00</div>
+      <div class="status" id="statusText">Очікування старту</div>
+      <div class="btns">
+        <button class="primary wide" id="startBtn">▶ Почати збір</button>
+        <button id="pauseBtn" disabled>⏸ Пауза</button>
+        <button id="stopBtn" disabled>⏹ Завершити</button>
+        <button id="plusBtn">+1 хв</button>
+        <button id="minusBtn">−1 хв</button>
+      </div>
+      <label>Тривалість збору (хв)</label>
+      <input type="number" id="duration" min="1" step="1" value="10">
+      <div class="hint">Замовлення записуються лише поки йде таймер.</div>
+    </div>
+
+    <div class="card">
+      <h2>Нагорода за бали каналу</h2>
+      <div id="rewardBound" class="hint">Нагороду ще не вибрано.</div>
+      <div class="row" style="margin-top:6px">
+        <select id="rewardSelect"><option value="">— виберіть нагороду —</option></select>
+        <button id="rewardRefresh" style="flex:0" title="Оновити список">⟳</button>
+      </div>
+      <div id="rewardsErr" class="hint err"></div>
+      <details>
+        <summary>Отримані погашення / ввести ID вручну</summary>
+        <div id="seenRewards"></div>
+        <div class="row" style="margin-top:6px">
+          <input id="rewardIdInput" placeholder="custom-reward-id">
+          <button id="rewardIdSave" style="flex:0">OK</button>
+        </div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>Правила балів</h2>
+      <div class="row">
+        <div><label>Тір 1 ×</label><input type="number" id="m1" min="0" step="1"></div>
+        <div><label>Тір 2 ×</label><input type="number" id="m2" min="0" step="1"></div>
+        <div><label>Тір 3 ×</label><input type="number" id="m3" min="0" step="1"></div>
+      </div>
+      <label>Бали для не-підписника</label>
+      <input type="number" id="nonSub" min="0" step="1">
+      <label>Кілька замовлень від однієї людини</label>
+      <select id="dupMode">
+        <option value="last">Рахується лише останнє</option>
+        <option value="first">Рахується лише перше</option>
+        <option value="all">Рахуються всі</option>
+      </select>
+      <div class="hint">Бали = множник тіра × місяці підписки. Тір — з Twitch API, місяці — з бейджа в чаті; можна виправити в таблиці.</div>
+    </div>
+
+    <div class="card">
+      <h2>Marbles on Stream</h2>
+      <div class="row">
+        <div><label>Макс. куль</label><input type="number" id="cap" min="1" max="1000" step="1"></div>
+        <div><label>Макс. довжина назви</label><input type="number" id="nameMax" min="5" max="100" step="1"></div>
+      </div>
+      <div class="row">
+        <div><label>Назва кулі</label>
+          <select id="nameFormat"><option value="order">Назва замовлення</option><option value="orderPts">Назва + бали</option></select></div>
+        <div><label>Кодування файлу</label>
+          <select id="encoding"><option value="utf8">UTF-8</option><option value="utf16">UTF-16</option></select></div>
+      </div>
+      <div class="hint" id="marblePreview">—</div>
+      <div class="btns" style="margin-top:10px">
+        <button class="primary wide" id="exportMarbles">🎱 Експорт у Marbles</button>
+        <button id="copyMarbles">Копіювати список</button>
+        <button id="openMarbles">Папка marbles</button>
+      </div>
+      <details>
+        <summary>Як завантажити в гру</summary>
+        <div class="hint">Шлях до файлу вже в буфері обміну. У грі: Race → Simulate → ⚙ Settings (праворуч унизу) → Simulation Settings → увімкнути <b>Use Custom Names</b> → <b>Add Names</b> → <b>Open</b> → <b>Ctrl+V</b> у полі «Ім'я файлу» → Enter. Потім Bots-гонка на стільки куль, скільки рядків. Якщо кирилиця — кракозябри, виберіть UTF-16 і експортуйте ще раз.</div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>Дані</h2>
+      <div class="btns">
+        <button id="exportCsv">⬇ Excel (.csv)</button>
+        <button id="exportJson">⬇ JSON</button>
+        <button id="openExports">Папка експорту</button>
+        <button id="openHistory">Історія зборів</button>
+        <button id="newSession" class="danger wide">Новий збір (архівувати й очистити)</button>
+      </div>
+      <details>
+        <summary>Додати замовлення вручну</summary>
+        <label>Нік</label><input id="mUser">
+        <div class="row">
+          <div><label>Тір</label><select id="mTier"><option value="0">не саб</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+          <div><label>Місяці</label><input id="mMonths" type="number" min="1" value="1"></div>
+        </div>
+        <label>Замовлення</label><input id="mText">
+        <button id="mAdd" style="margin-top:8px;width:100%">Додати</button>
+      </details>
+    </div>
+  </aside>
+
+  <section>
+    <div class="stats">
+      <div class="stat"><b id="sEntries">0</b><span>замовлень</span></div>
+      <div class="stat"><b id="sUsers">0</b><span>чатерсів</span></div>
+      <div class="stat"><b id="sUnique">0</b><span>унікальних варіантів</span></div>
+      <div class="stat"><b id="sPoints">0</b><span>балів усього</span></div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-tab="summary">Підсумок за замовленнями</button>
+      <button class="tab" data-tab="entries">Усі замовлення</button>
+      <button class="tab" data-tab="log">Журнал</button>
+      <input id="search" placeholder="Пошук…">
+    </div>
+    <div class="tablewrap" id="tableWrap"></div>
+    <div class="hint" style="margin-top:8px">Однакові замовлення (без урахування регістру, зайвих пробілів і розділових знаків у кінці) об'єднуються. Щоб злити варіанти з помилками, виправте текст в «Усі замовлення».</div>
+  </section>
+</main>
+
+<div class="modal" id="modal"><div class="box"><p id="modalText"></p><div class="row"><button id="modalNo">Скасувати</button><button id="modalYes" class="primary">Так</button></div></div></div>
+<div id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

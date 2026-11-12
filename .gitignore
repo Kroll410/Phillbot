@@ -1,8 +1,13 @@
-# секрети й локальні дані — ніколи не комітити
+﻿# секрети й локальні дані — ніколи не комітити
 config.json
 tokens.json
 redemptions.csv
 marbles/
+subday_state.json
+subday_state.json.tmp
+history/
+exports/
+app/frontend/wailsjs/
 *.exe
 build/bin/
 node_modules/

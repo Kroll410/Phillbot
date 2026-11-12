@@ -54,6 +54,15 @@ GitHub: `kroll44`. Мережевий доступ середовища — Trus
 - збереження стану/історії в JSON поруч з exe; секрети не комітити (.gitignore вже є).
 - Інтерфейс українською. Готовий exe класти в `C:\dev\SubDay` на ПК користувача.
 
+## Зроблено 2026-11-12: Wails-програма `app/`
+- `SubDay.exe` (Wails v2.17.1, Go 1.27, без Node/CGO) зібрано й покладено в `C:\dev\SubDay\`.
+- Go: `app.go` (стан, таймер, методи для UI), `twitch.go` (Device Code, Helix, EventSub), `export.go`
+  (Marbles/CSV/JSON), `state.go` (`subday_state.json`, архів у `history/`). UI: `frontend/dist/` з `ui-draft.html`.
+- Перший запуск питає Client ID (зберігається в `config.json`, як у бота). Нагорода «СабДей…» вибирається автоматично.
+- Ще не перевірено на живому каналі: вхід через GUI, отримання redeem-ів, кирилиця в Marbles.
+- Код у GitHub: `Kroll410/Phillbot` (main), а не `kroll44/subday-bot`.
+- Наступне — `docs/PLAN-db-obs-chat.md` (БД, OBS, чат).
+
 ## Де що лежить
 - ПК: `C:\dev\SubDay\` — `subday-bot\` (git-репо), `SubDayBot-test.zip`, `subday-source.zip`, `subday-bot-repo.zip`.
   У git увімкнено `core.fileMode false` (Windows-права файлів).

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "SubDay",
+  "outputfilename": "SubDay",
+  "frontend:dir": "frontend",
+  "frontend:install": "",
+  "frontend:build": "",
+  "wailsjsdir": "./frontend",
+  "author": {
+    "name": "SubDay"
+  },
+  "info": {
+    "companyName": "SubDay",
+    "productName": "SubDay",
+    "productVersion": "0.1.0",
+    "copyright": "",
+    "comments": "Збір замовлень СабДей для Twitch"
+  }
+}

@@ -962,7 +962,8 @@ function wheelSectors(){
   return au.lots.filter(l => !l.out && !l.hidden && l.amount > 0).map(l => ({id: l.id, w: elim ? 1 / l.amount : l.amount}));
 }
 function chanceOf(lot){
-  const act = AU().lots.filter(l => !l.out && !l.hidden && l.amount > 0); if(lot.out || lot.hidden || !act.length) return 0;
+  // шанс перемогти — від сум усіх лотів на колесі до обертів (вибування його не обнуляє)
+  const act = AU().lots.filter(l => !l.hidden && l.amount > 0); if(lot.hidden || !act.length) return 0;
   return lot.amount / act.reduce((a, l) => a + l.amount, 0); // шанс перемогти пропорційний сумі
 }
 
@@ -988,7 +989,7 @@ function renderAuList(){
     auListEl.querySelectorAll(".autop-i[data-lot]").forEach(el => before[el.dataset.lot] = el.getBoundingClientRect().top);
     $("auList").innerHTML = `<div class="autop">` + top.map((l, i) => `<div class="autop-i${au.winner === l.id ? " win wglow" : ""}${gone(l) && au.winner !== l.id ? " out" : ""}" data-lot="${esc(l.id)}" style="--c:${lotColor(l.id)}">
         <span class="rk">${i + 1}</span><span class="nm" title="${esc(l.name)}">${esc(l.name)}</span><span class="am">${POINTS_ICON}${fmtN(l.amount)}</span>
-        <span class="bar"><i style="width:${(au.winner === l.id ? 100 : chanceOf(l) * 100).toFixed(1)}%"></i></span></div>`).join("")
+        <span class="bar"><i style="width:${(chanceOf(l) * 100).toFixed(1)}%"></i></span></div>`).join("")
       + `</div>` + (au.lots.length > 3 ? `<div class="auinfo">і ще ${au.lots.length - 3} ${au.lots.length - 3 === 1 ? "лот" : "лотів"}</div>` : "");
     auListEl.querySelectorAll(".autop-i[data-lot]").forEach(el => {
       const was = before[el.dataset.lot], now = el.getBoundingClientRect().top;
@@ -1005,7 +1006,8 @@ function renderAuList(){
     + lots.map((l, i) => {
       const who = [...l.users].sort((a, b) => b.amount - a.amount);
       const users = who.slice(0, 6).map(u => `${userTag(u)}<span class="muted uam">${fmtN(u.amount)}</span>`).join(" ") + (who.length > 6 ? ` <span class="muted">+${who.length - 6}</span>` : "");
-      const st = au.winner === l.id ? `<span class="lwin">Переможець</span>` : l.hidden ? `<span class="muted">приховано</span>` : l.out ? `<span class="lout">вибув · ${l.out}-й оберт</span>` : `${(chanceOf(l) * 100).toFixed(1)}%`;
+      const pct = `${(chanceOf(l) * 100).toFixed(1)}%`;
+      const st = l.hidden ? `<span class="muted">приховано</span>` : au.winner === l.id ? `<span class="lwin">Переміг із ${pct}</span>` : pct;
       return `<tr data-lot="${esc(l.id)}"${au.winner ? "" : ' draggable="true"'} class="${l.hidden ? "off " : ""}${l.out ? "out" : ""}${au.winner === l.id ? " win" : ""}${auFresh.has(l.id) ? " fresh" : ""}">
         <td class="gripcol"><span class="grip" title="Перетягніть рядок на інший лот, щоб об'єднати їх">⠿</span></td>
         <td class="num">${l.out ? "" : i + 1}</td>

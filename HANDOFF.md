@@ -52,8 +52,9 @@ GitHub: `kroll44`. Мережевий доступ середовища — Trus
 - таблиці «Підсумок» і «Усі замовлення» з редагуванням; налаштування балів;
 - кнопка Marbles (як команда `marbles`), експорт в Excel (CSV з BOM);
 - збереження стану/історії в JSON поруч з exe; секрети не комітити (.gitignore вже є).
-- Інтерфейс українською. Готовий exe класти в `Документи\SubDay` на ПК користувача.
+- Інтерфейс українською. Готовий exe класти в `C:\dev\SubDay` на ПК користувача.
 
 ## Де що лежить
-- ПК: `C:\Users\k\Documents\SubDay\` — `subday-bot\` (git-репо), `SubDayBot-test.zip`, `subday-source.zip`.
+- ПК: `C:\dev\SubDay\` — `subday-bot\` (git-репо), `SubDayBot-test.zip`, `subday-source.zip`, `subday-bot-repo.zip`.
+  У git увімкнено `core.fileMode false` (Windows-права файлів).
 - GitHub: репо `kroll44/subday-bot` (private) — користувач створює вручну; запушити `main`.

@@ -100,9 +100,7 @@ func defaultState() State {
 
 func (s *Settings) normalize() {
 	d := defaultSettings()
-	if s.DurationMin < 1 {
-		s.DurationMin = d.DurationMin
-	}
+	s.DurationMin = 10 // збір замовлень завжди 10 хв (±1 хв кнопками); налаштування прибрано
 	// правила балів фіксовані: T1×1, T2×2, T3×3, не-підписник 0, від чатерса — останнє замовлення
 	s.Mult, s.NonSubPoints, s.DupMode = map[string]int{"1": 1, "2": 2, "3": 3}, 0, "last"
 	if s.Mult == nil {
@@ -143,6 +141,9 @@ func loadState(file string) State {
 		_ = json.Unmarshal(b, &st)
 	}
 	st.Settings.normalize()
+	if st.Session.Status == "idle" || st.Session.Status == "" { // ще не почато — завжди повні 10 хв
+		st.Session.RemainingMs = int64(st.Settings.DurationMin) * 60000
+	}
 	if st.Entries == nil {
 		st.Entries = []Entry{}
 	}

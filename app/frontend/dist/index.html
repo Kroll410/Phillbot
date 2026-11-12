@@ -25,14 +25,15 @@
 <!-- загальні налаштування -->
 <div class="modal" id="generalModal"><div class="box settings">
   <h2>Загальні налаштування</h2>
+  <h3>Віджет для OBS</h3>
+  <div id="obsWidget" class="owidget"></div>
+  <div class="hint">OBS → Джерела → «+» → <b>Браузер</b> → вставте URL, розмір 640×360. Віджет сам показує збір, гру й голосування.</div>
+  <label>Порт локального сервера (127.0.0.1)</label>
+  <input type="number" id="obsPort" min="1024" max="65000" step="1" style="max-width:160px">
+  <div class="hint">Працює лише на цьому комп'ютері. Після зміни порту оновіть URL у джерелі OBS.</div>
   <h3>Акаунт Twitch</h3>
   <div id="accountInfo" class="hint"></div>
   <div class="row" style="margin-top:8px"><button id="logoutBtn2">Вийти з акаунта</button><button id="changeClient2">Змінити Client ID</button></div>
-  <h3>OBS</h3>
-  <label>Порт локального сервера (127.0.0.1)</label>
-  <input type="number" id="obsPort" min="1024" max="65000" step="1">
-  <div id="obsWidget"></div>
-  <div class="hint">Віджет працює лише на цьому комп'ютері. Після зміни порту оновіть URL у джерелі OBS.</div>
   <h3>Файли</h3>
   <div class="row"><button id="openBase">Папка програми</button></div>
   <div class="row actions" style="margin-top:16px">

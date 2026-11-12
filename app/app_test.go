@@ -362,6 +362,9 @@ func TestGamePhase(t *testing.T) {
 	if s.Phase != "collect" {
 		t.Fatal("next collection")
 	}
+	if _, err := a.SetWinner("Hades"); err == nil {
+		t.Fatal("second winner for the same collection allowed")
+	}
 	s = a.StartTimer() // новий збір — переможець і прапорець експорту скидаються
 	if s.Winner != "" || s.Exported || s.Phase != "collect" || s.CollN != 2 {
 		t.Fatalf("%+v", s.Phase)

@@ -456,23 +456,42 @@ h1,h2,h3,h4{font-family:var(--font-display)}
 .card h2,.cuhead,th,.glabel,.settings h3:not(.twitchfont){font-family:var(--font-ui)}
 .settings h3.row>.icon-btn{flex:0 0 34px}
 
-/* ---------- «Переможець»: затисніть — кнопка наповнюється водою (зелений → фіолетовий) ---------- */
-.winbtn{position:relative;overflow:hidden;border:1px solid rgba(145,71,255,.55);background:rgba(145,71,255,.1);color:#e9dcff;
-  font-weight:700;border-radius:9px;padding:6px 14px;min-width:120px;user-select:none;touch-action:none}
-.winbtn:hover{background:rgba(145,71,255,.18)!important;border-color:#a970ff}
-.winbtn .wl{position:relative;z-index:2;text-shadow:0 1px 2px rgba(0,0,0,.5)}
-.winbtn .water{position:absolute;left:0;top:0;bottom:0;width:0;z-index:1;background:linear-gradient(90deg,#00c853,#4fd27a 30%,#9147ff);
-  transition:width .35s ease}
-.winbtn .water::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.18) 0 6px,transparent 6px 16px);
-  background-size:40px 100%;animation:wshimmer .7s linear infinite}
-.winbtn .water i{position:absolute;right:-7px;top:-20%;bottom:-20%;width:14px;
-  background:radial-gradient(circle at 0 50%,transparent 6px,#9147ff 7px) 0 0/14px 12px repeat-y;animation:wwave .5s linear infinite}
-.winbtn.holding .water{width:100%;transition:width 1.4s cubic-bezier(.35,.05,.45,1)}
-.winbtn.drain .water{width:0;transition:width .35s ease}
-.winbtn.full{border-color:#c9a6ff;box-shadow:0 0 0 3px rgba(145,71,255,.35),0 0 18px rgba(0,200,83,.45)}
-.winbtn.full .water i{display:none}
-@keyframes wshimmer{to{background-position:40px 0}}
-@keyframes wwave{to{background-position:0 12px}}
+/* ---------- «Переможець»: затисніть і тримайте ----------
+   Натиск — кнопка вдавлюється; рідина з градієнтом зелений → фіолетовий заповнює її зліва направо (рух — у JS, змінна --p). */
+.winbtn{--p:0;--w:132px;position:relative;overflow:hidden;isolation:isolate;min-width:132px;height:34px;padding:0 16px;border-radius:10px;
+  border:1px solid rgba(145,71,255,.5);background:linear-gradient(180deg,#2a2236,#211b2b);color:#e9dcff;font-weight:700;letter-spacing:.2px;
+  user-select:none;touch-action:none;transform:translateY(0) scale(1);
+  box-shadow:0 2px 0 rgba(0,0,0,.45),0 4px 12px rgba(145,71,255,.12),inset 0 1px 0 rgba(255,255,255,.06);
+  transition:transform .14s cubic-bezier(.3,.7,.4,1),box-shadow .14s,border-color .2s}
+.winbtn:hover{border-color:#a970ff;background:linear-gradient(180deg,#2f2640,#251e31)!important}
+.winbtn.pressed{transform:translateY(2px) scale(.955);border-color:#b78bff;
+  box-shadow:0 0 0 rgba(0,0,0,0),inset 0 3px 10px rgba(0,0,0,.55),0 0 0 4px rgba(145,71,255,.18)}
+.winbtn.near{animation:near .12s linear infinite}
+@keyframes near{0%,100%{translate:0 0}25%{translate:.6px 0}75%{translate:-.6px 0}}
+.winbtn .wl{position:relative;z-index:3;transition:color .2s;text-shadow:0 1px 2px rgba(0,0,0,.45)}
+.winbtn.pressed .wl{color:#fff}
+.winbtn .liquid{position:absolute;inset:0;z-index:1;pointer-events:none}
+.winbtn .lq-fill{position:absolute;left:0;top:0;bottom:0;width:calc(var(--p) * 100%);overflow:hidden;
+  background:linear-gradient(90deg,#00c853,#38d68a 28%,#7a6cff 68%,#9147ff) 0 0 / var(--w) 100% no-repeat;
+  box-shadow:inset 0 -6px 12px rgba(0,0,0,.18)}
+.winbtn .lq-edge{position:absolute;top:-4px;bottom:-4px;left:calc(var(--p) * 100% - 1px);width:10px;overflow:visible;opacity:calc(min(1, var(--p) * 12));
+  filter:drop-shadow(2px 0 4px rgba(185,140,255,.7))}
+.winbtn .lq-edge path{fill:#8f5cff;animation:edge 1.1s linear infinite}
+.winbtn .lq-edge path.e2{fill:rgba(220,200,255,.35);animation-duration:.8s}
+@keyframes edge{from{transform:translateY(-15px)}to{transform:translateY(0)}}
+.winbtn .lq-gloss{position:absolute;inset:0;border-radius:inherit;z-index:2;
+  background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.04) 42%,transparent 55%)}
+.winbtn .bub{position:absolute;bottom:-6px;width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.55);opacity:0}
+.winbtn.pressed .bub{animation:bub 1.1s ease-in infinite}
+.winbtn .bub:nth-child(1){left:12%;animation-delay:.05s} .winbtn .bub:nth-child(2){left:38%;width:3px;height:3px;animation-delay:.4s}
+.winbtn .bub:nth-child(3){left:62%;animation-delay:.7s} .winbtn .bub:nth-child(4){left:85%;width:4px;height:4px;animation-delay:.25s}
+@keyframes bub{0%{transform:translateY(0);opacity:0}20%{opacity:.8}100%{transform:translateY(-38px);opacity:0}}
+.winbtn.full{border-color:#e2cfff;animation:fullpop .38s cubic-bezier(.2,1.6,.4,1);
+  box-shadow:0 0 0 4px rgba(145,71,255,.35),0 0 22px rgba(0,200,83,.55),0 0 40px rgba(145,71,255,.5)}
+.winbtn.full .lq-edge{display:none}
+.winbtn.full::after{content:"";position:absolute;inset:0;z-index:4;border-radius:inherit;background:#fff;animation:flash .38s ease-out forwards}
+@keyframes fullpop{0%{transform:scale(.955)}55%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes flash{from{opacity:.75}to{opacity:0}}
 /* блискітки на весь екран */
 .sparkles{position:fixed;inset:0;width:100%;height:100%;z-index:60;pointer-events:none;display:none}
 .sparkles.on{display:block}
@@ -493,3 +512,8 @@ h1,h2,h3,h4{font-family:var(--font-display)}
 .vopt b{position:relative;font:800 30px/1 var(--font-display)} .vopt.v1 b{color:#00e676} .vopt.v2 b{color:#c9a6ff}
 .vopt span{position:relative;font-weight:600}
 .vopt em{position:relative;font-style:normal;font:700 15px/1 var(--font-ui);font-variant-numeric:tabular-nums;color:var(--muted)}
+/* степер: оптичне центрування цифр у колі (виміряно: гліф на 1px нижче, «1» на ~0.8px лівіше) */
+.step .num{padding:0 0 2px;font-variant-numeric:tabular-nums}
+.step[data-step="1"] .num{padding-left:1.5px}
+.owidget .obsrow{background:var(--panel2);border:1px solid var(--line);margin:0;padding:10px 12px}
+.owidget .obsrow code{font-size:12.5px;color:#c9a6ff}

@@ -197,7 +197,7 @@ function rewardTile(r, opts={}){
   if(r.is_enabled===false) tags.push(`<span class="rtag off">вимкнена</span>`);
   if(r.is_user_input_required===false) tags.push(`<span class="rtag" title="Глядачі не вводять текст — замовлення не записуватимуться">без тексту</span>`);
   const tag = opts.button ? "button" : "div";
-  return `<${tag} class="rtile${opts.sel?" sel":""}${r.is_enabled===false?" off":""}" ${opts.button?`data-rid="${esc(r.id)}" title="${esc(r.title)}"`:""} style="--rbg:${esc(r.background_color||"#9147ff")}">
+  return `<${tag} class="rtile${opts.sel?" sel":""}${r.is_enabled===false?" off":""}" ${opts.button?`data-rid="${esc(r.id)}" title="${esc(r.title)}"`:""} style="--rbg:${esc(r.background_color||"#9147ff")}${opts.delay!=null?`;animation-delay:${opts.delay}ms`:""}">
     <div class="rimg"><img src="${esc(rewardImg(r))}" alt="" onerror="this.style.visibility='hidden'">${r.cost!=null?`<span class="rcost">${POINTS_ICON}${Number(r.cost).toLocaleString("uk-UA")}</span>`:""}</div>
     <div class="rtitle">${esc(r.title||"(без назви)")}</div>${tags.length?`<div class="rtags">${tags.join("")}</div>`:""}</${tag}>`;
 }
@@ -221,7 +221,7 @@ function renderRewardGrid(animate){
   if(sel && !all.some(r=>r.id===sel)){ const r = rewardById(sel); if(r) all.unshift(r); }
   let html;
   if(showAllRewards){
-    html = all.map((r,i)=>rewardTile(r,{button:true, sel:r.id===sel}).replace('class="rtile', `style="animation-delay:${animate? i*45 : 0}ms" class="rtile${animate?" appear":""}`)).join("");
+    html = all.map((r,i)=>rewardTile(r,{button:true, sel:r.id===sel, delay: animate ? i*45 : null}).replace('class="rtile', `class="rtile${animate?" appear":""}`)).join("");
     if(!all.length) html = `<div class="hint">Список нагород порожній. Натисніть «Оновити».</div>`;
   } else {
     const cur = all.find(r=>r.id===sel);
@@ -366,7 +366,7 @@ function renderTable(){
         const open = openGroups.has(g.key);
         const main = `<tr class="grow${open?" open":""}" data-key="${esc(g.key)}" data-name="${esc(g.name)}"><td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
         <td class="num pts">${g.points}</td><td><div class="share"><div class="track"><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div></div><span>${(g.points/total*100).toFixed(0)}%</span></div></td>
-        <td class="num">${g.count}</td><td class="wincell">${canPickWinner() && g.points>0 ? `<button class="winbtn" data-win="${esc(g.name)}" title="Затисніть і тримайте, щоб вибрати переможцем"><span class="water"><i></i></span><span class="wl">Переможець</span></button>` : ""}</td><td class="chev" title="${open?"Згорнути":"Показати замовлення"}"><span></span></td></tr>`;
+        <td class="num">${g.count}</td><td class="wincell">${canPickWinner() && g.points>0 ? `<button class="winbtn" data-win="${esc(g.name)}" title="Затисніть і тримайте, щоб вибрати переможцем">${LIQUID}<span class="wl">Переможець</span></button>` : ""}</td><td class="chev" title="${open?"Згорнути":"Показати замовлення"}"><span></span></td></tr>`;
         if(!open) return main;
         const list = D().entries.filter(e=>counted.has(e.id) && norm(e.text)===g.key).sort((a,b)=>pointsOf(b)-pointsOf(a) || a.ts-b.ts);
         return main + `<tr class="gdetail"><td colspan="8"><table class="subtable"><thead><tr><th>Час</th><th>Чатерс</th><th>Тір сабки</th><th class="num">Має сабку</th><th class="num">Бали</th></tr></thead><tbody>${
@@ -537,22 +537,51 @@ $("newStreamBtn").onclick = async () => {
   setState(await call("NewStream")); loadStreams(); toast("Почато новий стрім");
 };
 /* ---------- етапи СабДею: 1 збір → 2 гра переможця ---------- */
-const canPickWinner = () => D().live && S.exported && S.phase !== "play";
-const HOLD_MS = 1400;
-let holding = null; // {btn, timer, name}
+// переможця можна вибрати раз на збір: після експорту в Marbles і поки його ще не вибрано
+const canPickWinner = () => D().live && S.exported && S.phase !== "play" && !S.winner;
+const HOLD_MS = 1500;
+// рідина: смуга з градієнтом, хвилястий передній край, бульбашки, скляний відблиск
+const LIQUID = `<span class="liquid"><span class="lq-fill"><b class="bub"></b><b class="bub"></b><b class="bub"></b><b class="bub"></b></span>`
+  + `<svg class="lq-edge" viewBox="0 0 12 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0 H5 C12 5 12 10 5 15 C-2 20 -2 25 5 30 C12 35 12 40 5 45 L0 45 Z"/><path class="e2" d="M0 0 H4 C9 6 9 12 4 18 C-1 24 -1 30 4 36 C9 42 9 48 4 54 L0 54 Z"/></svg>`
+  + `<span class="lq-gloss"></span></span>`;
+let holding = null; // {btn, name, p, t0, raf, mode:"fill"|"drain"}
+const easeFill = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; // плавно розганяється і плавно доходить
+function setLevel(btn, p){ btn.style.setProperty("--p", p.toFixed(4)); btn.style.setProperty("--w", btn.offsetWidth + "px"); }
 function holdStart(btn){
-  if(holding) return;
-  btn.classList.remove("drain"); void btn.offsetWidth; btn.classList.add("holding");
-  holding = {btn, name: btn.dataset.win, timer: setTimeout(holdDone, HOLD_MS)};
+  if(holding && holding.btn !== btn) return;
+  if(holding){ cancelAnimationFrame(holding.raf); }
+  const p0 = holding ? holding.p : 0;
+  holding = {btn, name: btn.dataset.win, p: p0, mode: "fill", t0: performance.now() - p0 * HOLD_MS};
+  btn.classList.add("pressed"); btn.classList.remove("drain");
+  const step = now => {
+    if(!holding || holding.btn !== btn || holding.mode !== "fill") return;
+    const t = Math.min(1, (now - holding.t0) / HOLD_MS);
+    holding.p = t; setLevel(btn, easeFill(t));
+    btn.classList.toggle("near", t > .8);
+    if(t >= 1) return holdDone();
+    holding.raf = requestAnimationFrame(step);
+  };
+  holding.raf = requestAnimationFrame(step);
 }
 function holdCancel(){
-  if(!holding) return;
-  clearTimeout(holding.timer);
-  holding.btn.classList.remove("holding"); holding.btn.classList.add("drain");
-  holding = null; if(tableDirty) setTimeout(renderTable, 400);
+  if(!holding || holding.mode !== "fill") return;
+  const h = holding; cancelAnimationFrame(h.raf); h.mode = "drain";
+  h.btn.classList.remove("pressed","near"); h.btn.classList.add("drain");
+  const from = easeFill(h.p), t0 = performance.now(), dur = 260 + 340 * from;
+  const step = now => {
+    if(holding !== h) return;
+    const t = Math.min(1, (now - t0) / dur), lvl = from * (1 - (1 - Math.pow(1 - t, 3)));
+    setLevel(h.btn, lvl); h.p = 0;
+    if(t < 1) h.raf = requestAnimationFrame(step);
+    else { h.btn.classList.remove("drain"); holding = null; if(tableDirty) renderTable(); }
+  };
+  h.raf = requestAnimationFrame(step);
+  setTimeout(() => { if(holding === h){ setLevel(h.btn, 0); holding = null; if(tableDirty) renderTable(); } }, dur + 200);
 }
 async function holdDone(){
-  const {btn, name} = holding; btn.classList.add("full");
+  const {btn, name} = holding; holding.mode = "done";
+  setLevel(btn, 1); btn.classList.remove("pressed","near"); btn.classList.add("full");
+  await new Promise(r => setTimeout(r, 380)); // «вистрибнула» і спалахнула
   await sparkles(1500);
   holding = null;
   try{ setState(await call("SetWinner", name)); } catch(e){ renderTable(); }
@@ -562,9 +591,9 @@ $("tableWrap").addEventListener("pointerdown", e => {
   e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(_){}
   holdStart(b);
 });
-// відпустили раніше (де завгодно) — вода стікає назад
-["pointerup","pointercancel"].forEach(t => document.addEventListener(t, () => { if(holding && !holding.btn.classList.contains("full")) holdCancel(); }));
-window.addEventListener("blur", () => { if(holding && !holding.btn.classList.contains("full")) holdCancel(); });
+// відпустили раніше (де завгодно) — рідина стікає назад
+["pointerup","pointercancel"].forEach(t => document.addEventListener(t, () => holdCancel()));
+window.addEventListener("blur", () => holdCancel());
 
 // зелено-фіолетові блискітки, що злітаються від меж екрана
 function sparkles(ms){

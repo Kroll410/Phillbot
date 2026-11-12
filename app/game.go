@@ -37,10 +37,13 @@ func (a *App) SetWinner(name string) (Snapshot, error) {
 		return a.GetState(), errors.New("переможця не вказано")
 	}
 	a.mu.Lock()
-	ok := a.st.Exported
+	ok, already := a.st.Exported, a.st.Winner != ""
 	a.mu.Unlock()
 	if !ok {
 		return a.GetState(), errors.New("спершу експортуйте замовлення в Marbles")
+	}
+	if already { // переможця цього збору вже вибрано — наступний вибір лише після нового збору
+		return a.GetState(), errors.New("переможця цього збору вже вибрано — почніть новий збір")
 	}
 	snap := a.mutate(func(st *State) {
 		now := time.Now().UnixMilli()

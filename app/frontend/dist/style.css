@@ -556,3 +556,23 @@ button.icon:not(:disabled):hover{color:var(--text)}
 .slidein{animation:slidein .38s cubic-bezier(.2,.9,.3,1)}
 @keyframes slidein{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
 .cchips{scrollbar-width:thin}.cchips::-webkit-scrollbar{height:4px}.cchips::-webkit-scrollbar-thumb{background:linear-gradient(90deg,#00c853,#9147ff);border-radius:4px}
+
+/* статус збору — плашка (замість дрібного тексту) */
+.status{margin:6px 0 16px;display:flex;justify-content:center}
+.spill{display:inline-flex;align-items:center;gap:8px;padding:5px 14px 5px 12px;border-radius:999px;
+  font:600 12px/1.2 var(--font-ui);letter-spacing:.9px;text-transform:uppercase;color:var(--muted);background:var(--panel2);border:1px solid var(--line)}
+.spill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.8}
+.spill.running{color:#5cf29a;background:linear-gradient(var(--panel2),var(--panel2)) padding-box,var(--grad) border-box;border-color:transparent}
+.spill.running::before{background:#00e676;box-shadow:0 0 0 0 rgba(0,230,118,.6);animation:live 1.6s infinite}
+@keyframes live{0%{box-shadow:0 0 0 0 rgba(0,230,118,.55)}70%{box-shadow:0 0 0 7px rgba(0,230,118,0)}100%{box-shadow:0 0 0 0 rgba(0,230,118,0)}}
+.spill.paused{color:var(--warn)}
+.spill.finished{color:#c9a6ff}
+.timerbox.live + .status{color:inherit}
+
+/* вкладка «Переглядовий» — заготовка */
+#modeViewing{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+.vempty{max-width:520px;text-align:center;padding:40px 36px;border-radius:16px;background:var(--panel);
+  border:1px solid transparent;background:linear-gradient(var(--panel),var(--panel)) padding-box,var(--grad) border-box}
+.vbadge{display:inline-block;font:600 11px/1 var(--font-ui);letter-spacing:1.2px;text-transform:uppercase;padding:6px 12px;border-radius:999px;background:var(--grad-soft);color:#c9a6ff}
+.vempty h2{font:800 34px/1.2 var(--font-display);margin:14px 0 10px;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.vempty p{color:var(--muted);margin:0;line-height:1.6}

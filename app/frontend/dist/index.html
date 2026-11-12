@@ -13,7 +13,7 @@
   <nav class="modes" id="modes">
     <button class="mode-tab" data-mode="chat">Чат<span class="lock hidden" id="chatLockIcon" title="Чат відкрито в окремому вікні">⧉</span></button>
     <button class="mode-tab active" data-mode="subday">СабДей</button>
-    <button class="mode-tab" disabled title="Механіку ще не описано — додамо пізніше">Переглядовий <small>скоро</small></button>
+    <button class="mode-tab" data-mode="viewing">Переглядовий</button>
   </nav>
   <button id="generalBtn" class="icon-btn" title="Загальні налаштування"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   <div class="conn">
@@ -140,6 +140,14 @@
   </div>
 </section>
 
+<section id="modeViewing" class="mode viewing hidden">
+  <div class="vempty">
+    <div class="vbadge">Новий івент</div>
+    <h2>Переглядовий</h2>
+    <p>Тут буде другий івент стріму. Механіку ще не описано — щойно вона буде, ця вкладка отримає свій збір, таблиці й віджет.</p>
+  </div>
+</section>
+
 <div id="modeSubday" class="mode subdaywrap">
 <div class="stepper hidden" id="stepper">
   <div class="step" data-step="1"><span class="num">1</span><span class="txt">Збір замовлень</span></div>
@@ -156,7 +164,7 @@
         <div class="timer idle" id="timer">10:00</div>
         <button id="plusBtn" class="tadj" title="Плюс 1 хвилина">+1</button>
       </div>
-      <div class="status" id="statusText">Очікування старту</div>
+      <div class="status"><span class="spill" id="statusText">Очікування старту</span></div>
       <div class="tctl">
         <button class="primary" id="startBtn">Старт</button>
         <button id="pauseBtn" disabled>Пауза</button>

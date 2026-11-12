@@ -178,7 +178,9 @@ function renderTimer(){
   const s = S.session, r = remaining(), el = $("timer");
   el.textContent = fmtTime(s.status==="finished"?0:r);
   el.className = "timer " + s.status + (s.status==="running" && r<=30000 ? " low" : "");
-  $("statusText").textContent = {idle:"Очікування старту", running:"Збір іде — замовлення записуються", paused:"Пауза — замовлення не записуються", finished:"Збір завершено"}[s.status] || "";
+  $("statusText").textContent = {idle:"Очікування старту", running:"Збір іде", paused:"Пауза", finished:"Збір завершено"}[s.status] || "";
+  $("statusText").className = "spill " + (s.status || "idle");
+  $("statusText").title = {running:"Замовлення записуються", paused:"Замовлення не записуються, поки пауза"}[s.status] || "";
   $("startBtn").disabled = s.status==="running";
   $("startBtn").textContent = s.status==="paused" ? "Продовжити" : "Старт";
   $("pauseBtn").disabled = s.status!=="running";
@@ -468,14 +470,15 @@ function slideSeg(box){
 function slideAll(){ slideSeg($("modes")); slideSeg(document.querySelector(".tabs .seg")); }
 addEventListener("resize", slideAll);
 function showMode(m){
-  mode = m === "chat" ? "chat" : "subday";
+  mode = ["chat","viewing"].includes(m) ? m : "subday";
   try{ localStorage.setItem("phillbot-mode", mode); }catch(e){}
   document.querySelectorAll(".mode-tab[data-mode]").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
   $("modeChat").classList.toggle("hidden", mode !== "chat");
   $("modeSubday").classList.toggle("hidden", mode !== "subday");
+  $("modeViewing").classList.toggle("hidden", mode !== "viewing");
   if(mode === "chat"){ chatStick = true; chatWrap.scrollTop = chatWrap.scrollHeight; }
   slideAll();
-  const pane = mode === "chat" ? $("modeChat") : $("modeSubday"); // вміст вкладки теж «прослизає»
+  const pane = {chat:$("modeChat"), viewing:$("modeViewing")}[mode] || $("modeSubday"); // вміст вкладки теж «прослизає»
   pane.classList.remove("slidein"); void pane.offsetWidth; pane.classList.add("slidein");
 }
 document.querySelectorAll(".mode-tab[data-mode]").forEach(b => b.onclick = () => showMode(b.dataset.mode));

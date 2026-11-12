@@ -510,6 +510,11 @@ function subdayBusy(){
   const st = S.session && S.session.status;
   return st === "running" || st === "paused" || S.phase === "play";
 }
+// аукціон іде (ставки приймаються або пауза) — на «СабДей» не переходимо
+function auctionBusy(){
+  const t = S && S.auction && S.auction.timer && S.auction.timer.status;
+  return t === "running" || t === "paused";
+}
 let denyBusy = false, blinkUntil = 0;
 function denyMode(btn){
   if(denyBusy) return; denyBusy = true;
@@ -523,11 +528,13 @@ function denyMode(btn){
     setTimeout(() => { ind.classList.add("deny"); btn.classList.add("denied"); }, 260);
     setTimeout(() => { ind.classList.remove("deny"); btn.classList.remove("denied"); slideSeg(box); denyBusy = false; }, 820);
   } else denyBusy = false;
-  if(mode !== "subday") showMode("subday");
-  toast(S.phase === "play" ? "Спершу завершіть гру в СабДеї" : "Спершу завершіть збір у СабДеї");
+  const home = btn.dataset.mode === "subday" ? "viewing" : "subday"; // вкладка, що зайнята
+  if(mode !== home) showMode(home);
+  toast(home === "viewing" ? "Спершу завершіть аукціон (прийом ставок)" : S.phase === "play" ? "Спершу завершіть гру в СабДеї" : "Спершу завершіть збір у СабДеї");
 }
 document.querySelectorAll(".mode-tab[data-mode]").forEach(b => b.onclick = () => {
   if(b.dataset.mode === "viewing" && subdayBusy()) return denyMode(b);
+  if(b.dataset.mode === "subday" && mode !== "subday" && auctionBusy()) return denyMode(b);
   showMode(b.dataset.mode);
 });
 showMode(mode);
@@ -960,7 +967,7 @@ function renderAuList(){
       return `<tr data-lot="${esc(l.id)}" class="${l.out ? "out" : ""}${au.winner === l.id ? " win" : ""}${auFresh.has(l.id) ? " fresh" : ""}">
         <td class="gripcol"><span class="grip" draggable="true" title="Перетягніть на інший лот, щоб об'єднати їх">⠿</span></td>
         <td class="num">${l.out ? "" : i + 1}</td>
-        <td><span class="ldot" style="background:${lotColor(l.id)}"></span><b class="lname">${esc(l.name)}</b>${l.bids > 1 ? ` <span class="muted">× ${l.bids}</span>` : ""}</td>
+        <td><span class="ldot" style="background:${lotColor(l.id)}"></span><b class="lname">${esc(l.name)}</b><span class="mtag"></span></td>
         <td class="num lamt">${fmtN(l.amount)}</td><td class="num">${st}</td>
         <td class="users">${users}</td>
         <td class="act"><button class="icon" data-lotdel="${esc(l.id)}" title="Видалити лот">${ICON_TRASH}</button></td></tr>`;
@@ -985,23 +992,45 @@ auListEl.addEventListener("dragover", ev => {
   if(!auDrag) return;
   const tr = ev.target.closest("tr[data-lot]"); if(!tr || tr.dataset.lot === auDrag) return;
   ev.preventDefault(); ev.dataTransfer.dropEffect = "move";
-  auListEl.querySelectorAll("tr.drop").forEach(x => x !== tr && x.classList.remove("drop")); tr.classList.add("drop");
+  if(tr.classList.contains("drop")) return;
+  auListEl.querySelectorAll("tr.drop").forEach(x => { x.classList.remove("drop"); x.querySelector(".mtag").textContent = ""; });
+  tr.classList.add("drop");
+  // одразу видно, що куди зіллється і яка буде сума
+  const from = lotById(auDrag), to = lotById(tr.dataset.lot);
+  if(from && to){
+    tr.querySelector(".mtag").innerHTML = `<i>+</i> ${esc(from.name)} <b>= ${fmtN(from.amount + to.amount)}</b>`;
+    const src = auListEl.querySelector(`tr[data-lot="${CSS.escape(auDrag)}"] .mtag`);
+    if(src) src.innerHTML = `<i>→</i> ${esc(to.name)}`;
+  }
 });
-auListEl.addEventListener("dragleave", ev => { const tr = ev.target.closest && ev.target.closest("tr[data-lot]"); if(tr && !tr.contains(ev.relatedTarget)) tr.classList.remove("drop"); });
-function auDragEnd(){ auDrag = null; auListEl.querySelectorAll("tr.drop,tr.dragging").forEach(x => x.classList.remove("drop", "dragging")); if(auListDirty) renderAuList(); }
+function auClearTags(){ auListEl.querySelectorAll(".mtag").forEach(x => x.textContent = ""); }
+auListEl.addEventListener("dragleave", ev => {
+  const tr = ev.target.closest && ev.target.closest("tr[data-lot]");
+  if(tr && !tr.contains(ev.relatedTarget)){ tr.classList.remove("drop"); auClearTags(); }
+});
+function auDragEnd(){ auDrag = null; auListEl.querySelectorAll("tr.drop,tr.dragging").forEach(x => x.classList.remove("drop", "dragging")); auClearTags(); if(auListDirty) renderAuList(); }
 auListEl.addEventListener("dragend", auDragEnd);
 auListEl.addEventListener("drop", async ev => {
   ev.preventDefault();
   const from = lotById(auDrag), tr = ev.target.closest("tr[data-lot]"), to = tr && lotById(tr.dataset.lot);
   auDragEnd();
   if(!from || !to || from.id === to.id) return;
-  const ok = await confirmBox(`Об'єднати «${from.name}» з «${to.name}»?
-
-Ставки лота «${from.name}» (${fmtN(from.amount)} балів) перейдуть до «${to.name}», суми складуться.`, "Об'єднати", "Скасувати");
-  if(!ok) return;
-  setState(await call("AuctionMergeLots", from.id, to.id));
-  toast("Лоти об'єднано");
+  setState(await call("AuctionMergeLots", from.id, to.id)); // без підтвердження — є «Скасувати об'єднання»
+  auFresh.add(to.id); setTimeout(() => auFresh.delete(to.id), 2500); renderAuList();
+  toast(`«${from.name}» → «${to.name}»`);
 });
+// «Скасувати об'єднання» — останнє об'єднання повертається
+function renderAuUndo(){
+  const m = AU().merges || [], last = m[m.length - 1], b = $("auUndo");
+  b.disabled = !last;
+  b.title = last ? `Повернути «${last.src.name}» окремим лотом` : "Немає об'єднань";
+}
+$("auUndo").onclick = async () => {
+  const m = AU().merges || [], last = m[m.length - 1]; if(!last) return;
+  setState(await call("AuctionUndoMerge"));
+  auFresh.add(last.src.id); setTimeout(() => auFresh.delete(last.src.id), 2500); renderAuList();
+  toast(`«${last.src.name}» знову окремим лотом`);
+};
 
 // ----- стрічка ставок -----
 function renderAuFeed(){
@@ -1242,7 +1271,7 @@ function renderAuction(){
   $("auLots").textContent = au.lots.filter(l => !l.out).length;
   $("auBids").textContent = au.feed.length;
   $("auSum").textContent = fmtN(au.lots.reduce((a, l) => a + l.amount, 0));
-  renderAuWarn(); if(!wAnim) renderAuList(); renderAuFeed(); renderWheel(); renderAuTimer();
+  renderAuWarn(); renderAuUndo(); if(!wAnim) renderAuList(); renderAuFeed(); renderWheel(); renderAuTimer();
   if($("auctionModal").classList.contains("show")) auRewardGrid();
 }
 // нова ставка — підсвітка й рамка-індикатор навколо стрічки (як нові замовлення в СабДеї)

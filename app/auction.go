@@ -99,6 +99,17 @@ type AuctionState struct {
 	Winner  string          `json:"winner"` // id лота-переможця
 	Spin    *Spin           `json:"spin,omitempty"`
 	SeenIDs []string        `json:"seenIds"`
+	Merges  []MergeRec      `json:"merges"` // історія об'єднань — для «Скасувати об'єднання»
+}
+
+// MergeRec — одне об'єднання лотів: що повернути, якщо стрімер натисне «Скасувати об'єднання».
+type MergeRec struct {
+	Src       Lot      `json:"src"`       // лот, що зник (як був до об'єднання)
+	Index     int      `json:"index"`     // його місце в списку
+	To        string   `json:"to"`        // лот, у який його злили
+	FeedLot   []string `json:"feedLot"`   // ставки, що перейшли до To
+	FeedSug   []string `json:"feedSug"`   // пропозиції «Додати до X?», що перейшли до To
+	WasWinner bool     `json:"wasWinner"` // Src був переможцем
 }
 
 func (au *AuctionState) durMs() int64 { return int64(au.Cfg.DurationMin) * 60000 }
@@ -457,6 +468,9 @@ func (a *App) AuctionMergeLots(from, to string) Snapshot {
 			return
 		}
 		src := au.Lots[i]
+		rec := MergeRec{Src: src, Index: i, To: to, WasWinner: au.Winner == from}
+		src.Users = append([]LotUser(nil), src.Users...)
+		rec.Src.Users = src.Users
 		for _, u := range src.Users {
 			au.addToLot(j, Bid{User: u.Name, Login: u.Login, Color: u.Color, Badges: u.Badges, Amount: u.Amount})
 		}
@@ -464,16 +478,86 @@ func (a *App) AuctionMergeLots(from, to string) Snapshot {
 		for k := range au.Feed {
 			if au.Feed[k].LotID == from {
 				au.Feed[k].LotID = to
+				rec.FeedLot = append(rec.FeedLot, au.Feed[k].ID)
 			}
 			if au.Feed[k].SuggestID == from { // пропозиція «Додати до X?» тепер про об'єднаний лот
 				au.Feed[k].SuggestID, au.Feed[k].SuggestName = to, au.Lots[j].Name
+				rec.FeedSug = append(rec.FeedSug, au.Feed[k].ID)
 			}
 		}
 		if au.Winner == from {
 			au.Winner = to
 		}
 		au.Lots = append(au.Lots[:i], au.Lots[i+1:]...)
+		au.Merges = append(au.Merges, rec)
+		if len(au.Merges) > 50 {
+			au.Merges = au.Merges[len(au.Merges)-50:]
+		}
 	})
+}
+
+// AuctionUndoMerge — скасувати останнє об'єднання: лот повертається на своє місце з усіма ставками,
+// з цільового лота віднімається його внесок (ставки, що прийшли після об'єднання, лишаються).
+func (a *App) AuctionUndoMerge() (Snapshot, error) {
+	var err error
+	snap := a.mutate(func(st *State) {
+		au := &st.Auction
+		for len(au.Merges) > 0 {
+			rec := au.Merges[len(au.Merges)-1]
+			au.Merges = au.Merges[:len(au.Merges)-1]
+			j := au.lotIndex(rec.To)
+			if j < 0 { // цільовий лот видалили — це об'єднання вже не скасувати
+				continue
+			}
+			t := &au.Lots[j]
+			t.Amount -= rec.Src.Amount
+			t.Bids -= rec.Src.Bids
+			if t.Amount < 0 {
+				t.Amount = 0
+			}
+			if t.Bids < 1 {
+				t.Bids = 1
+			}
+			for _, u := range rec.Src.Users {
+				for k := range t.Users {
+					if strings.EqualFold(t.Users[k].Login, u.Login) {
+						t.Users[k].Amount -= u.Amount
+						if t.Users[k].Amount <= 0 {
+							t.Users = append(t.Users[:k], t.Users[k+1:]...)
+						}
+						break
+					}
+				}
+			}
+			idx := rec.Index
+			if idx > len(au.Lots) {
+				idx = len(au.Lots)
+			}
+			au.Lots = append(au.Lots[:idx], append([]Lot{rec.Src}, au.Lots[idx:]...)...)
+			ids := map[string]bool{}
+			for _, id := range rec.FeedLot {
+				ids[id] = true
+			}
+			sug := map[string]bool{}
+			for _, id := range rec.FeedSug {
+				sug[id] = true
+			}
+			for k := range au.Feed {
+				if ids[au.Feed[k].ID] && au.Feed[k].LotID == rec.To {
+					au.Feed[k].LotID = rec.Src.ID
+				}
+				if sug[au.Feed[k].ID] && au.Feed[k].SuggestID == rec.To {
+					au.Feed[k].SuggestID, au.Feed[k].SuggestName = rec.Src.ID, rec.Src.Name
+				}
+			}
+			if rec.WasWinner && au.Winner == rec.To {
+				au.Winner = rec.Src.ID
+			}
+			return
+		}
+		err = errors.New("немає об'єднань, які можна скасувати")
+	})
+	return snap, err
 }
 
 func (a *App) AuctionRemoveLot(id string) Snapshot {
@@ -593,7 +677,7 @@ func (a *App) AuctionResetSpins() Snapshot {
 func (a *App) AuctionNew() Snapshot {
 	return a.mutate(func(st *State) {
 		a.saveAuctionLocked()
-		st.Auction = AuctionState{Cfg: st.Auction.Cfg}
+		st.Auction = AuctionState{Cfg: st.Auction.Cfg} // історія об'єднань теж очищується
 		st.Auction.normalize()
 	})
 }

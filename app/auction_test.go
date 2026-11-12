@@ -115,3 +115,36 @@ func TestAuctionMerge(t *testing.T) {
 		t.Fatal("feed lot id")
 	}
 }
+
+func TestAuctionUndoMerge(t *testing.T) {
+	a := newTestApp(t)
+	a.AuctionSaveSettings(AuctionSettings{RewardIDs: []string{"q"}})
+	a.AuctionStart()
+	a.onRedemption(bid("1", "q", "Квиток", "u1", "Elden Ring", 1000), User{})
+	a.onRedemption(bid("2", "q", "Квиток", "u2", "Hades", 1000), User{})
+	a.onRedemption(bid("3", "q", "Квиток", "u1", "Celeste", 5000), User{})
+	au := &a.st.Auction
+	el, cel := au.Lots[0].ID, au.Lots[2].ID
+	a.AuctionMergeLots(cel, el)
+	a.onRedemption(bid("4", "q", "Квиток", "u3", "Elden Ring", 1000), User{}) // ставка вже після об'єднання
+	if au.Lots[0].Amount != 7000 || len(au.Merges) != 1 {
+		t.Fatalf("merge %+v", au.Lots)
+	}
+	if _, err := a.AuctionUndoMerge(); err != nil {
+		t.Fatal(err)
+	}
+	if len(au.Lots) != 3 || au.Lots[2].ID != cel || au.Lots[2].Amount != 5000 || au.Lots[0].Amount != 2000 || au.Lots[0].Bids != 2 {
+		t.Fatalf("undo %+v", au.Lots)
+	}
+	if len(au.Lots[0].Users) != 2 || au.Lots[0].Users[0].Amount != 1000 {
+		t.Fatalf("users %+v", au.Lots[0].Users)
+	}
+	for _, b := range au.Feed {
+		if b.Text == "Celeste" && b.LotID != cel {
+			t.Fatal("feed not restored")
+		}
+	}
+	if _, err := a.AuctionUndoMerge(); err == nil {
+		t.Fatal("nothing to undo")
+	}
+}

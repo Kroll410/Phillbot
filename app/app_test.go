@@ -141,14 +141,10 @@ func TestAggregateAndMarbles(t *testing.T) {
 	if len(lines) != 164 {
 		t.Fatal(len(lines))
 	}
-	s.Cap = 100
-	lines = marbleLines(s, es)
-	cnt := map[string]int{}
-	for _, l := range lines {
-		cnt[l]++
-	}
-	if len(lines) != 100 || cnt["Hades"] < 1 || cnt["Dark Souls"] < 90 {
-		t.Fatal(len(lines), cnt)
+	big := append([]Entry{}, es...)
+	big = append(big, Entry{ID: "6", Ts: 6, UserID: "u6", User: "z", Tier: 3, Months: 400, Text: "Hades"})
+	if n := len(marbleLines(s, big)); n != 164+1200 { // без ліміту: куль = сума балів
+		t.Fatal(n)
 	}
 	s.DupMode = "first"
 	if g := aggregate(s, es); g[1].Name != "Elden Ring" {
@@ -177,5 +173,21 @@ func TestExport(t *testing.T) {
 	b, _ = os.ReadFile(p)
 	if b[0] != 0xEF {
 		t.Fatal("csv bom")
+	}
+}
+
+func TestRenameEntries(t *testing.T) {
+	a := newTestApp(t)
+	a.AddManual("A", 1, 3, "dark souls 3")
+	a.AddManual("B", 1, 2, "DS3")
+	s, _ := a.AddManual("C", 1, 1, "Hades")
+	ids := []string{s.Entries[1].ID}
+	s = a.RenameEntries(ids, "  dark souls 3 ")
+	g := aggregate(s.Settings, s.Entries)
+	if len(g) != 2 || g[0].Name != "dark souls 3" || g[0].Points != 5 || g[0].Count != 2 {
+		t.Fatalf("%+v", g)
+	}
+	if s = a.RenameEntries(ids, " "); s.Entries[1].Text != "dark souls 3" {
+		t.Fatal("empty rename applied")
 	}
 }

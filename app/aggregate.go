@@ -4,7 +4,6 @@ package main
 // Потрібна в Go для оверлеїв OBS.
 
 import (
-	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -132,38 +131,12 @@ func aggregate(s Settings, entries []Entry) []Group {
 	return groups
 }
 
-// Скільки куль буде в Marbles (кожен бал = куля, ліміт cap з пропорційним зменшенням, мін. 1).
-func marbleCounts(groups []Group, cap int) (counts []int, total int, scaled bool) {
-	var gs []Group
+// Скільки куль буде в Marbles: кожен бал = одна куля, без обмежень (сума куль = сума балів).
+func marbleCounts(groups []Group) (counts []int, total int) {
 	for _, g := range groups {
 		if g.Points > 0 && marbleName(g.Name) != "" {
-			gs = append(gs, g)
+			counts = append(counts, g.Points)
 			total += g.Points
-		}
-	}
-	counts = make([]int, len(gs))
-	for i, g := range gs {
-		counts[i] = g.Points
-	}
-	if total > cap {
-		scaled = true
-		sum := 0
-		for i, g := range gs {
-			counts[i] = int(math.Max(1, math.Round(float64(g.Points)*float64(cap)/float64(total))))
-			sum += counts[i]
-		}
-		for sum > cap {
-			mi := 0
-			for i := range counts {
-				if counts[i] > counts[mi] {
-					mi = i
-				}
-			}
-			if counts[mi] <= 1 {
-				break
-			}
-			counts[mi]--
-			sum--
 		}
 	}
 	return

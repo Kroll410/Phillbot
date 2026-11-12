@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>СабДей</title>
+<title>PhillBot</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header>
-  <h1>Саб<span>Дей</span></h1>
+  <h1>Phill<span>Bot</span></h1>
   <div class="mode-switch">
     <button class="active" title="Поточний івент">СабДей</button>
     <button disabled title="Механіку ще не описано — додамо пізніше">Переглядовий (скоро)</button>
@@ -119,10 +119,8 @@
 
     <div class="card">
       <h2>Marbles on Stream</h2>
-      <label>Куль сумарно (до 1000)</label>
-      <input type="number" id="cap" min="1" max="1000" step="1">
       <div class="hint" id="marblePreview">—</div>
-      <div class="hint">Кожен бал = одна куля з назвою замовлення (до 15 символів, далі «...»). Якщо балів більше — кулі розподіляються пропорційно.</div>
+      <div class="hint">Кожен бал = одна куля з назвою замовлення (до 15 символів, далі «...»). Куль завжди стільки, скільки балів.</div>
       <div class="btns" style="margin-top:10px">
         <button class="primary wide" id="exportMarbles">🎱 Експорт у Marbles</button>
         <button id="copyMarbles">Копіювати список</button>
@@ -175,7 +173,7 @@
     </div>
     <div class="tabs">
       <button class="tab active" data-tab="summary">Підсумок за замовленнями</button>
-      <button class="tab" data-tab="entries">Усі замовлення</button>
+      <button class="tab" data-tab="entries">Замовлення</button>
       <button class="tab" data-tab="chat">Чат</button>
       <button class="tab" data-tab="log">Журнал</button>
       <button id="chatWindowBtn" class="hidden small">⧉ Чат в окремому вікні</button>
@@ -183,7 +181,7 @@
     </div>
     <div class="tablewrap" id="tableWrap"></div>
     <div class="tablewrap chatwrap hidden" id="chatWrap"><div id="chatList"></div><button id="chatMore" class="hidden">↓ Нові повідомлення</button></div>
-    <div class="hint" id="tableHint" style="margin-top:8px">Однакові замовлення (без урахування регістру, зайвих пробілів і розділових знаків у кінці) об'єднуються. Щоб злити варіанти з помилками, виправте текст в «Усі замовлення».</div>
+    <div class="hint" id="tableHint" style="margin-top:8px">Однакові замовлення (без урахування регістру, зайвих пробілів і розділових знаків у кінці) об'єднуються. Щоб об'єднати схожі замовлення, перетягніть їх за ⠿ одне на одне.</div>
   </section>
 </main>
 

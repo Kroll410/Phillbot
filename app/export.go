@@ -43,7 +43,7 @@ func marbleName(s string) string {
 	return s
 }
 
-// Кожен бал = одна куля; сумарно не більше Settings.Cap (пропорційне зменшення, мін. 1 на замовлення). Перемішано.
+// Кожен бал = одна куля з назвою замовлення; куль рівно стільки, скільки балів. Перемішано.
 func marbleLines(s Settings, entries []Entry) []string {
 	groups := aggregate(s, entries)
 	var gs []Group
@@ -52,11 +52,11 @@ func marbleLines(s Settings, entries []Entry) []string {
 			gs = append(gs, g)
 		}
 	}
-	counts, _, _ := marbleCounts(gs, s.Cap)
+	counts, _ := marbleCounts(gs)
 	var lines []string
 	for i, g := range gs {
 		n := marbleName(g.Name)
-		for k := 0; k < counts[i] && len(lines) < s.Cap; k++ {
+		for k := 0; k < counts[i]; k++ {
 			lines = append(lines, n)
 		}
 	}

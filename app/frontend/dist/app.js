@@ -57,19 +57,11 @@ function aggregate(){
     return {...g, name};
   });
 }
-// попередній перегляд кількості куль (сам файл формує Go)
+// кількість куль = сума балів (кожен бал — одна куля)
 function marbleInfo(){
-  const cap = Math.min(1000, Math.max(1, Number(S.settings.cap)||1000));
   const groups = aggregate().filter(g=>g.points>0);
   const total = groups.reduce((a,g)=>a+g.points,0);
-  let count = total;
-  if(total>cap){
-    const counts = groups.map(g=>Math.max(1, Math.round(g.points*cap/total)));
-    let sum = counts.reduce((a,b)=>a+b,0);
-    while(sum>cap){ const j = counts.indexOf(Math.max(...counts)); if(counts[j]<=1) break; counts[j]--; sum--; }
-    count = Math.min(sum, cap);
-  }
-  return {count, total, scaled: total>cap, groups: groups.length};
+  return {count: total, total, groups: groups.length};
 }
 
 /* ---------- auth / header ---------- */
@@ -167,11 +159,59 @@ function renderStats(){
   $("sUnique").textContent = groups.length;
   $("sPoints").textContent = groups.reduce((a,g)=>a+g.points,0);
   const m = marbleInfo();
-  $("marblePreview").textContent = m.total ? `${m.count} куль із ${m.groups} замовлень` + (m.scaled ? ` (зменшено пропорційно з ${m.total} балів)` : "") : "Немає замовлень із балами > 0";
+  $("marblePreview").innerHTML = m.total ? `<b>${m.count}</b> куль із ${m.groups} замовлень` + (m.count>1000 ? ` <span class="err">— більше 1000: гра може не прийняти весь список</span>` : "") : "Немає замовлень із балами > 0";
 }
 
 function sortRows(rows, [k,dir]){ return rows.sort((a,b)=>{ const x=a[k], y=b[k]; return (typeof x==="string" ? x.localeCompare(y,"uk") : (x-y))*dir; }); }
 function th(label, key, cls=""){ const [k,d]=sortKey[tab]; return `<th class="${cls}" data-sort="${key}">${label}${k===key?(d>0?" ▲":" ▼"):""}</th>`; }
+
+const svg = d => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICON_EYE = svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>');
+const ICON_EYE_OFF = svg('<path d="M17.9 17.9A10.4 10.4 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 4.1-5.1M9.9 5.2A9.6 9.6 0 0 1 12 5c6.4 0 10 7 10 7a18.6 18.6 0 0 1-2.2 3.2M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/>');
+const ICON_TRASH = svg('<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/>');
+const GRIP = `<span class="grip" draggable="true" title="Перетягніть на інше замовлення, щоб об'єднати їх">⠿</span>`;
+
+/* ---------- drag-n-drop: об'єднання схожих замовлень ---------- */
+let drag = null; // {ids, label}
+function dragInfo(tr){
+  if(!tr) return null;
+  if(tr.dataset.key !== undefined){ // Підсумок: уся група
+    const ids = S.entries.filter(e=>norm(e.text)===tr.dataset.key).map(e=>e.id);
+    return {ids, label: tr.dataset.name, text: tr.dataset.name, key: tr.dataset.key};
+  }
+  const e = S.entries.find(x=>x.id===tr.dataset.id);
+  return e ? {ids:[e.id], label:e.text, text:e.text, key:norm(e.text)} : null;
+}
+const wrapEl = $("tableWrap");
+wrapEl.addEventListener("dragstart", ev => {
+  const g = ev.target.closest && ev.target.closest(".grip"); if(!g){ ev.preventDefault(); return; }
+  const tr = g.closest("tr"); drag = dragInfo(tr); if(!drag) return;
+  tr.classList.add("dragging"); ev.dataTransfer.effectAllowed = "move";
+  try{ ev.dataTransfer.setData("text/plain", drag.label); ev.dataTransfer.setDragImage(tr, 20, 16); }catch(e){}
+});
+wrapEl.addEventListener("dragover", ev => {
+  if(!drag) return;
+  const tr = ev.target.closest("tbody tr"); if(!tr) return;
+  const t = dragInfo(tr); if(!t || t.key===drag.key) return;
+  ev.preventDefault(); ev.dataTransfer.dropEffect = "move";
+  wrapEl.querySelectorAll("tr.drop").forEach(x=>x!==tr && x.classList.remove("drop")); tr.classList.add("drop");
+});
+wrapEl.addEventListener("dragleave", ev => { const tr = ev.target.closest && ev.target.closest("tbody tr"); if(tr && !tr.contains(ev.relatedTarget)) tr.classList.remove("drop"); });
+function dragEnd(){ drag = null; wrapEl.querySelectorAll("tr.drop,tr.dragging").forEach(x=>x.classList.remove("drop","dragging")); if(tableDirty) renderTable(); }
+wrapEl.addEventListener("dragend", dragEnd);
+wrapEl.addEventListener("drop", async ev => {
+  ev.preventDefault();
+  const src = drag, tr = ev.target.closest("tbody tr"), dst = dragInfo(tr);
+  dragEnd();
+  if(!src || !dst || src.key===dst.key) return;
+  const n = src.ids.length;
+  const ok = await confirmBox(`Об'єднати «${src.label}» з «${dst.text}»?
+
+Текст ${n===1?"цього замовлення":`${n} замовлень`} буде замінено на «${dst.text}», бали складуться.`, "Об'єднати", "Скасувати");
+  if(!ok) return;
+  setState(await call("RenameEntries", src.ids, dst.text));
+  toast("Об'єднано");
+});
 
 function renderTable(){
   const wrap = $("tableWrap");
@@ -181,7 +221,7 @@ function renderTable(){
   $("tableHint").classList.toggle("hidden", tab!=="summary" && tab!=="entries");
   if(isChat) return;
   // не перемальовувати, поки користувач редагує клітинку
-  if(wrap.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)){ tableDirty = true; return; }
+  if(drag || (wrap.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName))){ tableDirty = true; return; }
   tableDirty = false;
   const q = $("search").value.trim().toLowerCase();
   if(tab==="log"){
@@ -193,8 +233,8 @@ function renderTable(){
     rows = sortRows(rows, sortKey.summary);
     const max = Math.max(1,...rows.map(r=>r.points)), total = rows.reduce((a,r)=>a+r.points,0)||1;
     if(!rows.length){ wrap.innerHTML = `<div class="empty">${S.entries.length?"Нічого не знайдено":"Замовлень поки немає. Виберіть нагороду і натисніть «Почати збір»."}</div>`; return; }
-    wrap.innerHTML = `<table><thead><tr><th style="width:40px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:140px">Частка</th>${th("Людей","count","num")}<th>Хто замовив</th></tr></thead><tbody>${
-      rows.map((g,i)=>`<tr><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
+    wrap.innerHTML = `<table class="dnd"><thead><tr><th class="gripcol"></th><th style="width:40px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:140px">Частка</th>${th("Людей","count","num")}<th>Хто замовив</th></tr></thead><tbody>${
+      rows.map((g,i)=>`<tr data-key="${esc(g.key)}" data-name="${esc(g.name)}"><td class="gripcol">${GRIP}</td><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
         <td class="num pts">${g.points}</td><td><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div><span class="muted" style="font-size:11px">${(g.points/total*100).toFixed(1)}%</span></td>
         <td class="num">${g.count}</td><td class="users">${g.users.map(u=>`${esc(u.name)} <span class="muted">(${u.p})</span>`).join(", ")}</td></tr>`).join("")
     }</tbody></table>`;
@@ -204,15 +244,15 @@ function renderTable(){
       .filter(e=>!q || e.text.toLowerCase().includes(q) || e.user.toLowerCase().includes(q));
     rows = sortRows(rows, sortKey.entries);
     if(!rows.length){ wrap.innerHTML = `<div class="empty">${S.entries.length?"Нічого не знайдено":"Замовлень поки немає."}</div>`; return; }
-    wrap.innerHTML = `<table><thead><tr>${th("Час","ts")}${th("Чатерс","user")}${th("Тір","tier")}${th("Місяці","months","num")}${th("Бали","points","num")}${th("Замовлення","text")}<th></th></tr></thead><tbody>${
-      rows.map(e=>`<tr data-id="${e.id}" class="${e.excluded?"off":!e.counted?"replaced":""} ${freshIds.has(e.id)?"fresh":""}" title="${esc(!e.excluded&&!e.counted?"Не рахується: від цього чатерса враховано інше замовлення":(e.source||""))}">
-        <td class="muted">${fmtClock(e.ts)}</td>
+    wrap.innerHTML = `<table class="dnd"><thead><tr><th class="gripcol"></th>${th("Час","ts")}${th("Чатерс","user")}${th("Тір","tier")}${th("Місяці","months","num")}${th("Бали","points","num")}${th("Замовлення","text")}<th></th></tr></thead><tbody>${
+      rows.map(e=>`<tr data-id="${e.id}" class="${e.excluded?"off":!e.counted?"replaced":""} ${freshIds.has(e.id)?"fresh":""}" title="${esc(e.excluded?"Приховано — не рахується":!e.counted?"Не рахується: від цього чатерса враховано інше замовлення":(e.source||""))}">
+        <td class="gripcol">${GRIP}</td><td class="muted">${fmtClock(e.ts)}</td>
         <td>${esc(e.user)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
         <td><select data-f="tier"><option value="0" ${!e.tier?"selected":""}>—</option>${[1,2,3].map(t=>`<option value="${t}" ${e.tier===t?"selected":""}>T${t}</option>`).join("")}</select></td>
         <td class="num"><input class="mo" type="number" min="1" data-f="months" value="${e.months||""}" ${!e.tier?"disabled":""}></td>
         <td class="num pts">${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span> `:""}${e.points}</td>
         <td><input class="edit" data-f="text" value="${esc(e.text)}"></td>
-        <td style="white-space:nowrap"><button class="small" data-act="toggle">${e.excluded?"Повернути":"Виключити"}</button> <button class="small danger" data-act="del" title="Видалити">✕</button></td></tr>`).join("")
+        <td class="acts"><button class="icon${e.excluded?" on":""}" data-act="toggle" title="${e.excluded?"Показати — знову рахувати":"Приховати — не рахувати (можна повернути)"}">${e.excluded?ICON_EYE_OFF:ICON_EYE}</button><button class="icon danger" data-act="del" title="Видалити назавжди">${ICON_TRASH}</button></td></tr>`).join("")
     }</tbody></table>`;
   }
 }
@@ -250,7 +290,6 @@ function fillSettings(){
 }
 function initInputs(){
   $("duration").value = S.settings.durationMin;
-  $("cap").value = S.settings.cap;
 }
 const n = (id, d) => { const v = Number($(id).value); return Number.isFinite(v) && $(id).value !== "" ? v : d; };
 async function saveSettings(patch){ setState(await call("SaveSettings", {...S.settings, ...patch})); }
@@ -265,8 +304,6 @@ $("settingsSave").onclick = async () => {
   $("settingsModal").classList.remove("show"); obsKey = ""; renderObs(); toast("Налаштування збережено");
 };
 $("duration").addEventListener("change", async () => { await saveSettings({durationMin: Math.max(1, Math.round(n("duration",10)))}); initInputs(); });
-$("cap").addEventListener("change", async () => { await saveSettings({cap: Math.min(1000, Math.max(1, Math.round(n("cap",1000))))}); initInputs(); });
-
 function renderAll(){
   if(!inited){ initInputs(); inited = true; }
   renderAuth();

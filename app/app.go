@@ -107,7 +107,7 @@ func (a *App) startup(ctx context.Context) {
 	a.mu.Unlock()
 	a.overlay.start(port)
 	if low := strings.ToLower(a.baseDir); strings.Contains(low, `\temp\`) || strings.Contains(low, `\tmp\`) {
-		a.logf("⚠ Програму запущено з тимчасової папки (архіву) — налаштування й токени зникнуть. Розпакуйте SubDay.exe у звичайну папку.")
+		a.logf("⚠ Програму запущено з тимчасової папки (архіву) — налаштування й токени зникнуть. Розпакуйте PhillBot.exe у звичайну папку.")
 	}
 }
 
@@ -558,6 +558,25 @@ func (a *App) UpdateEntry(e Entry) Snapshot {
 				x.Text = t
 			}
 			x.Excluded = e.Excluded
+		}
+	})
+}
+
+// Об'єднання схожих замовлень (drag-n-drop): текст вибраних замовлень замінюється на текст цільового.
+func (a *App) RenameEntries(ids []string, text string) Snapshot {
+	text = strings.TrimSpace(text)
+	set := map[string]bool{}
+	for _, id := range ids {
+		set[id] = true
+	}
+	return a.mutate(func(st *State) {
+		if text == "" {
+			return
+		}
+		for i := range st.Entries {
+			if set[st.Entries[i].ID] {
+				st.Entries[i].Text = text
+			}
 		}
 	})
 }

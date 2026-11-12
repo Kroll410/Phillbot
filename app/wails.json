@@ -1,17 +1,17 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "SubDay",
-  "outputfilename": "SubDay",
+  "name": "PhillBot",
+  "outputfilename": "PhillBot",
   "frontend:dir": "frontend",
   "frontend:install": "",
   "frontend:build": "",
   "wailsjsdir": "./frontend",
   "author": {
-    "name": "SubDay"
+    "name": "PhillBot"
   },
   "info": {
-    "companyName": "SubDay",
-    "productName": "SubDay",
+    "companyName": "PhillBot",
+    "productName": "PhillBot",
     "productVersion": "0.1.0",
     "copyright": "",
     "comments": "Збір замовлень СабДей для Twitch"

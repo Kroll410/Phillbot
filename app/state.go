@@ -20,7 +20,6 @@ type Settings struct {
 	NonSubPoints int            `json:"nonSubPoints"`
 	Mult         map[string]int `json:"mult"`
 	DupMode      string         `json:"dupMode"` // last | first | all
-	Cap          int            `json:"cap"`     // куль сумарно у файлі для Marbles (≤ 1000)
 	ObsPort      int            `json:"obsPort"` // локальний сервер для OBS (127.0.0.1)
 }
 
@@ -66,7 +65,7 @@ type State struct {
 
 func defaultSettings() Settings {
 	return Settings{DurationMin: 10, NonSubPoints: 0, Mult: map[string]int{"1": 1, "2": 2, "3": 3},
-		DupMode: "last", Cap: 1000, ObsPort: defaultObsPort}
+		DupMode: "last", ObsPort: defaultObsPort}
 }
 
 func defaultState() State {
@@ -96,9 +95,6 @@ func (s *Settings) normalize() {
 	}
 	if s.DupMode != "first" && s.DupMode != "all" {
 		s.DupMode = "last"
-	}
-	if s.Cap < 1 || s.Cap > 1000 {
-		s.Cap = 1000
 	}
 	if s.ObsPort < 1024 || s.ObsPort > 65000 {
 		s.ObsPort = defaultObsPort

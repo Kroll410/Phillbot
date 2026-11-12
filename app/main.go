@@ -1,4 +1,4 @@
-// СабДей — програма для збору замовлень через нагороду за бали каналу Twitch (Wails: Go + WebView2).
+// PhillBot — програма для збору замовлень через нагороду за бали каналу Twitch (Wails: Go + WebView2).
 package main
 
 import (
@@ -20,7 +20,7 @@ var version = "dev"
 func main() {
 	app := NewApp()
 	err := wails.Run(&options.App{
-		Title:            "СабДей " + version,
+		Title:            "PhillBot " + version,
 		Width:            1360,
 		Height:           860,
 		MinWidth:         960,

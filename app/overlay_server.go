@@ -44,12 +44,11 @@ type LastOrder struct {
 }
 
 type OverlayTotals struct {
-	Entries int  `json:"entries"`
-	Users   int  `json:"users"`
-	Orders  int  `json:"orders"`
-	Points  int  `json:"points"`
-	Marbles int  `json:"marbles"`
-	Scaled  bool `json:"scaled"`
+	Entries int `json:"entries"`
+	Users   int `json:"users"`
+	Orders  int `json:"orders"`
+	Points  int `json:"points"`
+	Marbles int `json:"marbles"`
 }
 
 type OverlayState struct {
@@ -312,7 +311,7 @@ func (a *App) overlayState() OverlayState {
 			users[userKey(e)] = true
 		}
 	}
-	counts, total, scaled := marbleCounts(groups, st.Settings.Cap)
+	counts, total := marbleCounts(groups)
 	var top []Group // у топі й лічильнику — лише замовлення з балами > 0 (ті, що стануть кулями)
 	for _, g := range groups {
 		if g.Points > 0 {
@@ -324,7 +323,7 @@ func (a *App) overlayState() OverlayState {
 	}
 	out := OverlayState{Session: st.Session, ServerNow: time.Now().UnixMilli(), RewardTitle: st.Settings.RewardTitle,
 		Channel: a.bc.DisplayName, Top: append([]Group(nil), top...),
-		Totals: OverlayTotals{Entries: n, Users: len(users), Orders: len(counts), Points: total, Marbles: sumInts(counts), Scaled: scaled}}
+		Totals: OverlayTotals{Entries: n, Users: len(users), Orders: len(counts), Points: total, Marbles: sumInts(counts)}}
 	for i := range out.Top {
 		if len(out.Top[i].Users) > 10 {
 			out.Top[i].Users = out.Top[i].Users[:10]

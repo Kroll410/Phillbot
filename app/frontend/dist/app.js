@@ -725,8 +725,13 @@ let lastV = "";
 function renderGameTimer(){
   if(!S || S.phase !== "play") return;
   const sec = gameSection();
-  document.querySelectorAll("#pane2 .gsec").forEach(x => x.classList.toggle("on", x.id === sec));
-  $("gPlayCtl").classList.toggle("hidden", sec !== "gPlay"); // Пауза / Завершити — під карткою, лише поки гра йде
+  // час гри вийшов: той самий таймер (00:00) лишається, шапка згортається, знизу плавно розгортається блок з кнопками
+  const over = sec === "gOver";
+  document.querySelectorAll("#pane2 .gamecard .gsec").forEach(x => x.classList.toggle("on", x.id === sec || (over && x.id === "gPlay")));
+  $("gOver").classList.toggle("open", over);
+  $("gPlayCtl").classList.toggle("gone", sec !== "gPlay");
+  $("gWrap").classList.toggle("ended", sec !== "gPlay");
+  if(over){ $("gTimer").textContent = "00:00"; $("gTimer").className = "gtimer finished"; }
   const g = S.game || {}, v = S.vote || {};
   if(sec === "gPlay"){
     const r = remainOf(g);

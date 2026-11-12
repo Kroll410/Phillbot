@@ -240,32 +240,17 @@ $("rewardRefresh").onclick = async () => {
   renderRewardGrid(); toast("Список нагород оновлено");
 };
 
-/* ---------- OBS ---------- */
-const OVERLAYS = [
-  ["Таймер збору", "/overlay/timer", "600×220"],
-  ["Топ замовлень", "/overlay/top", "520×420"],
-  ["Кулі / бали", "/overlay/marbles", "620×80"],
-  ["Алерт замовлення", "/overlay/last", "800×180"],
-];
-let obsKey = "";
+/* ---------- OBS: один віджет (загальні налаштування) ---------- */
 function renderObs(){
-  const o = S.obs || {};
-  const key = JSON.stringify(o);
-  if(key === obsKey) return; obsKey = key;
-  if(!o.running){
-    $("obsStatus").innerHTML = `<span class="err">${esc(o.error || "Сервер для OBS не запущено.")}</span> Змініть порт у загальних налаштуваннях.`;
-    $("obsList").innerHTML = ""; return;
-  }
-  $("obsStatus").textContent = "Браузерні джерела для OBS (розмір — підказка):";
-  $("obsList").innerHTML = OVERLAYS.map(([name, p, size])=>`<div class="obsrow"><span><b>${esc(name)}</b> <span class="muted">${size}</span><code>${esc(o.url + p)}</code></span>
-    <button class="small" data-copy="${esc(o.url + p)}">Копіювати</button><button class="small" data-open="${esc(p)}" title="Відкрити в браузері">↗</button></div>`).join("")
-    + `<div class="obsrow"><span class="muted">Усі параметри й розміри</span><button class="small" data-open="/overlay/index">Усі оверлеї ↗</button></div>`;
+  const o = S.obs || {}, box = $("obsWidget"); if(!box) return;
+  box.innerHTML = o.running
+    ? `<div class="obsrow"><span><b>Віджет PhillBot</b> <span class="muted">640×360 · таймер збору, гри й голосування</span><code>${esc(o.url)}/overlay/widget</code></span>
+       <button class="small" data-copy="${esc(o.url)}/overlay/widget">Копіювати</button><button class="small" data-open="/overlay/widget" title="Відкрити в браузері">↗</button></div>`
+    : `<div class="hint err">${esc(o.error || "Сервер для OBS не запущено.")}</div>`;
 }
-try{ if(localStorage.getItem("phillbot-obs-open")==="1") $("obsCard").open = true; }catch(e){}
-$("obsCard").addEventListener("toggle", () => { try{ localStorage.setItem("phillbot-obs-open", $("obsCard").open ? "1" : "0"); }catch(e){} });
-$("obsList").addEventListener("click", async e => {
+$("obsWidget").addEventListener("click", async e => {
   const c = e.target.closest("[data-copy]"), o = e.target.closest("[data-open]");
-  if(c){ const ok = await call("CopyText", c.dataset.copy); toast(ok ? "URL скопійовано — вставте в OBS → Браузер" : "Не вдалося скопіювати"); }
+  if(c){ const ok = await call("CopyText", c.dataset.copy); toast(ok ? "URL скопійовано — OBS → Джерела → Браузер" : "Не вдалося скопіювати"); }
   if(o) call("OpenOverlay", o.dataset.open);
 });
 
@@ -359,7 +344,7 @@ function renderTable(){
   $("search").classList.toggle("hidden", tab==="log");
   $("tableHint").classList.toggle("hidden", tab!=="summary" && tab!=="entries");
   // не перемальовувати, поки користувач редагує клітинку
-  if(drag || (wrap.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName))){ tableDirty = true; return; }
+  if(drag || holding || (wrap.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName))){ tableDirty = true; return; }
   tableDirty = false;
   const q = $("search").value.trim().toLowerCase();
   if(tab==="log"){
@@ -381,7 +366,7 @@ function renderTable(){
         const open = openGroups.has(g.key);
         const main = `<tr class="grow${open?" open":""}" data-key="${esc(g.key)}" data-name="${esc(g.name)}"><td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
         <td class="num pts">${g.points}</td><td><div class="share"><div class="track"><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div></div><span>${(g.points/total*100).toFixed(0)}%</span></div></td>
-        <td class="num">${g.count}</td><td class="wincell">${canPickWinner() && g.points>0 ? `<button class="small winbtn" data-win="${esc(g.name)}" title="Вибрати переможцем і перейти до гри">Переможець</button>` : ""}</td><td class="chev" title="${open?"Згорнути":"Показати замовлення"}"><span></span></td></tr>`;
+        <td class="num">${g.count}</td><td class="wincell">${canPickWinner() && g.points>0 ? `<button class="winbtn" data-win="${esc(g.name)}" title="Затисніть і тримайте, щоб вибрати переможцем"><span class="water"><i></i></span><span class="wl">Переможець</span></button>` : ""}</td><td class="chev" title="${open?"Згорнути":"Показати замовлення"}"><span></span></td></tr>`;
         if(!open) return main;
         const list = D().entries.filter(e=>counted.has(e.id) && norm(e.text)===g.key).sort((a,b)=>pointsOf(b)-pointsOf(a) || a.ts-b.ts);
         return main + `<tr class="gdetail"><td colspan="8"><table class="subtable"><thead><tr><th>Час</th><th>Чатерс</th><th>Тір сабки</th><th class="num">Має сабку</th><th class="num">Бали</th></tr></thead><tbody>${
@@ -503,9 +488,9 @@ document.querySelectorAll(".modal").forEach(m => m.addEventListener("mousedown",
 $("generalBtn").onclick = () => {
   const u = S.auth && S.auth.user;
   $("accountInfo").innerHTML = u ? `Канал: <b>${esc(u.display_name)}</b> <span class="muted">(${esc(u.login)})</span>` : "Не увійшли";
-  $("obsPort").value = S.settings.obsPort; openModal("generalModal");
+  $("obsPort").value = S.settings.obsPort; renderObs(); openModal("generalModal");
 };
-$("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round(n("obsPort",17841))}); closeModal("generalModal"); obsKey = ""; renderObs(); toast("Збережено"); };
+$("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round(n("obsPort",17841))}); closeModal("generalModal"); toast("Збережено"); };
 $("logoutBtn2").onclick = async () => { if(await confirmBox("Вийти з акаунта Twitch?")){ closeModal("generalModal"); call("Logout"); } };
 $("changeClient2").onclick = async () => { if(await confirmBox("Змінити Client ID? Потрібно буде увійти знову.")){ closeModal("generalModal"); call("ChangeClientID"); } };
 $("openBase").onclick = () => call("OpenFolder", "");
@@ -514,7 +499,7 @@ $("openCsv").onclick = () => call("OpenFolder", "exports");
 // СабДей: нагорода + правила балів
 $("subdaySettingsBtn").onclick = () => {
   pendingReward = null; showAllRewards = false;
-  $("gameMin").value = S.settings.gameMin || 40;
+  $("gameMin").value = S.settings.gameMin || 40; $("voteMin").value = S.settings.voteMin || 3;
   renderRewardGrid(); openModal("subdayModal");
   if(!(S.rewards||[]).length) withLoading([$("subdayModal").querySelector(".box"), $("rewardRefresh")], () => call("RefreshRewards")).then(() => renderRewardGrid());
 };
@@ -524,7 +509,7 @@ $("subdaySave").onclick = async () => {
     setState(await call("SelectReward", pendingReward, r ? r.title : ""));
     if(r && r.is_user_input_required === false) toast("Увага: ця нагорода не вимагає тексту — замовлення без тексту ігноруються", 4500);
   }
-  await saveSettings({ gameMin: Math.min(600, Math.max(1, Math.round(n("gameMin",40)))) });
+  await saveSettings({ gameMin: Math.min(600, Math.max(1, Math.round(n("gameMin",40)))), voteMin: Math.min(60, Math.max(1, Math.round(n("voteMin",3)))) });
   pendingReward = null; closeModal("subdayModal"); toast("Налаштування СабДею збережено");
 };
 
@@ -533,18 +518,9 @@ $("chatSettingsBtn").onclick = () => {
   const c = S.settings.chat;
   $("chatFont").value = c.fontSize; $("chatFontVal").textContent = c.fontSize + " px";
   $("chatTime").checked = !c.hideTime; $("chatBadges").checked = !c.hideBadges;
-  const o = S.obs || {};
-  $("chatObs").innerHTML = o.running ? `<div class="obsrow"><span><b>Оверлей чату</b> <span class="muted">420×700, прозорий</span><code>${esc(o.url)}/overlay/chat</code></span>
-    <button class="small" data-copy="${esc(o.url)}/overlay/chat">Копіювати</button><button class="small" data-open="/overlay/chat">↗</button></div>
-    <div class="hint">Параметри: <code>?fade=30</code> — повідомлення зникають, <code>?hide=nightbot</code> — сховати ботів, <code>?size=20</code> — розмір.</div>` : "Сервер для OBS не запущено.";
   openModal("chatModal");
 };
 $("chatFont").oninput = () => $("chatFontVal").textContent = $("chatFont").value + " px";
-$("chatObs").addEventListener("click", async e => {
-  const c = e.target.closest("[data-copy]"), o = e.target.closest("[data-open]");
-  if(c){ const ok = await call("CopyText", c.dataset.copy); toast(ok ? "URL скопійовано" : "Не вдалося скопіювати"); }
-  if(o) call("OpenOverlay", o.dataset.open);
-});
 $("chatSave").onclick = async () => {
   await saveSettings({chat: {fontSize: Math.round(n("chatFont",14)), hideTime: !$("chatTime").checked, hideBadges: !$("chatBadges").checked}});
   closeModal("chatModal"); toast("Налаштування чату збережено");
@@ -562,12 +538,73 @@ $("newStreamBtn").onclick = async () => {
 };
 /* ---------- етапи СабДею: 1 збір → 2 гра переможця ---------- */
 const canPickWinner = () => D().live && S.exported && S.phase !== "play";
-async function pickWinner(name){
-  const min = S.settings.gameMin || 40;
-  if(!(await confirmBox(`Переможець: «${name}».\n\nПерейти до гри? Таймер на ${min} хв стартує одразу.`, "Почати гру", "Скасувати"))) return;
-  setState(await call("SetWinner", name));
+const HOLD_MS = 1400;
+let holding = null; // {btn, timer, name}
+function holdStart(btn){
+  if(holding) return;
+  btn.classList.remove("drain"); void btn.offsetWidth; btn.classList.add("holding");
+  holding = {btn, name: btn.dataset.win, timer: setTimeout(holdDone, HOLD_MS)};
 }
-function gameRemaining(){ const g = S.game || {}; return g.status==="running" ? g.endsAt - Date.now() : (g.remainingMs || 0); }
+function holdCancel(){
+  if(!holding) return;
+  clearTimeout(holding.timer);
+  holding.btn.classList.remove("holding"); holding.btn.classList.add("drain");
+  holding = null; if(tableDirty) setTimeout(renderTable, 400);
+}
+async function holdDone(){
+  const {btn, name} = holding; btn.classList.add("full");
+  await sparkles(1500);
+  holding = null;
+  try{ setState(await call("SetWinner", name)); } catch(e){ renderTable(); }
+}
+$("tableWrap").addEventListener("pointerdown", e => {
+  const b = e.target.closest("button[data-win]"); if(!b || e.button !== 0) return;
+  e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(_){}
+  holdStart(b);
+});
+// відпустили раніше (де завгодно) — вода стікає назад
+["pointerup","pointercancel"].forEach(t => document.addEventListener(t, () => { if(holding && !holding.btn.classList.contains("full")) holdCancel(); }));
+window.addEventListener("blur", () => { if(holding && !holding.btn.classList.contains("full")) holdCancel(); });
+
+// зелено-фіолетові блискітки, що злітаються від меж екрана
+function sparkles(ms){
+  return new Promise(resolve => {
+    const cv = $("sparkles"), ctx = cv.getContext("2d"), W = cv.width = innerWidth, H = cv.height = innerHeight;
+    cv.classList.add("on");
+    const parts = [], N = 170, cx = W/2, cy = H/2;
+    for(let i=0;i<N;i++){
+      const side = i % 4, t = Math.random();
+      const x = side===0 ? t*W : side===1 ? W : side===2 ? t*W : 0;
+      const y = side===0 ? 0 : side===1 ? t*H : side===2 ? H : t*H;
+      const ang = Math.atan2(cy - y, cx - x) + (Math.random()-.5)*0.9, sp = 3 + Math.random()*7;
+      const mix = Math.random();
+      parts.push({x, y, vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp, r:1.5+Math.random()*3.5, rot:Math.random()*6, vr:(Math.random()-.5)*.3,
+        c:`rgb(${Math.round(0+145*mix)},${Math.round(200-129*mix)},${Math.round(83+172*mix)})`, d:Math.random()*250});
+    }
+    const t0 = performance.now();
+    function star(p, a){
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = a; ctx.fillStyle = p.c;
+      ctx.shadowColor = p.c; ctx.shadowBlur = 12;
+      ctx.beginPath(); for(let k=0;k<8;k++){ const rr = k%2 ? p.r*.45 : p.r*2.2, aa = k*Math.PI/4; ctx.lineTo(Math.cos(aa)*rr, Math.sin(aa)*rr); } ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+    function frame(now){
+      const el = now - t0; ctx.clearRect(0,0,W,H);
+      for(const p of parts){
+        if(el < p.d) continue;
+        p.x += p.vx; p.y += p.vy; p.vx *= .985; p.vy *= .985; p.rot += p.vr;
+        const life = (el - p.d) / (ms - 250), a = Math.max(0, Math.min(1, life < .2 ? life*5 : 1 - (life-.2)/.8)) * (.6 + .4*Math.sin(el/60 + p.r));
+        star(p, a);
+      }
+      if(el < ms && !done) requestAnimationFrame(frame); else finish();
+    }
+    let done = false;
+    function finish(){ if(done) return; done = true; ctx.clearRect(0,0,W,H); cv.classList.remove("on"); resolve(); }
+    setTimeout(finish, ms + 150); // гарантія: перехід відбудеться, навіть якщо анімацію кадрів призупинено
+    requestAnimationFrame(frame);
+  });
+}
+
+function remainOf(t){ return t.status==="running" ? t.endsAt - Date.now() : (t.remainingMs || 0); }
 let shownStep = 0;
 function renderSteps(){
   const play = S.phase === "play";
@@ -581,38 +618,56 @@ function renderSteps(){
   const step = play ? 2 : 1;
   if(step !== shownStep){
     $("stepTrack").classList.toggle("at2", play);
-    if(shownStep) toast(play ? "Етап 2: гра переможця" : "Гру завершено — етап 1");
+    if(shownStep && !play) toast(S.vote && S.vote.result === "next" ? "Чат вирішив: наступний збір" : "Етап 1: збір замовлень");
     shownStep = step;
   }
   if(!play) return;
-  $("gLabel").textContent = `Гра · Збір ${S.collN || ""}`;
+  $("gLabel").textContent = `Гра · Збір ${S.collN || ""}` + (S.round > 1 ? ` · раунд ${S.round}` : "");
   $("gName").textContent = S.winner || "—";
-  // хто замовляв переможне замовлення
   const g = aggregate(LIVE()).find(x => x.name === S.winner || x.key === norm(S.winner||""));
   $("gUsers").innerHTML = g ? g.users.map(u => `${userTag(u)} <span class="muted">(${u.p})</span>`).join(" ") : "";
-  const o = S.obs || {};
-  $("gObs").innerHTML = o.running ? `<div class="obsrow"><span><b>Віджет гри для OBS</b> <span class="muted">600×260</span><code>${esc(o.url)}/overlay/game</code></span>
-    <button class="small" data-copy="${esc(o.url)}/overlay/game">Копіювати</button><button class="small" data-open="/overlay/game">↗</button></div>` : "";
+  $("vStart").textContent = `Почати голосування · ${S.settings.voteMin || 3} хв`;
   renderGameTimer();
 }
+function gameSection(){
+  const g = S.game || {}, v = S.vote || {};
+  if(v.status === "running") return "gVote";
+  if(g.status === "finished") return v.status === "finished" && v.result === "tie" ? "gTie" : "gOver";
+  return "gPlay";
+}
+let lastV = "";
 function renderGameTimer(){
   if(!S || S.phase !== "play") return;
-  const g = S.game || {}, r = gameRemaining();
-  $("gTimer").textContent = fmtTime(r);
-  $("gTimer").className = "gtimer " + (g.status||"") + (g.status==="running" && r <= 60000 ? " low" : "");
-  $("gStatus").textContent = g.status==="paused" ? "Пауза" : "Гра йде — після завершення таймера повернемось до збору замовлень";
-  $("gPause").textContent = g.status==="paused" ? "Продовжити" : "Пауза";
+  const sec = gameSection();
+  document.querySelectorAll("#pane2 .gsec").forEach(x => x.classList.toggle("on", x.id === sec));
+  const g = S.game || {}, v = S.vote || {};
+  if(sec === "gPlay"){
+    const r = remainOf(g);
+    $("gTimer").textContent = fmtTime(r);
+    $("gTimer").className = "gtimer " + (g.status||"") + (g.status==="running" && r <= 60000 ? " low" : "");
+    $("gStatus").textContent = g.status==="paused" ? "Пауза" : "Гра йде. Коли час вийде — запустіть голосування за продовження.";
+    $("gPause").textContent = g.status==="paused" ? "Продовжити" : "Пауза";
+  }
+  if(sec === "gVote"){
+    const r = remainOf(v), tot = (v.yes||0) + (v.no||0);
+    $("vTimer").textContent = fmtTime(r);
+    $("vTimer").classList.toggle("low", r <= 15000);
+    $("vf1").style.width = (tot ? v.yes/tot*100 : 0) + "%"; $("vf2").style.width = (tot ? v.no/tot*100 : 0) + "%";
+    const k = `${v.yes}:${v.no}`;
+    if(k !== lastV){ $("vn1").textContent = `${v.yes||0}${tot?` · ${Math.round(v.yes/tot*100)}%`:""}`; $("vn2").textContent = `${v.no||0}${tot?` · ${Math.round(v.no/tot*100)}%`:""}`; lastV = k; }
+  }
+  if(sec === "gTie") $("tieInfo").textContent = `Голоси розділились порівну: 1 — ${v.yes||0}, 2 — ${v.no||0}. Вирішіть самі.`;
 }
 setInterval(renderGameTimer, 250);
 $("gPause").onclick = async () => setState(await call(S.game.status==="paused" ? "GameResume" : "GamePause"));
 $("gPlus").onclick = async () => setState(await call("GameAddTime", 60000));
 $("gMinus").onclick = async () => setState(await call("GameAddTime", -60000));
-$("gFinish").onclick = async () => { if(await confirmBox("Завершити гру й повернутися до збору замовлень?", "Завершити", "Скасувати")) setState(await call("FinishGame")); };
-$("gObs").addEventListener("click", async e => {
-  const c = e.target.closest("[data-copy]"), o = e.target.closest("[data-open]");
-  if(c){ const ok = await call("CopyText", c.dataset.copy); toast(ok ? "URL скопійовано" : "Не вдалося скопіювати"); }
-  if(o) call("OpenOverlay", o.dataset.open);
-});
+$("gFinish").onclick = async () => { if(await confirmBox("Завершити гру зараз? Далі — голосування або наступний збір.", "Завершити", "Скасувати")) setState(await call("FinishGame")); };
+$("vStart").onclick = async () => setState(await call("StartVote"));
+$("vPlus").onclick = async () => setState(await call("VoteAddTime", 60000));
+$("vFinish").onclick = async () => setState(await call("FinishVote"));
+$("gContinue").onclick = $("tContinue").onclick = async () => setState(await call("ContinueGame"));
+$("gNext").onclick = $("tNext").onclick = async () => setState(await call("NextCollection"));
 
 function renderAll(){
   if(!inited){ initInputs(); inited = true; }
@@ -662,8 +717,7 @@ $("search").oninput = renderTable;
 $("tableWrap").addEventListener("click", async e => {
   const h = e.target.closest("th[data-sort]");
   if(h){ const k=h.dataset.sort, cur=sortKey[tab]; sortKey[tab] = [k, cur[0]===k ? -cur[1] : (k==="name"||k==="user"||k==="text"?1:-1)]; renderTable(); return; }
-  const wb = e.target.closest("button[data-win]");
-  if(wb){ e.stopPropagation(); pickWinner(wb.dataset.win); return; }
+  if(e.target.closest("button[data-win]")){ e.stopPropagation(); return; } // вибір — лише затисканням
   const gr = e.target.closest("tr.grow");
   if(gr && !e.target.closest(".grip")){ const k = gr.dataset.key; openGroups.has(k) ? openGroups.delete(k) : openGroups.add(k); renderTable(); return; }
   const btn = e.target.closest("button[data-act]"); if(!btn) return;

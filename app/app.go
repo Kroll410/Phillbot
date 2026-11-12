@@ -256,11 +256,11 @@ func (a *App) ticker(ctx context.Context) {
 			return
 		case <-t.C:
 			a.mu.Lock()
-			if a.tickGameLocked(time.Now().UnixMilli()) {
+			if msg := a.tickGameLocked(time.Now().UnixMilli()); msg != "" {
 				a.saveLocked()
 				a.emitLocked()
 				a.mu.Unlock()
-				a.logf("Час гри вийшов — назад до збору замовлень")
+				a.logf("%s", msg)
 				continue
 			}
 			s := &a.st.Session
@@ -467,7 +467,8 @@ func (a *App) StartTimer() Snapshot {
 			a.archiveLocked()
 			a.ensureStreamLocked(time.UnixMilli(now)) // довга перерва — новий стрім
 			st.CollN = len(st.Past) + 1
-			st.Winner, st.Exported, st.Phase = "", false, phaseCollect
+			st.Winner, st.Exported, st.Phase, st.Round = "", false, phaseCollect, 0
+			st.Vote = VoteState{Status: "idle"}
 			st.Game = Timer{Status: "idle"}
 			st.Entries = []Entry{}
 			st.SeenRedeems = []string{}

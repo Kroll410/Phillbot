@@ -455,3 +455,41 @@ code,kbd,pre,samp{font-family:var(--font-mono)}
 h1,h2,h3,h4{font-family:var(--font-display)}
 .card h2,.cuhead,th,.glabel,.settings h3:not(.twitchfont){font-family:var(--font-ui)}
 .settings h3.row>.icon-btn{flex:0 0 34px}
+
+/* ---------- «Переможець»: затисніть — кнопка наповнюється водою (зелений → фіолетовий) ---------- */
+.winbtn{position:relative;overflow:hidden;border:1px solid rgba(145,71,255,.55);background:rgba(145,71,255,.1);color:#e9dcff;
+  font-weight:700;border-radius:9px;padding:6px 14px;min-width:120px;user-select:none;touch-action:none}
+.winbtn:hover{background:rgba(145,71,255,.18)!important;border-color:#a970ff}
+.winbtn .wl{position:relative;z-index:2;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.winbtn .water{position:absolute;left:0;top:0;bottom:0;width:0;z-index:1;background:linear-gradient(90deg,#00c853,#4fd27a 30%,#9147ff);
+  transition:width .35s ease}
+.winbtn .water::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.18) 0 6px,transparent 6px 16px);
+  background-size:40px 100%;animation:wshimmer .7s linear infinite}
+.winbtn .water i{position:absolute;right:-7px;top:-20%;bottom:-20%;width:14px;
+  background:radial-gradient(circle at 0 50%,transparent 6px,#9147ff 7px) 0 0/14px 12px repeat-y;animation:wwave .5s linear infinite}
+.winbtn.holding .water{width:100%;transition:width 1.4s cubic-bezier(.35,.05,.45,1)}
+.winbtn.drain .water{width:0;transition:width .35s ease}
+.winbtn.full{border-color:#c9a6ff;box-shadow:0 0 0 3px rgba(145,71,255,.35),0 0 18px rgba(0,200,83,.45)}
+.winbtn.full .water i{display:none}
+@keyframes wshimmer{to{background-position:40px 0}}
+@keyframes wwave{to{background-position:0 12px}}
+/* блискітки на весь екран */
+.sparkles{position:fixed;inset:0;width:100%;height:100%;z-index:60;pointer-events:none;display:none}
+.sparkles.on{display:block}
+/* ---------- етап 2: секції ---------- */
+.gsec{display:none}
+.gsec.on{display:block;animation:enter2 .4s cubic-bezier(.2,1.2,.4,1)}
+@keyframes enter2{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.gover{font:800 30px/1.2 var(--font-display);margin:22px 0 6px}
+.vstart{height:48px;min-width:280px;font-size:16px;border-radius:12px;margin:8px 0 14px;background:linear-gradient(135deg,#00c853,#9147ff);border:0}
+.vstart:hover{filter:brightness(1.1)}
+.gctl.small2 button{min-width:0;height:36px;font-size:13px;font-weight:600}
+.vtimer{font:600 84px/1 var(--font-display);font-variant-numeric:tabular-nums;margin:8px 0 14px}
+.vtimer.low{color:var(--bad);animation:pulse 1s infinite}
+.vopts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.vopt{position:relative;overflow:hidden;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;background:var(--panel2);text-align:left}
+.vopt .vfill{position:absolute;left:0;top:0;bottom:0;width:0;opacity:.35;transition:width .6s cubic-bezier(.2,1,.3,1)}
+.vopt.v1 .vfill{background:#00c853} .vopt.v2 .vfill{background:#9147ff}
+.vopt b{position:relative;font:800 30px/1 var(--font-display)} .vopt.v1 b{color:#00e676} .vopt.v2 b{color:#c9a6ff}
+.vopt span{position:relative;font-weight:600}
+.vopt em{position:relative;font-style:normal;font:700 15px/1 var(--font-ui);font-variant-numeric:tabular-nums;color:var(--muted)}

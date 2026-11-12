@@ -31,7 +31,8 @@
   <h3>OBS</h3>
   <label>Порт локального сервера (127.0.0.1)</label>
   <input type="number" id="obsPort" min="1024" max="65000" step="1">
-  <div class="hint">Оверлеї для OBS працюють лише на цьому комп'ютері. Після зміни порту оновіть URL у джерелах OBS.</div>
+  <div id="obsWidget"></div>
+  <div class="hint">Віджет працює лише на цьому комп'ютері. Після зміни порту оновіть URL у джерелі OBS.</div>
   <h3>Файли</h3>
   <div class="row"><button id="openBase">Папка програми</button></div>
   <div class="row actions" style="margin-top:16px">
@@ -48,8 +49,10 @@
   <div id="rewardGrid" class="rgrid"></div>
   <div id="rewardsErr" class="hint err"></div>
   <h3>Гра переможця</h3>
-  <label>Час на гру (хв)</label>
-  <input type="number" id="gameMin" min="1" max="600" step="1" style="max-width:160px">
+  <div class="row" style="max-width:360px">
+    <div><label>Час на гру (хв)</label><input type="number" id="gameMin" min="1" max="600" step="1"></div>
+    <div><label>Голосування (хв)</label><input type="number" id="voteMin" min="1" max="60" step="1"></div>
+  </div>
   <h3>Дані</h3>
   <div class="row" style="align-items:center"><button id="openCsv" style="flex:0 0 auto">Відкрити теку з .csv</button>
     <span class="hint" style="margin:0">Після кожного збору таблиця зберігається сюди автоматично.</span></div>
@@ -78,8 +81,6 @@
   <input type="range" id="chatFont" min="11" max="28" step="1">
   <label class="chk"><input type="checkbox" id="chatTime"> Показувати час</label>
   <label class="chk"><input type="checkbox" id="chatBadges"> Показувати бейджі</label>
-  <h3>Чат в OBS</h3>
-  <div id="chatObs" class="hint"></div>
   <div class="row actions" style="margin-top:16px">
     <button data-close="chatModal">Скасувати</button>
     <button id="chatSave" class="primary">Зберегти</button>
@@ -166,12 +167,6 @@
       </div>
     </div>
 
-    <details class="card fold" id="obsCard">
-      <summary><h2>OBS — оверлеї</h2></summary>
-      <div id="obsStatus" class="hint"></div>
-      <div id="obsList"></div>
-    </details>
-
     <div class="card scard">
       <h2>Стрім</h2>
       <div class="scur" id="streamCur">—</div>
@@ -208,17 +203,52 @@
     <div class="glabel" id="gLabel">Гра</div>
     <div class="gname" id="gName">—</div>
     <div class="gusers" id="gUsers"></div>
-    <div class="gtimerbox">
-      <button id="gMinus" class="tadj big" title="Мінус 1 хвилина">−1</button>
-      <div class="gtimer" id="gTimer">40:00</div>
-      <button id="gPlus" class="tadj big" title="Плюс 1 хвилина">+1</button>
+
+    <div class="gsec" id="gPlay">
+      <div class="gtimerbox">
+        <button id="gMinus" class="tadj big" title="Мінус 1 хвилина">−1</button>
+        <div class="gtimer" id="gTimer">40:00</div>
+        <button id="gPlus" class="tadj big" title="Плюс 1 хвилина">+1</button>
+      </div>
+      <div class="gstatus" id="gStatus"></div>
+      <div class="gctl">
+        <button id="gPause">Пауза</button>
+        <button id="gFinish" class="danger">Завершити гру</button>
+      </div>
     </div>
-    <div class="gstatus" id="gStatus"></div>
-    <div class="gctl">
-      <button id="gPause">Пауза</button>
-      <button id="gFinish" class="danger">Завершити гру</button>
+
+    <div class="gsec" id="gOver">
+      <div class="gover">Час гри вийшов</div>
+      <div class="gstatus">Запустіть голосування: чат вирішить — продовжити гру чи перейти до наступного збору.</div>
+      <button id="vStart" class="primary vstart">Почати голосування</button>
+      <div class="gctl small2">
+        <button id="gContinue">Продовжити гру без голосування</button>
+        <button id="gNext">Наступний збір</button>
+      </div>
     </div>
-    <div class="gobs" id="gObs"></div>
+
+    <div class="gsec" id="gVote">
+      <div class="gover">Продовжуємо гру?</div>
+      <div class="vtimer" id="vTimer">3:00</div>
+      <div class="vopts">
+        <div class="vopt v1"><div class="vfill" id="vf1"></div><b>1</b><span>Продовжити гру</span><em id="vn1">0</em></div>
+        <div class="vopt v2"><div class="vfill" id="vf2"></div><b>2</b><span>Наступний збір</span><em id="vn2">0</em></div>
+      </div>
+      <div class="gstatus">Чатерси пишуть <b>1</b> або <b>2</b> — від кожного рахується останній голос.</div>
+      <div class="gctl">
+        <button id="vPlus">+1 хв</button>
+        <button id="vFinish">Завершити голосування</button>
+      </div>
+    </div>
+
+    <div class="gsec" id="gTie">
+      <div class="gover">Нічия</div>
+      <div class="gstatus" id="tieInfo"></div>
+      <div class="gctl">
+        <button id="tContinue" class="primary">Продовжити гру</button>
+        <button id="tNext">Наступний збір</button>
+      </div>
+    </div>
   </div>
 </div>
 </div></div>
@@ -228,6 +258,7 @@
 <div class="modal" id="modal"><div class="box"><p id="modalText"></p><div class="row actions"><button id="modalNo">Скасувати</button><button id="modalYes" class="primary">Так</button></div></div></div>
 <div id="welcome" class="welcome hidden"><div class="wbox"><div class="whi">Вітаю,</div><div class="wname" id="wName"></div><div class="wsub">PhillBot готовий до стріму</div></div></div>
 <div id="toast"></div>
+<canvas id="sparkles" class="sparkles"></canvas>
 
 <script src="chatrender.js"></script>
 <script src="app.js"></script>

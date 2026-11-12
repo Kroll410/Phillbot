@@ -234,10 +234,11 @@ func (a *App) NewStream() Snapshot {
 		}
 		a.archiveLocked()
 		a.writeStreamLocked()
-		a.finishGameLocked()
+		a.endPlayLocked()
 		st.Entries = []Entry{}
 		st.SeenRedeems = []string{}
-		st.Winner, st.Exported, st.Phase = "", false, phaseCollect
+		st.Winner, st.Exported, st.Phase, st.Round = "", false, phaseCollect, 0
+		st.Vote = VoteState{Status: "idle"}
 		a.lastOrd = nil
 		a.beginStreamLocked(time.Now())
 		st.Session = Timer{Status: "idle", RemainingMs: int64(st.Settings.DurationMin) * 60000}

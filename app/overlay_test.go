@@ -43,7 +43,7 @@ func TestOverlayServer(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	for _, p := range []string{"/overlay/timer", "/overlay/top", "/overlay/marbles", "/overlay/last", "/overlay/chat", "/overlay/index", "/overlay/overlay.js", "/overlay/chatrender.js"} {
+	for _, p := range []string{"/overlay/widget", "/overlay/chat", "/overlay/index", "/overlay/overlay.js", "/overlay/chatrender.js"} {
 		resp, err := http.Get(base + p)
 		if err != nil || resp.StatusCode != 200 {
 			t.Fatal(p, err, resp.StatusCode)

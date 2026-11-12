@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<!-- Єдиний віджет PhillBot для OBS: таймер, що сам змінює вигляд за етапом СабДею.
+     Збір замовлень (таймер + лідери + нові замовлення) → гра переможця (таймер гри) → голосування «1/2» (таймер + живі смуги) → результат.
+     Розмір у OBS: 640×360. Параметри: ?scale=1.2&theme=box|shadow|plain&align=center&hideIdle=1&top=3 -->
+<html lang="uk"><head><meta charset="utf-8"><title>PhillBot — віджет</title>
+<link rel="stylesheet" href="overlay.css">
+<style>
+  :root{--green:#00e676;--purple:#9147ff}
+  body{display:flex;justify-content:center}
+  #w{position:relative;display:inline-block;min-width:calc(420px * var(--scale));max-width:calc(640px * var(--scale));text-align:center;
+     transition:opacity .5s, transform .5s}
+  #w.out{opacity:0;transform:translateY(12px) scale(.97)}
+  body.theme-box #w{background:rgba(14,14,16,.82);border:2px solid rgba(145,71,255,.55);border-radius:calc(18px * var(--scale));
+     padding:calc(16px * var(--scale)) calc(26px * var(--scale));box-shadow:0 10px 40px rgba(0,0,0,.45)}
+  .mode{display:none} .mode.on{display:block;animation:enter .45s cubic-bezier(.2,1.2,.4,1)}
+  @keyframes enter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .lbl{font:700 calc(15px * var(--scale))/1.2 var(--font-ui);text-transform:uppercase;letter-spacing:calc(2px * var(--scale));color:var(--muted)}
+  .lbl .acc{color:#c9a6ff}
+  .t{font:700 calc(78px * var(--scale))/1 var(--font-display);font-variant-numeric:tabular-nums;letter-spacing:1px;margin:calc(4px * var(--scale)) 0}
+  .t.paused{color:var(--warn)} .t.low{color:var(--bad);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.55}}
+  .sub{font:600 calc(15px * var(--scale))/1.3 var(--font-ui);color:var(--muted)}
+  .sub b{color:var(--text)}
+  /* лідери збору */
+  .top{margin-top:calc(10px * var(--scale));text-align:left}
+  .trow{display:grid;grid-template-columns:1fr auto;gap:calc(8px * var(--scale));align-items:center;font:700 calc(16px * var(--scale))/1.2 var(--font-ui);margin-top:calc(6px * var(--scale))}
+  .trow .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .trow .pt{font-variant-numeric:tabular-nums;color:#c9a6ff}
+  .trow .bar{grid-column:1 / 3;height:calc(5px * var(--scale));border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}
+  .trow .bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--green),var(--purple));transition:width .6s ease}
+  /* нове замовлення */
+  .toast{position:absolute;left:50%;bottom:calc(-14px * var(--scale));transform:translate(-50%,100%);white-space:nowrap;
+     font:700 calc(15px * var(--scale))/1 var(--font-ui);padding:calc(8px * var(--scale)) calc(14px * var(--scale));border-radius:calc(10px * var(--scale));
+     background:linear-gradient(90deg,rgba(0,200,83,.9),rgba(145,71,255,.9));color:#fff;opacity:0;transition:opacity .3s, transform .3s}
+  .toast.show{opacity:1;transform:translate(-50%,calc(100% + 6px * var(--scale)))}
+  /* гра */
+  .game{font:800 calc(36px * var(--scale))/1.15 var(--font-display);margin:calc(6px * var(--scale)) 0 0;overflow-wrap:anywhere;
+     background:linear-gradient(90deg,#fff,#c9a6ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  /* голосування */
+  .q{font:800 calc(28px * var(--scale))/1.2 var(--font-display);margin:calc(4px * var(--scale)) 0}
+  .vt{font:700 calc(46px * var(--scale))/1 var(--font-display);font-variant-numeric:tabular-nums}
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:calc(12px * var(--scale));margin-top:calc(12px * var(--scale))}
+  .opt{position:relative;border-radius:calc(12px * var(--scale));overflow:hidden;background:rgba(255,255,255,.06);padding:calc(10px * var(--scale)) calc(12px * var(--scale));text-align:left}
+  .opt .fill{position:absolute;left:0;top:0;bottom:0;width:0;transition:width .6s cubic-bezier(.2,1,.3,1);opacity:.5}
+  .opt.o1 .fill{background:linear-gradient(90deg,rgba(0,230,118,.6),rgba(0,230,118,.25))}
+  .opt.o2 .fill{background:linear-gradient(90deg,rgba(145,71,255,.7),rgba(145,71,255,.3))}
+  .opt .k{position:relative;font:800 calc(30px * var(--scale))/1 var(--font-display)}
+  .opt.o1 .k{color:var(--green)} .opt.o2 .k{color:#c9a6ff}
+  .opt .d{position:relative;font:600 calc(14px * var(--scale))/1.25 var(--font-ui);color:var(--text);margin-top:calc(4px * var(--scale))}
+  .opt .n{position:relative;font:700 calc(14px * var(--scale))/1 var(--font-ui);color:var(--muted);margin-top:calc(6px * var(--scale));font-variant-numeric:tabular-nums}
+  .opt.lead{box-shadow:inset 0 0 0 2px rgba(255,255,255,.35)}
+  .pop{animation:pop .35s cubic-bezier(.2,1.6,.4,1)} @keyframes pop{50%{transform:scale(1.15)}}
+  .hint{margin-top:calc(10px * var(--scale));font:600 calc(14px * var(--scale))/1.3 var(--font-ui);color:var(--muted)}
+  .hint b{color:var(--text)}
+  .res{font:800 calc(40px * var(--scale))/1.15 var(--font-display);margin:calc(6px * var(--scale)) 0;
+     background:linear-gradient(90deg,var(--green),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent}
+</style></head>
+<body class="theme-box align-center">
+<div id="w" class="out">
+  <!-- збір замовлень -->
+  <div class="mode" id="mCollect">
+    <div class="lbl" id="cLbl">Збір замовлень</div>
+    <div class="t" id="cT">10:00</div>
+    <div class="sub" id="cSub"></div>
+    <div class="top" id="cTop"></div>
+  </div>
+  <!-- гра переможця -->
+  <div class="mode" id="mGame">
+    <div class="lbl" id="gLbl">Граємо</div>
+    <div class="game" id="gName"></div>
+    <div class="t" id="gT">40:00</div>
+    <div class="sub" id="gSub"></div>
+  </div>
+  <!-- голосування -->
+  <div class="mode" id="mVote">
+    <div class="lbl">Голосування <span class="acc" id="vRound"></span></div>
+    <div class="q">Продовжуємо гру?</div>
+    <div class="vt" id="vT">3:00</div>
+    <div class="opts">
+      <div class="opt o1" id="o1"><div class="fill" id="f1"></div><div class="k">1</div><div class="d">Продовжити гру</div><div class="n" id="n1">0 голосів</div></div>
+      <div class="opt o2" id="o2"><div class="fill" id="f2"></div><div class="k">2</div><div class="d">Наступний збір</div><div class="n" id="n2">0 голосів</div></div>
+    </div>
+    <div class="hint">Пишіть у чат <b>1</b> або <b>2</b></div>
+  </div>
+  <!-- результат голосування -->
+  <div class="mode" id="mResult">
+    <div class="lbl">Результат голосування</div>
+    <div class="res" id="rText"></div>
+    <div class="sub" id="rSub"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+</div>
+<script src="overlay.js"></script>
+<script>
+(() => {
+  const hideIdle = OV.flag("hideIdle", true), topN = Math.max(0, OV.num("top", 3));
+  const SHOW_AFTER = 20000; // скільки показувати «збір завершено» / результат
+  let S = null, lastYes = -1, lastNo = -1;
+  const $ = id => document.getElementById(id);
+  const plural = (n, a, b, c) => n%10===1&&n%100!==11 ? a : [2,3,4].includes(n%10)&&![12,13,14].includes(n%100) ? b : c;
+  function remain(t){ return t.status === "running" ? t.endsAt - OV.serverNow() : (t.remainingMs || 0); }
+  function setMode(id){ document.querySelectorAll(".mode").forEach(m => m.classList.toggle("on", m.id === id)); }
+  function pickMode(){
+    if(!S) return null;
+    const now = OV.serverNow(), v = S.vote || {}, g = S.game || {}, s = S.session || {};
+    if(S.phase === "play"){
+      if(v.status === "running") return "mVote";
+      if(v.status === "finished" && v.result === "tie" && g.status === "finished") return "mResult";
+      if(v.status === "finished" && v.result === "continue" && now - v.finishedAt < 6000) return "mResult";
+      return "mGame";
+    }
+    if(v.status === "finished" && v.result === "next" && now - v.finishedAt < SHOW_AFTER) return "mResult";
+    if(s.status === "running" || s.status === "paused") return "mCollect";
+    if(s.status === "finished" && now - (s.finishedAt||0) < SHOW_AFTER) return "mCollect";
+    return hideIdle ? null : "mCollect";
+  }
+  function tick(){
+    if(!S) return;
+    const mode = pickMode();
+    $("w").classList.toggle("out", !mode);
+    if(!mode) return;
+    if(!$(mode).classList.contains("on")) setMode(mode);
+    const s = S.session || {}, g = S.game || {}, v = S.vote || {};
+    if(mode === "mCollect"){
+      const r = remain(s), fin = s.status === "finished";
+      $("cLbl").innerHTML = (fin ? "Збір завершено" : s.status === "paused" ? "Збір — пауза" : "Збір замовлень") + (S.collN ? ` <span class="acc">№${S.collN}</span>` : "");
+      $("cT").textContent = OV.fmtTime(fin ? 0 : r);
+      $("cT").className = "t " + (s.status||"") + (s.status === "running" && r <= 30000 ? " low" : "");
+      const tt = S.totals || {};
+      $("cSub").innerHTML = tt.entries ? `<b>${tt.entries}</b> ${plural(tt.entries,"замовлення","замовлення","замовлень")} · <b>${tt.points}</b> балів` : "Замовляйте через нагороду за бали каналу";
+    }
+    if(mode === "mGame"){
+      const r = remain(g), over = g.status === "finished";
+      $("gLbl").innerHTML = (over ? "Час гри вийшов" : g.status === "paused" ? "Гра — пауза" : "Граємо") + (S.round > 1 ? ` <span class="acc">раунд ${S.round}</span>` : "");
+      $("gName").textContent = S.winner || "";
+      $("gT").textContent = OV.fmtTime(over ? 0 : r);
+      $("gT").className = "t " + (g.status||"") + (g.status === "running" && r <= 60000 ? " low" : "");
+      $("gSub").textContent = over ? "Скоро голосування за продовження" : "";
+    }
+    if(mode === "mVote"){
+      const r = remain(v), total = (v.yes||0) + (v.no||0);
+      $("vRound").textContent = S.round ? `· раунд ${S.round}` : "";
+      $("vT").textContent = OV.fmtTime(r);
+      $("vT").className = "vt" + (r <= 15000 ? " t low" : "");
+      $("f1").style.width = (total ? v.yes/total*100 : 0) + "%";
+      $("f2").style.width = (total ? v.no/total*100 : 0) + "%";
+      $("n1").textContent = `${v.yes||0} ${plural(v.yes||0,"голос","голоси","голосів")}` + (total ? ` · ${Math.round(v.yes/total*100)}%` : "");
+      $("n2").textContent = `${v.no||0} ${plural(v.no||0,"голос","голоси","голосів")}` + (total ? ` · ${Math.round(v.no/total*100)}%` : "");
+      $("o1").classList.toggle("lead", v.yes > v.no); $("o2").classList.toggle("lead", v.no > v.yes);
+      if(v.yes !== lastYes && lastYes >= 0){ $("o1").classList.remove("pop"); void $("o1").offsetWidth; $("o1").classList.add("pop"); }
+      if(v.no !== lastNo && lastNo >= 0){ $("o2").classList.remove("pop"); void $("o2").offsetWidth; $("o2").classList.add("pop"); }
+      lastYes = v.yes; lastNo = v.no;
+    } else { lastYes = lastNo = -1; }
+    if(mode === "mResult"){
+      $("rText").textContent = v.result === "continue" ? "Продовжуємо гру!" : v.result === "next" ? "Наступний збір!" : "Нічия";
+      $("rSub").textContent = `1 — ${v.yes||0} · 2 — ${v.no||0}` + (v.result === "tie" ? " · вирішує стрімер" : "");
+    }
+  }
+  function renderTop(){
+    if(!S || !topN) { $("cTop").innerHTML = ""; return; }
+    const top = (S.top || []).slice(0, topN), max = Math.max(1, ...top.map(g => g.points));
+    $("cTop").innerHTML = top.map(g => `<div class="trow"><span class="nm"></span><span class="pt">${g.points}</span><div class="bar"><i style="width:${Math.round(g.points/max*100)}%"></i></div></div>`).join("");
+    [...$("cTop").querySelectorAll(".nm")].forEach((el, i) => el.textContent = top[i].name);
+  }
+  let toastT = 0;
+  function showOrder(o){
+    if(!o) return;
+    const t = $("toast"); t.textContent = `${o.user}: ${o.text}  +${o.points}`;
+    t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 4000);
+  }
+  OV.connect({ state: s => { S = s; renderTop(); tick(); }, redeem: d => showOrder(d && d.order) });
+  setInterval(tick, 200);
+})();
+</script>
+</body></html>

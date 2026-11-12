@@ -63,6 +63,17 @@ type OverlayState struct {
 	Game        Timer         `json:"game"`   // таймер гри переможця
 	Winner      string        `json:"winner"` // переможне замовлення
 	CollN       int           `json:"collN"`
+	Round       int           `json:"round"`
+	Vote        OverlayVote   `json:"vote"`
+}
+
+type OverlayVote struct {
+	Status     string `json:"status"`
+	EndsAt     int64  `json:"endsAt"`
+	FinishedAt int64  `json:"finishedAt"`
+	Yes        int    `json:"yes"`
+	No         int    `json:"no"`
+	Result     string `json:"result"`
 }
 
 // ---------- SSE ----------
@@ -330,7 +341,8 @@ func (a *App) overlayState() OverlayState {
 		top = top[:50]
 	}
 	out := OverlayState{Session: st.Session, ServerNow: time.Now().UnixMilli(), RewardTitle: st.Settings.RewardTitle,
-		Channel: a.bc.DisplayName, Top: append([]Group(nil), top...), Phase: st.Phase, Game: st.Game, Winner: st.Winner, CollN: st.CollN,
+		Channel: a.bc.DisplayName, Top: append([]Group(nil), top...), Phase: st.Phase, Game: st.Game, Winner: st.Winner, CollN: st.CollN, Round: st.Round,
+		Vote:   OverlayVote{Status: st.Vote.Status, EndsAt: st.Vote.EndsAt, FinishedAt: st.Vote.FinishedAt, Yes: st.Vote.Yes, No: st.Vote.No, Result: st.Vote.Result},
 		Totals: OverlayTotals{Entries: n, Users: len(users), Orders: len(counts), Points: total, Marbles: sumInts(counts)}}
 	for i := range out.Top {
 		if len(out.Top[i].Users) > 10 {

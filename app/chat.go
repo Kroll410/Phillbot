@@ -120,6 +120,7 @@ func (a *App) onChatMessage(raw json.RawMessage) {
 	a.emitEvent("chat", msg)
 	a.backfillLook(msg.UserID, msg.Color, msg.Badges)
 	a.trackChatter(ev, msg)
+	a.onVoteMessage(ev.ChatterUserID, ev.Message.Text)
 }
 
 // видалення: ids — конкретні повідомлення; userID — усі повідомлення людини; all — очищення чату

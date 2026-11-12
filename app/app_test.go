@@ -310,16 +310,57 @@ func TestGamePhase(t *testing.T) {
 		t.Fatal("+1")
 	}
 	a.GameResume()
-	// час гри вийшов — автоматично назад до етапу 1
+	// час гри вийшов — етап 2 НЕ закінчується, чекаємо стрімера
 	a.mu.Lock()
 	a.st.Game.EndsAt = time.Now().UnixMilli() - 1
-	ended := a.tickGameLocked(time.Now().UnixMilli())
+	msg := a.tickGameLocked(time.Now().UnixMilli())
 	a.mu.Unlock()
-	if !ended || a.st.Phase != "collect" || a.st.Game.Status != "finished" {
-		t.Fatal("auto return to collect", a.st.Phase)
+	if msg == "" || a.st.Phase != "play" || a.st.Game.Status != "finished" {
+		t.Fatal("game must wait for streamer", a.st.Phase, a.st.Game.Status)
 	}
 	if f, _ := a.GetStream(a.st.Stream.ID); len(f.Collections) != 1 || f.Collections[0].Winner != "Dark Souls" {
 		t.Fatal("winner not saved in stream")
+	}
+	// голосування: «1» продовжити, «2» наступний збір; від кожного — останній голос
+	if _, err := a.StartVote(); err != nil {
+		t.Fatal(err)
+	}
+	a.onVoteMessage("u1", "1")
+	a.onVoteMessage("u2", " 1 ")
+	a.onVoteMessage("u3", "2")
+	a.onVoteMessage("u2", "2")     // передумав
+	a.onVoteMessage("u4", "12")    // не голос
+	a.onVoteMessage("u5", "lol 1") // не голос
+	if v := a.st.Vote; v.Yes != 1 || v.No != 2 {
+		t.Fatalf("votes %+v", v)
+	}
+	a.mu.Lock()
+	a.st.Vote.EndsAt = time.Now().UnixMilli() - 1
+	msg = a.tickGameLocked(time.Now().UnixMilli())
+	a.mu.Unlock()
+	if a.st.Vote.Result != "next" || a.st.Phase != "collect" {
+		t.Fatal("vote result next", msg, a.st.Vote.Result, a.st.Phase)
+	}
+	// продовження за голосуванням — новий раунд гри
+	a.mu.Lock()
+	a.st.Phase, a.st.Game.Status = "play", "finished"
+	a.mu.Unlock()
+	a.StartVote()
+	a.onVoteMessage("u1", "1")
+	s = a.FinishVote()
+	if s.Vote.Result != "continue" || s.Phase != "play" || s.Game.Status != "running" || s.Round != 2 {
+		t.Fatalf("continue: %+v phase=%s round=%d", s.Vote, s.Phase, s.Round)
+	}
+	// нічия — вирішує стрімер
+	a.FinishGame()
+	a.StartVote()
+	s = a.FinishVote()
+	if s.Vote.Result != "tie" || s.Phase != "play" {
+		t.Fatal("tie")
+	}
+	s = a.NextCollection()
+	if s.Phase != "collect" {
+		t.Fatal("next collection")
 	}
 	s = a.StartTimer() // новий збір — переможець і прапорець експорту скидаються
 	if s.Winner != "" || s.Exported || s.Phase != "collect" || s.CollN != 2 {

@@ -25,7 +25,7 @@ func main() {
 		Height:           860,
 		MinWidth:         960,
 		MinHeight:        600,
-		AssetServer:      &assetserver.Options{Assets: assets},
+		AssetServer:      &assetserver.Options{Assets: assets, Handler: app.userAssets()}, // + картинки користувача (центр колеса)
 		BackgroundColour: &options.RGBA{R: 14, G: 14, B: 16, A: 255},
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,

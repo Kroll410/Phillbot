@@ -542,6 +542,7 @@ function denyMode(btn){
   toast(home === "viewing" ? "Спершу завершіть аукціон (прийом ставок)" : S.phase === "play" ? "Спершу завершіть гру в СабДеї" : "Спершу завершіть збір у СабДеї");
 }
 document.querySelectorAll(".mode-tab[data-mode]").forEach(b => b.onclick = () => {
+  if(b.dataset.mode === mode) return; // уже відкрита — без анімації переходу
   if(b.dataset.mode === "viewing" && subdayBusy()) return denyMode(b);
   if(b.dataset.mode === "subday" && mode !== "subday" && auctionBusy()) return denyMode(b);
   showMode(b.dataset.mode);
@@ -851,7 +852,8 @@ $("stopBtn").onclick = async () => { setState(await call("FinishTimer")); toast(
 $("plusBtn").onclick = async () => setState(await call("AddTime", 60000));
 $("minusBtn").onclick = async () => setState(await call("AddTime", -60000));
 
-document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
+document.querySelectorAll(".tabs .tab").forEach(b => b.onclick = () => {
+  if(b.dataset.tab === tab) return; // уже відкрита — без анімації переходу
   tab = b.dataset.tab; document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b)); renderTable();
   slideSeg(document.querySelector(".tabs .seg"));
   const w = $("tableWrap"); w.classList.remove("slidein"); void w.offsetWidth; w.classList.add("slidein");
@@ -1121,11 +1123,30 @@ function wheelDraw(secs){
     }
     a0 = a1;
   }
-  // центр
-  c.beginPath(); c.arc(cx, cx, Math.max(14, R * .14), 0, Math.PI * 2); c.fillStyle = "#18181b"; c.fill();
+  // центр: з картинкою — більший круг, сама картинка (і GIF) — елемент <img> поверх колеса
+  const hasImg = !!centerSrc(), hub = hasImg ? Math.max(24, R * (big ? .22 : .2)) : Math.max(14, R * .14);
+  c.beginPath(); c.arc(cx, cx, hub, 0, Math.PI * 2); c.fillStyle = "#18181b"; c.fill();
   c.lineWidth = 3; c.strokeStyle = ring; c.stroke();
+  placeCenter(hub);
 }
 new ResizeObserver(() => wheelDraw()).observe($("wheelBox"));
+// картинка в центрі колеса: емодзі каналу (CDN Twitch) або власний файл (/userimg/wheel/…)
+function centerSrc(c = (AU().cfg || {}).center){
+  if(!c || !c.kind) return "";
+  if(c.kind === "emote") return c.url || "";
+  if(c.kind === "file" && c.name) return "/userimg/wheel/" + encodeURIComponent(c.name);
+  return "";
+}
+function placeCenter(hub){
+  const img = $("wCenter"), src = centerSrc(), c = (AU().cfg || {}).center || {};
+  img.classList.toggle("hidden", !src);
+  if(!src) return;
+  if(img.getAttribute("src") !== src) img.src = src;
+  const sz = Math.round((hub - 3) * 2);
+  img.style.width = img.style.height = sz + "px";
+  img.style.padding = c.kind === "emote" ? Math.round(sz * .12) + "px" : "0";
+  img.classList.toggle("emote", c.kind === "emote");
+}
 const easeSpin = t => 1 - Math.pow(1 - t, 4);
 function animateSpin(sp){
   const secs = sp.ids.map((id, i) => ({id, w: sp.weights[i]}));
@@ -1163,7 +1184,6 @@ async function showWinner(){
 function renderWheel(){
   const au = AU(), sp = au.spin;
   $("auModeLbl").textContent = au.cfg.spinMode === "instant" ? "одразу результат" : "на вибування";
-  $("wSrc").textContent = sp && sp.source && sp.source !== "—" ? `Останній оберт: ${sp.source}` : "Випадковість — random.org";
   if(sp && lastSpinAt !== null && sp.at !== lastSpinAt){ lastSpinAt = sp.at; if(Date.now() - sp.at < 15000){ animateSpin(sp); return; } }
   if(lastSpinAt === null) lastSpinAt = sp ? sp.at : 0;
   if(!sp) lastSpinAt = 0;
@@ -1213,7 +1233,42 @@ document.querySelectorAll("[data-swap]").forEach(b => b.onclick = () => {
 placeWins();
 
 // ----- нагороди-ставки (налаштування, як у СабДеї) -----
-let auPending = null, auShowAll = false, auModePending = null;
+let auPending = null, auShowAll = false, auModePending = null, auCenterPending = null, emotes = null;
+const curCenter = () => auCenterPending || (AU().cfg || {}).center || {kind: ""};
+function auCenterUI(){
+  const c = curCenter();
+  document.querySelectorAll("#auCenterSeg .tab").forEach(b => b.classList.toggle("active", b.dataset.c === (c.kind || "")));
+  slideSeg($("auCenterSeg"));
+  const box = $("auCenterBox"), src = centerSrc(c);
+  const prev = src ? `<span class="wcprev${c.kind === "emote" ? " emote" : ""}"><img src="${esc(src)}" alt=""></span>` : "";
+  if(!c.kind) box.innerHTML = `<div class="hint">У центрі колеса — звичайний круг.</div>`;
+  else if(c.kind === "file") box.innerHTML = `<div class="wcfile">${prev}<button id="auPickImg">${c.name ? "Вибрати інший файл…" : "Вибрати файл…"}</button><span class="hint" style="margin:0">PNG, JPG, GIF або WEBP. GIF у центрі анімується.</span></div>`;
+  else {
+    if(!emotes){ box.innerHTML = `<div class="hint">Завантажую емодзі каналу…</div>`; return; }
+    if(!emotes.length){ box.innerHTML = `<div class="hint">У каналу немає власних емодзі.</div>`; return; }
+    box.innerHTML = `<div class="emgrid">` + emotes.map(e => `<button class="em${c.url === e.url ? " sel" : ""}" data-em="${esc(e.id)}" title="${esc(e.name)}${e.animated ? " (анімоване)" : ""}"><img src="${esc(e.url)}" alt="" loading="lazy"></button>`).join("") + `</div>`;
+  }
+}
+async function loadEmotes(){
+  if(emotes) return;
+  try{ emotes = await withLoading($("auCenterBox"), () => api().GetChannelEmotes()) || []; }
+  catch(e){ emotes = null; $("auCenterBox").innerHTML = `<div class="hint err">Не вдалося отримати емодзі: ${esc(e && e.message || e)}</div>`; return; }
+  auCenterUI();
+}
+document.querySelectorAll("#auCenterSeg .tab").forEach(b => b.onclick = () => {
+  const k = b.dataset.c, cur = (AU().cfg || {}).center || {};
+  auCenterPending = k === (cur.kind || "") ? {...cur} : {kind: k};
+  auCenterUI();
+  if(k === "emote") loadEmotes();
+});
+$("auCenterBox").addEventListener("click", async e => {
+  const em = e.target.closest("[data-em]");
+  if(em){ const x = emotes.find(v => v.id === em.dataset.em); if(x){ auCenterPending = {kind: "emote", url: x.url, name: x.name}; auCenterUI(); } return; }
+  if(e.target.closest("#auPickImg")){
+    const name = await call("PickWheelImage");
+    if(name){ auCenterPending = {kind: "file", name}; auCenterUI(); }
+  }
+});
 function auRewardGrid(animate){
   const sel = auPending ?? AU().cfg.rewardIds ?? [];
   const all = [...(S.rewards || [])].sort((a, b) => a.cost - b.cost);
@@ -1252,17 +1307,21 @@ function auModeSeg(){
 }
 document.querySelectorAll("#auModeSeg .tab").forEach(b => b.onclick = () => { auModePending = b.dataset.mode; auModeSeg(); });
 $("auSettingsBtn").onclick = () => {
-  auPending = null; auShowAll = false; auModePending = null;
+  auPending = null; auShowAll = false; auModePending = null; auCenterPending = null;
   $("auMin").value = AU().cfg.durationMin || 10;
-  auRewardGrid(); openModal("auctionModal"); requestAnimationFrame(auModeSeg);
+  auRewardGrid(); openModal("auctionModal"); requestAnimationFrame(() => { auModeSeg(); auCenterUI(); });
+  if(((AU().cfg || {}).center || {}).kind === "emote") loadEmotes();
   if(!(S.rewards || []).length) withLoading([$("auctionModal").querySelector(".box"), $("auRewardRefresh")], () => call("RefreshRewards")).then(() => auRewardGrid());
 };
 $("auctionSave").onclick = async () => {
-  const cfg = {...AU().cfg, rewardIds: auPending ?? AU().cfg.rewardIds, spinMode: auModePending || AU().cfg.spinMode,
+  let center = curCenter();
+  if(center.kind === "emote" && !center.url) center = {kind: ""}; // вкладку відкрили, але емодзі не вибрали
+  if(center.kind === "file" && !center.name) center = {kind: ""};
+  const cfg = {...AU().cfg, center, rewardIds: auPending ?? AU().cfg.rewardIds, spinMode: auModePending || AU().cfg.spinMode,
     durationMin: Math.min(180, Math.max(1, Math.round(n("auMin", 10))))};
   setState(await call("AuctionSaveSettings", cfg));
   const noText = cfg.rewardIds.map(rewardById).filter(r => r && r.is_user_input_required === false);
-  closeModal("auctionModal"); auPending = null;
+  closeModal("auctionModal"); auPending = null; auCenterPending = null; wheelDraw();
   toast(noText.length ? "Увага: «" + noText[0].title + "» не вимагає тексту — такі ставки ігноруються" : "Налаштування аукціону збережено", noText.length ? 4500 : 2600);
 };
 function renderAuWarn(){

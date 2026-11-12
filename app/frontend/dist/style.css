@@ -840,3 +840,23 @@ tr[draggable="true"] input{cursor:text}
 #auListWin .austats{margin-left:4px}
 #auListWin .auundo{margin-left:auto}
 .auswap:disabled{opacity:.35;cursor:default}
+
+/* центр колеса: емодзі каналу або власна картинка / GIF */
+.wcenter-img{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;object-fit:cover;z-index:1;pointer-events:none;background:#18181b}
+.wcenter-img.emote{object-fit:contain;padding:6%}
+.wcbox{margin-top:10px;min-height:44px;border-radius:10px}
+.wcfile{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.wcprev{width:56px;height:56px;border-radius:50%;overflow:hidden;flex:0 0 56px;background:#18181b;
+  border:2px solid transparent;background:linear-gradient(#18181b,#18181b) padding-box,var(--grad) border-box}
+.wcprev img{width:100%;height:100%;object-fit:cover;display:block}
+.wcprev.emote img{object-fit:contain;padding:6px}
+.emgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px;max-height:190px;overflow:auto;padding:2px}
+.emgrid .em{height:52px;padding:6px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--panel2)}
+.emgrid .em img{max-width:100%;max-height:100%}
+.emgrid .em.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(145,71,255,.25)}
+
+.wcenter-img.emote{padding:0}
+/* без заголовків «Лоти» / «Колесо»; режим колеса — помітний бейдж */
+#auListWin .austats{margin-left:0}
+.auMode{font:700 12.5px/1 var(--font-ui);letter-spacing:.3px;color:#fff;padding:6px 12px;border-radius:999px;
+  background:linear-gradient(#2a2236,#2a2236) padding-box,var(--grad) border-box;border:2px solid transparent;box-shadow:0 2px 10px rgba(145,71,255,.25)}

@@ -59,10 +59,11 @@ type Bid struct {
 
 // Налаштування аукціону (окремо від СабДею): до 5 нагород-ставок, тривалість прийому ставок, режим колеса.
 type AuctionSettings struct {
-	RewardIDs   []string `json:"rewardIds"`
-	RewardsSet  bool     `json:"rewardsSet"`  // стрімер сам вибрав нагороди — автовибір більше не втручається
-	DurationMin int      `json:"durationMin"` // 10 хв за замовчуванням
-	SpinMode    string   `json:"spinMode"`    // elim — на вибування (за замовчуванням) | instant — одразу результат
+	RewardIDs   []string    `json:"rewardIds"`
+	RewardsSet  bool        `json:"rewardsSet"`  // стрімер сам вибрав нагороди — автовибір більше не втручається
+	DurationMin int         `json:"durationMin"` // 10 хв за замовчуванням
+	SpinMode    string      `json:"spinMode"`    // elim — на вибування (за замовчуванням) | instant — одразу результат
+	Center      WheelCenter `json:"center"`      // емодзі каналу або власна картинка / GIF у центрі колеса
 }
 
 const maxAuctionRewards = 5
@@ -383,8 +384,25 @@ func (a *App) AuctionSaveSettings(c AuctionSettings) Snapshot {
 			}
 		}
 		c.RewardIDs, c.RewardsSet = out, true
+		switch c.Center.Kind {
+		case "emote":
+			if !strings.HasPrefix(c.Center.URL, "https://static-cdn.jtvnw.net/") {
+				c.Center = WheelCenter{}
+			}
+		case "file":
+			if c.Center.Name == "" || strings.ContainsAny(c.Center.Name, `/\`) {
+				c.Center = WheelCenter{}
+			}
+		default:
+			c.Center = WheelCenter{}
+		}
 		st.Auction.Cfg = c
 		st.Auction.normalize()
+		keep := ""
+		if c.Center.Kind == "file" {
+			keep = c.Center.Name
+		}
+		go a.cleanWheelDir(keep)
 	})
 }
 

@@ -656,6 +656,11 @@ async function holdDone(){
   setLevel(btn, 1); btn.classList.remove("pressed","near"); btn.classList.add("full");
   await new Promise(r => setTimeout(r, 380)); // «вистрибнула» і спалахнула
   const action = btn.dataset.hold;
+  if(action === "resetspins"){ // повернути всі лоти на колесо
+    holding = null;
+    try{ setState(await call("AuctionResetSpins")); toast("Усі лоти знову на колесі"); } catch(e){} finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); renderSpinBtn(); }, 500); }
+    return;
+  }
   if(action === "spin"){ // колесо: результат від Go (random.org), тут лише анімація
     holding = null;
     try{ setState(await call("AuctionSpin")); } catch(e){} finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); renderSpinBtn(); }, 500); }
@@ -1155,17 +1160,16 @@ function renderWheel(){
 function renderSpinBtn(){
   if(!S) return;
   const au = AU(), t = au.timer.status, btn = $("auSpin"), act = au.lots.filter(l => !l.out && l.amount > 0).length;
-  if(holding && holding.btn === btn) return;
+  if(holding && (holding.btn === btn || holding.btn === $("auReset"))) return;
   const why = wAnim ? "Колесо крутиться…" : (t === "running" || t === "paused") ? "Спершу завершіть прийом ставок" : au.winner ? "Переможця визначено" : !act ? "На колесі немає лотів" : "";
   btn.disabled = !!why; btn.title = why || "Затисніть і тримайте, щоб крутити колесо";
   btn.querySelector(".wl").textContent = au.cfg.spinMode === "instant" || act <= 2 ? "Крутити" : "Крутити на вибування";
   $("auReset").disabled = !!wAnim || (!au.lots.some(l => l.out) && !au.winner);
 }
 $("auSpin").insertAdjacentHTML("afterbegin", LIQUID);
-$("auReset").onclick = async () => {
-  if(!(await confirmBox("Повернути всі лоти на колесо? Результати обертів буде скасовано.", "Повернути"))) return;
-  setState(await call("AuctionResetSpins"));
-};
+// «Повернути лоти» — затисканням, червона «фарба» (як «Завершити гру»)
+$("auReset").insertAdjacentHTML("afterbegin", LIQUID);
+$("auReset").querySelector(".liquid").insertAdjacentHTML("beforeend", `<span class="ink"><i></i><i></i><i></i></span>`);
 
 // ----- обмін вікон місцями (FLIP-анімація): колесо стає великим і детальним, список — топ-3 -----
 function placeWins(){

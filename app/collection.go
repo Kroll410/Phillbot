@@ -308,17 +308,3 @@ func (a *App) GetStream(id string) (StreamFile, error) {
 }
 
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
-
-// freshStart — кожен запуск програми: новий стрім СабДею і новий аукціон.
-// Попередній стрім (якщо в ньому були збори) лишається в журналі стрімів, аукціон із лотами — у history/.
-func (a *App) freshStart() {
-	a.mu.Lock()
-	hadStream := len(a.st.Past) > 0 || len(a.st.Entries) > 0
-	hadAuction := len(a.st.Auction.Lots) > 0 || len(a.st.Auction.Feed) > 0
-	a.mu.Unlock()
-	a.NewStream()
-	a.AuctionNew()
-	if hadStream || hadAuction {
-		a.logf("Новий запуск — почато новий стрім і новий аукціон (попередні збережено)")
-	}
-}

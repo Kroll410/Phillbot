@@ -198,23 +198,3 @@ func TestAuctionEditAndWinnerLock(t *testing.T) {
 		t.Fatal("merge allowed after winner")
 	}
 }
-
-func TestFreshStart(t *testing.T) {
-	a := newTestApp(t)
-	a.StartTimer()
-	a.onRedemption(Redemption{ID: "s1", UserID: "", UserName: "Phill", UserInput: "Dark Souls"}, User{})
-	a.AuctionSaveSettings(AuctionSettings{RewardIDs: []string{"q"}})
-	a.AuctionStart()
-	a.onRedemption(bid("1", "q", "Квиток", "u1", "Elden Ring", 1000), User{})
-	oldStream := a.st.Stream.ID
-	a.freshStart()
-	if a.st.Stream.ID == oldStream || len(a.st.Entries) != 0 || a.st.Session.Status != "idle" || a.st.CollN != 0 {
-		t.Fatalf("stream not reset: %s %d %s", a.st.Stream.ID, len(a.st.Entries), a.st.Session.Status)
-	}
-	if len(a.st.Auction.Lots) != 0 || a.st.Auction.Timer.Status != "idle" || len(a.st.Auction.Cfg.RewardIDs) != 1 {
-		t.Fatalf("auction not reset: %+v", a.st.Auction)
-	}
-	if _, err := a.GetStream(oldStream); err != nil {
-		t.Fatalf("old stream lost: %v", err)
-	}
-}

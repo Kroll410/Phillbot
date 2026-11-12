@@ -114,8 +114,7 @@ func (a *App) startup(ctx context.Context) {
 	} else {
 		go a.authFlow(false)
 	}
-	a.freshStart()
-	go a.ticker(ctx)
+	go a.ticker(ctx) // запуск продовжує останній стрім і останній аукціон (стан зберігається між запусками)
 	a.overlay = newOverlayServer(a)
 	a.mu.Lock()
 	port := a.st.Settings.ObsPort

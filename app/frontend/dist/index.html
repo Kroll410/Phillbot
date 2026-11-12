@@ -63,6 +63,29 @@
   </div>
 </div></div>
 
+<!-- налаштування аукціону -->
+<div class="modal" id="auctionModal"><div class="box settings wide">
+  <h2>Налаштування аукціону</h2>
+  <h3 class="row twitchfont" style="align-items:center">Нагороди-ставки <span class="aucount" id="auRwCount"></span><button id="auRewardRefresh" class="icon-btn refresh" style="margin-left:auto" title="Оновити список нагород з Twitch"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button></h3>
+  <div class="hint" style="margin:-2px 0 10px">До 5 нагород за бали каналу. Ціна нагороди — це сума ставки; текст — назва лота.</div>
+  <div id="auRewardGrid" class="rgrid"></div>
+  <div id="auRewardsErr" class="hint err"></div>
+  <h3>Колесо</h3>
+  <div class="seg auseg" id="auModeSeg">
+    <button class="tab" data-mode="elim">На вибування</button>
+    <button class="tab" data-mode="instant">Одразу результат</button>
+  </div>
+  <div class="hint" id="auModeHint"></div>
+  <h3>Прийом ставок</h3>
+  <div class="row" style="max-width:180px">
+    <div><label>Час (хв)</label><input type="number" id="auMin" min="1" max="180" step="1"></div>
+  </div>
+  <div class="row actions" style="margin-top:18px">
+    <button data-close="auctionModal">Скасувати</button>
+    <button id="auctionSave" class="primary">Зберегти</button>
+  </div>
+</div></div>
+
 <!-- журнал стрімів -->
 <div class="modal" id="streamsModal"><div class="box settings wide">
   <h2>Журнал стрімів</h2>
@@ -141,10 +164,62 @@
 </section>
 
 <section id="modeViewing" class="mode viewing hidden">
-  <div class="vempty">
-    <div class="vbadge">Новий івент</div>
-    <h2>Переглядовий</h2>
-    <p>Тут буде другий івент стріму. Механіку ще не описано — щойно вона буде, ця вкладка отримає свій збір, таблиці й віджет.</p>
+  <!-- смуга аукціону: таймер прийому ставок (як збір у СабДеї), статистика, налаштування -->
+  <div class="aubar card">
+    <div class="aubar-l">
+      <div class="autitle">Аукціон</div>
+      <span class="spill" id="auStatus">Очікування старту</span>
+    </div>
+    <div class="timerbox autimer">
+      <button id="auMinus" class="tadj" title="Мінус 1 хвилина">−1</button>
+      <div class="timer idle" id="auTimer">10:00</div>
+      <button id="auPlus" class="tadj" title="Плюс 1 хвилина">+1</button>
+    </div>
+    <div class="auctl">
+      <button class="primary" id="auStart">Старт</button>
+      <button id="auPause" disabled>Пауза</button>
+      <button id="auStop" disabled>Завершити</button>
+    </div>
+    <div class="austats">
+      <div class="ms"><b id="auLots">0</b><span>лотів</span></div>
+      <div class="ms"><b id="auBids">0</b><span>ставок</span></div>
+      <div class="ms pts"><b id="auSum">0</b><span>балів</span></div>
+    </div>
+    <div class="aubar-r">
+      <button id="auNew" class="icon-btn" title="Новий аукціон (поточний збережеться в історію)"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button id="auSettingsBtn" class="icon-btn sgear" title="Налаштування аукціону"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+    </div>
+  </div>
+  <div id="auRewardWarn" class="rwarn hidden"></div>
+
+  <!-- два вікна, що міняються місцями: список лотів і колесо -->
+  <div class="auwrap" id="auWrap">
+    <div class="auwin card" id="auListWin">
+      <div class="auwin-h"><h2>Лоти</h2><span class="muted" id="auListHint"></span>
+        <button class="icon-btn auswap" data-swap title="Поміняти вікна місцями"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h13l-4-4M17 17H4l4 4"/></svg></button></div>
+      <div class="aulist" id="auList"></div>
+    </div>
+    <div class="auside">
+      <div class="auwin card" id="auWheelWin">
+        <div class="auwin-h"><h2>Колесо</h2><span class="auMode" id="auModeLbl"></span>
+          <button class="icon-btn auswap" data-swap title="Поміняти вікна місцями"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h13l-4-4M17 17H4l4 4"/></svg></button></div>
+        <div class="wheelbox" id="wheelBox">
+          <canvas id="wheel"></canvas>
+          <div class="wpointer"></div>
+          <div class="wresult" id="wResult"></div>
+        </div>
+        <div class="wctl">
+          <button id="auSpin" class="winbtn spinbtn" data-hold="spin" title="Затисніть і тримайте, щоб крутити колесо"><span class="wl">Крутити</span></button>
+          <button id="auReset" title="Повернути всі лоти на колесо">Повернути лоти</button>
+        </div>
+        <div class="wsrc" id="wSrc"></div>
+      </div>
+      <!-- стрічка ставок: завжди під колесом -->
+      <div class="card aufeedcard">
+        <div class="auwin-h"><h2>Ставки</h2><span class="muted" id="auFeedHint"></span></div>
+        <div class="aufeed" id="auFeed"></div>
+      </div>
+    </div>
   </div>
 </section>
 

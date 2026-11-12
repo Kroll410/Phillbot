@@ -576,13 +576,6 @@ button.icon:not(:disabled):hover{color:var(--text)}
 .spill.finished{color:#c9a6ff}
 .timerbox.live + .status{color:inherit}
 
-/* вкладка «Переглядовий» — заготовка */
-#modeViewing{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
-.vempty{max-width:520px;text-align:center;padding:40px 36px;border-radius:16px;background:var(--panel);
-  border:1px solid transparent;background:linear-gradient(var(--panel),var(--panel)) padding-box,var(--grad) border-box}
-.vbadge{display:inline-block;font:600 11px/1 var(--font-ui);letter-spacing:1.2px;text-transform:uppercase;padding:6px 12px;border-radius:999px;background:var(--grad-soft);color:#c9a6ff}
-.vempty h2{font:800 34px/1.2 var(--font-display);margin:14px 0 10px;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
-.vempty p{color:var(--muted);margin:0;line-height:1.6}
 /* вкладки: при наведенні жодної заливки — градієнт лише в підкладці, що ковзає */
 .tab:not(.active):hover,.mode-tab:not(.active):not(:disabled):hover{background:transparent!important;color:var(--text)}
 /* кнопки керування таймером: фіксовані колонки — зміна «Старт» ↔ «Продовжити» не рухає сусідів */
@@ -684,3 +677,100 @@ button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--gr
 .icon-btn.is-loading.load-fade svg{animation:icon-spin .8s linear infinite;opacity:.6;transition:opacity .5s}
 @keyframes load-in{from{opacity:0}to{opacity:1}}
 @keyframes load-out{from{opacity:1}to{opacity:0}}
+
+/* ---------- «Переглядовий»: аукціон ---------- */
+#modeViewing{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:16px 20px}
+#modeViewing .card{margin-bottom:0}
+.aubar{display:grid;grid-template-columns:auto minmax(260px,330px) minmax(220px,300px) 1fr auto;align-items:center;gap:18px;padding:10px 14px}
+.aubar-l{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.autitle{font:800 22px/1 var(--font-display);background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.autimer{margin:0}
+.autimer .timer{font-size:46px;padding:0}
+.auctl{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:8px}
+.auctl button{height:36px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;padding-left:8px;padding-right:8px}
+#auStop{grid-column:1 / -1}
+.austats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-width:340px;justify-self:end;width:100%}
+.austats .ms b{font-size:21px}
+.aubar-r{display:flex;flex-direction:column;gap:8px}
+.aubar-r .icon-btn{width:42px;height:42px;border-radius:10px;background:var(--panel)}
+#auRewardWarn{margin:0}
+/* два вікна: велике зліва, колонка справа (верхнє вікно + стрічка ставок) */
+.auwrap{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px}
+.auside{display:flex;flex-direction:column;gap:16px;min-height:0}
+.auwin{display:flex;flex-direction:column;min-height:0;min-width:0;padding:12px 14px;border-radius:12px}
+.auwin-h{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.auwin-h h2{margin:0}
+.auwin-h .muted{font-size:12px}
+.auswap{margin-left:auto;width:32px;height:30px;border-radius:8px}
+.auside>.auwin{flex:0 0 auto}
+.aulist{flex:1;min-height:0;overflow:auto}
+/* колесо */
+.wheelbox{position:relative;flex:1;min-height:0;display:grid;place-items:center}
+.auside .wheelbox{height:300px;flex:0 0 300px}
+.wheelbox canvas{display:block;filter:drop-shadow(0 6px 22px rgba(145,71,255,.18))}
+.wpointer{position:absolute;top:-2px;left:50%;width:0;height:0;transform:translateX(-50%);z-index:2;
+  border-left:13px solid transparent;border-right:13px solid transparent;border-top:24px solid #fff;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))}
+.auwrap.swapped .wpointer{border-left-width:18px;border-right-width:18px;border-top-width:32px}
+.wresult{position:absolute;left:50%;bottom:8px;transform:translate(-50%,12px);opacity:0;pointer-events:none;z-index:3;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis;
+  padding:8px 16px;border-radius:999px;font-weight:600;background:rgba(24,24,27,.92);border:2px solid var(--line);transition:opacity .35s ease,transform .45s cubic-bezier(.2,1.3,.4,1)}
+.wresult.show{opacity:1;transform:translate(-50%,0)}
+.wresult.out{border-color:rgba(235,64,52,.6);color:#ffb3ad}
+.wresult.win{border-color:transparent;background:linear-gradient(#1f1f23,#1f1f23) padding-box,var(--grad) border-box;font-size:15px;box-shadow:0 6px 24px rgba(145,71,255,.35)}
+.auwrap.swapped .wresult.win{font-size:20px;padding:12px 24px}
+.wctl{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:8px;margin-top:10px}
+.wctl button{height:38px}
+.winbtn.spinbtn{width:100%;min-width:0;height:38px}
+.winbtn.spinbtn:disabled{opacity:.5;cursor:default}
+.wsrc{margin-top:6px;font-size:11.5px;color:var(--muted);text-align:center}
+.auMode{font-size:12px;color:#c9a6ff;padding:2px 9px;border-radius:999px;background:var(--grad-soft)}
+/* лоти — повна таблиця */
+.autable td.num,.autable th.num{text-align:right;white-space:nowrap}
+.autable .ldot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px;vertical-align:middle}
+.autable .lname{font-weight:600}
+.autable .lamt{font:600 15px/1 var(--font-display);font-variant-numeric:tabular-nums}
+.autable .uam{font-size:11.5px;margin:0 6px 0 3px}
+.autable tr.out td{opacity:.42}
+.autable tr.win td{background:linear-gradient(90deg,rgba(0,200,83,.14),rgba(145,71,255,.14))}
+.autable td.act{width:36px}
+.lwin{font-weight:700;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lout{font-size:12px;color:#ff9a95}
+/* лоти — стисло (топ-3 + інформація), коли колесо у великому вікні */
+.autop{display:flex;flex-direction:column;gap:8px}
+.autop-i{display:grid;grid-template-columns:26px minmax(0,1fr) auto;grid-template-rows:auto 4px;column-gap:10px;row-gap:6px;align-items:center;
+  padding:9px 12px;border-radius:10px;background:var(--panel2);border-left:4px solid var(--c)}
+.autop-i .rk{font:700 16px/1 var(--font-display);color:var(--muted);text-align:center}
+.autop-i .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.autop-i .am,.fbid .famt{display:inline-flex;align-items:center;gap:4px;font-weight:600;font-variant-numeric:tabular-nums;color:#c9a6ff}
+.autop-i .am svg,.fbid .famt svg{width:14px;height:14px}
+.autop-i .bar{grid-column:2 / -1;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.autop-i .bar i{display:block;height:100%;background:var(--grad);transition:width .5s ease}
+.autop-i.win{background:linear-gradient(var(--panel2),var(--panel2)) padding-box,var(--grad) border-box;border:2px solid transparent}
+.auinfo{display:flex;justify-content:space-between;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.auinfo b{color:var(--text);font-size:14px}
+/* стрічка ставок */
+.aufeedcard{flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 14px;border-radius:12px}
+.aufeed{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px;margin-right:-6px;padding-right:6px}
+.empty.small{padding:20px 10px;font-size:12.5px}
+.fbid{padding:8px 10px;border-radius:9px;background:var(--panel2);border-left:3px solid var(--c,var(--line))}
+.fbid.fresh{animation:fbin .5s cubic-bezier(.2,1.2,.4,1),fresh 2.5s ease-out}
+@keyframes fbin{from{transform:translateY(-8px);opacity:0}}
+.frow{display:flex;align-items:center;gap:8px;min-width:0}
+.frow .utag{min-width:0;overflow:hidden}
+.frow .utag .cname{font-size:13px}
+.frow .famt{margin-left:auto;font-size:12.5px}
+.ftime{font-size:11px;color:var(--muted)}
+.ftext{margin-top:3px;font-weight:600;word-break:break-word}
+.fst{margin-top:3px;font-size:12px;color:var(--muted)}
+.fst b{color:var(--text);font-weight:600}
+.fbid.pending{background:linear-gradient(var(--panel2),var(--panel2)) padding-box,var(--grad) border-box;border:2px solid transparent}
+.fsug{margin-top:6px;font-size:12.5px;color:#d9c7ff}
+.fbtns{display:grid;grid-template-columns:2fr 1fr;gap:6px;margin-top:7px}
+.fbtns button{height:30px}
+.aupend{color:#c9a6ff;font-weight:600}
+/* налаштування аукціону */
+.aucount{font:600 12px/1 var(--font-ui);color:var(--muted);margin-left:8px;letter-spacing:0;text-transform:none}
+.auseg{position:relative;display:inline-flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;margin-top:4px}
+.auseg .tab{position:relative;z-index:1;padding:7px 14px;border-radius:8px}
+.rtile.denied{animation:deny .35s linear}
+@keyframes deny{20%,60%{translate:-4px 0}40%,80%{translate:4px 0}}
+@media (max-width:1250px){.aubar{grid-template-columns:auto minmax(220px,1fr) minmax(200px,1fr) auto}.austats{display:none}}

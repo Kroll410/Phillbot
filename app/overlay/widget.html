@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Віджет PhillBot для OBS: лише таймер. Сам перемикається між таймером збору, гри та голосування —
+<!-- Віджет PhillBot для OBS: лише таймер. Сам перемикається між таймером збору, гри, голосування й аукціону —
      зі зміною таймера старий відлітає вгору, новий виринає знизу з зелено-фіолетовим відблиском.
      Розмір у OBS: 640×200. Параметри: ?scale=1.2&theme=shadow|box|plain&align=center -->
 <html lang="uk"><head><meta charset="utf-8"><title>PhillBot — таймер</title>
@@ -15,6 +15,7 @@
   .t.collect{color:#ffffff}
   .t.game{color:#5cf29a}
   .t.vote{color:#c9a6ff}
+  .t.auction{color:#ffd36b}
   .t.paused{opacity:.65}
   .t.low{animation:low 1s ease-in-out infinite}
   @keyframes low{50%{color:#ff5a52}}
@@ -44,6 +45,8 @@
     if(S.phase === "play" && v.status === "running") return {kind: "vote", t: v, low: 15000};
     if(S.phase === "play" && (g.status === "running" || g.status === "paused")) return {kind: "game", t: g, low: 60000};
     if(S.phase !== "play" && (s.status === "running" || s.status === "paused")) return {kind: "collect", t: s, low: 30000};
+    const au = S.auction || {};
+    if(au.status === "running" || au.status === "paused") return {kind: "auction", t: au, low: 30000};
     return null;
   }
   function swap(newKind){

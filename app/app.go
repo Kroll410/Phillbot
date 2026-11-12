@@ -263,6 +263,13 @@ func (a *App) ticker(ctx context.Context) {
 				a.logf("%s", msg)
 				continue
 			}
+			if a.tickAuctionLocked(time.Now().UnixMilli()) {
+				a.saveLocked()
+				a.emitLocked()
+				a.mu.Unlock()
+				a.logf("Аукціон: прийом ставок завершено (час вийшов)")
+				continue
+			}
 			s := &a.st.Session
 			if s.Status == "running" && s.EndsAt <= time.Now().UnixMilli() {
 				s.Status, s.RemainingMs, s.FinishedAt = "finished", 0, time.Now().UnixMilli()
@@ -413,6 +420,7 @@ func (a *App) RefreshRewards() {
 	} else {
 		a.rewErr = ""
 		a.rewards = list
+		a.autoAuctionRewardsLocked(list)
 		// автовибір: якщо нагороду ще не вибрано — беремо ту, де в назві «СабДей»
 		if a.st.Settings.RewardID == "" {
 			for _, r := range list {
@@ -560,6 +568,10 @@ func (a *App) onRedemption(ev Redemption, bc User) {
 	a.emitLocked()
 	a.mu.Unlock()
 
+	if ev.Reward.ID != bound && a.isAuctionReward(ev.Reward.ID, ev.Reward.Title) {
+		a.onAuctionBid(ev)
+		return
+	}
 	if ev.Reward.ID != bound {
 		a.logUser(ev.UserID, ev.UserName, ev.UserLogin, ev.Reward.ID, "Нагорода «%s» — не враховано (інша нагорода)", ev.Reward.Title)
 		return

@@ -85,6 +85,8 @@ type State struct {
 	Exported bool      `json:"exported"` // поточний збір уже експортовано в Marbles — можна вибрати переможця
 	Round    int       `json:"round"`    // раунд гри переможця (продовження за голосуванням)
 	Vote     VoteState `json:"vote"`
+	// «Переглядовий» — аукціон
+	Auction AuctionState `json:"auction"`
 }
 
 func defaultSettings() Settings {
@@ -94,8 +96,10 @@ func defaultSettings() Settings {
 
 func defaultState() State {
 	s := defaultSettings()
-	return State{Settings: s, Session: Timer{Status: "idle", RemainingMs: int64(s.DurationMin) * 60000},
+	st := State{Settings: s, Session: Timer{Status: "idle", RemainingMs: int64(s.DurationMin) * 60000},
 		Entries: []Entry{}, SeenRewards: map[string]SeenReward{}, SeenRedeems: []string{}}
+	st.Auction.normalize()
+	return st
 }
 
 func (s *Settings) normalize() {
@@ -156,6 +160,7 @@ func loadState(file string) State {
 	if st.SeenRedeems == nil {
 		st.SeenRedeems = []string{}
 	}
+	st.Auction.normalize()
 	switch st.Session.Status {
 	case "running":
 		// застосунок закрили під час збору — продовжуємо, якщо час ще не вийшов

@@ -537,7 +537,7 @@ function initInputs(){}
 const n = (id, d) => { const v = Number($(id).value); return Number.isFinite(v) && $(id).value !== "" ? v : d; };
 async function saveSettings(patch){ setState(await call("SaveSettings", {...S.settings, ...patch})); }
 const openModal = id => $(id).classList.add("show"), closeModal = id => $(id).classList.remove("show");
-document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { closeModal(b.dataset.close); pendingReward = null; });
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { closeModal(b.dataset.close); pendingReward = null; auPending = null; });
 // будь-яке вікно закривається через Esc або клік поза ним (підтвердження = «Скасувати»)
 function dismissModal(m){
   if(m.id === "modal"){ $("modalNo").click(); return; }
@@ -649,6 +649,11 @@ async function holdDone(){
   setLevel(btn, 1); btn.classList.remove("pressed","near"); btn.classList.add("full");
   await new Promise(r => setTimeout(r, 380)); // «вистрибнула» і спалахнула
   const action = btn.dataset.hold;
+  if(action === "spin"){ // колесо: результат від Go (random.org), тут лише анімація
+    holding = null;
+    try{ setState(await call("AuctionSpin")); } catch(e){} finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); renderSpinBtn(); }, 500); }
+    return;
+  }
   if(action === "finishgame"){ // завершити гру — без блискіток
     holding = null;
     try{ setState(await call("FinishGame")); } finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); }, 500); }
@@ -788,6 +793,7 @@ function renderAll(){
     if(ck !== lastCollKey){ lastCollKey = ck; if(streams.length) loadStreams(); }
     renderStreamBar();
     renderStats(); renderTable(); renderRewardCurrent(); renderObs(); renderChat(); renderSteps(); slideAll();
+    renderAuction();
     if($("subdayModal").classList.contains("show")) renderRewardGrid();
     if(!chatLoaded){ chatLoaded = true; api().GetChat().then(m => { chatPending = (m||[]).concat(chatPending); }); }
   }
@@ -888,6 +894,331 @@ async function exportMarbles(){
 }
 $("exportMarbles").onclick = exportMarbles;
 setInterval(renderExportBtn, 500); // таймер може завершитися сам
+/* ---------- «Переглядовий»: аукціон ----------
+   Ставки — нагороди за бали каналу (до 5), сума = ціна нагороди, текст = назва лота.
+   Два вікна (лоти / колесо) міняються місцями з анімацією; під колесом завжди стрічка ставок. */
+const AU = () => S.auction || {cfg:{rewardIds:[]}, timer:{status:"idle"}, lots:[], feed:[]};
+const fmtN = x => Number(x||0).toLocaleString("uk-UA");
+const PAL = ["#00c853","#9147ff","#20b2aa","#c86bff","#5cf29a","#6a5cff","#2fd3c0","#e07bff","#3fa34d","#7c4dff","#00a884","#a970ff"];
+function lotColor(id){ const i = AU().lots.findIndex(l => l.id === id); return PAL[(i < 0 ? 0 : i) % PAL.length]; }
+const lotById = id => AU().lots.find(l => l.id === id);
+let auSwapped = false;
+try{ auSwapped = localStorage.getItem("phillbot-auswap") === "1"; }catch(e){}
+$("auWrap").classList.toggle("swapped", auSwapped);
+
+// таймер прийому ставок
+function renderAuTimer(){
+  if(!S) return;
+  const t = AU().timer, r = t.status === "running" ? t.endsAt - Date.now() : (t.remainingMs || 0), el = $("auTimer");
+  el.textContent = fmtTime(t.status === "finished" ? 0 : r);
+  el.className = "timer " + t.status + (t.status === "running" && r <= 30000 ? " low" : "");
+  $("auStatus").textContent = {idle:"Очікування старту", running:"Ставки приймаються", paused:"Пауза", finished:"Ставки закрито"}[t.status] || "";
+  $("auStatus").className = "spill " + (t.status || "idle");
+  $("auStart").disabled = t.status === "running";
+  $("auStart").textContent = t.status === "paused" ? "Продовжити" : "Старт";
+  $("auPause").disabled = t.status !== "running";
+  $("auStop").disabled = !(t.status === "running" || t.status === "paused");
+  const going = t.status === "running" || t.status === "paused";
+  $("auMinus").disabled = !going; $("auPlus").disabled = !going;
+  renderSpinBtn();
+}
+setInterval(renderAuTimer, 250);
+
+// частки на колесі: «одразу результат» — пропорційно сумі; «на вибування» — 1/сума (дешевші вибувають частіше)
+function wheelSectors(){
+  const au = AU(), elim = au.cfg.spinMode !== "instant";
+  return au.lots.filter(l => !l.out && l.amount > 0).map(l => ({id: l.id, w: elim ? 1 / l.amount : l.amount}));
+}
+function chanceOf(lot){
+  const act = AU().lots.filter(l => !l.out && l.amount > 0); if(lot.out || !act.length) return 0;
+  return lot.amount / act.reduce((a, l) => a + l.amount, 0); // шанс перемогти пропорційний сумі
+}
+
+// ----- вікно 1: лоти -----
+const auFresh = new Set();
+function renderAuList(){
+  const au = AU(), lots = [...au.lots].sort((a, b) => (a.out ? 1 : 0) - (b.out ? 1 : 0) || b.amount - a.amount);
+  const total = au.lots.reduce((a, l) => a + l.amount, 0), active = au.lots.filter(l => !l.out).length;
+  $("auListHint").textContent = au.lots.length ? `${active} на колесі` + (au.lots.length > active ? ` · ${au.lots.length - active} вибуло` : "") : "";
+  if(!lots.length){ $("auList").innerHTML = `<div class="empty">Лотів ще немає. Запустіть таймер — ставки з'являться тут.</div>`; return; }
+  if(auSwapped){ // стисло: топ-3 та інформація
+    const top = lots.filter(l => !l.out).slice(0, 3);
+    $("auList").innerHTML = `<div class="autop">` + top.map((l, i) => `<div class="autop-i${au.winner === l.id ? " win" : ""}" style="--c:${lotColor(l.id)}">
+        <span class="rk">${i + 1}</span><span class="nm" title="${esc(l.name)}">${esc(l.name)}</span><span class="am">${POINTS_ICON}${fmtN(l.amount)}</span>
+        <span class="bar"><i style="width:${(chanceOf(l) * 100).toFixed(1)}%"></i></span></div>`).join("")
+      + `</div><div class="auinfo"><span><b>${fmtN(total)}</b> балів</span><span><b>${au.lots.length}</b> лотів</span><span><b>${au.feed.length}</b> ставок</span></div>`;
+    return;
+  }
+  $("auList").innerHTML = `<table class="autable"><thead><tr><th class="num">#</th><th>Лот</th><th class="num">Сума</th><th class="num">Шанс</th><th>Хто ставив</th><th></th></tr></thead><tbody>`
+    + lots.map((l, i) => {
+      const who = [...l.users].sort((a, b) => b.amount - a.amount);
+      const users = who.slice(0, 6).map(u => `${userTag(u)}<span class="muted uam">${fmtN(u.amount)}</span>`).join(" ") + (who.length > 6 ? ` <span class="muted">+${who.length - 6}</span>` : "");
+      const st = au.winner === l.id ? `<span class="lwin">Переможець</span>` : l.out ? `<span class="lout">вибув · ${l.out}-й оберт</span>` : `${(chanceOf(l) * 100).toFixed(1)}%`;
+      return `<tr data-lot="${esc(l.id)}" class="${l.out ? "out" : ""}${au.winner === l.id ? " win" : ""}${auFresh.has(l.id) ? " fresh" : ""}">
+        <td class="num">${l.out ? "" : i + 1}</td>
+        <td><span class="ldot" style="background:${lotColor(l.id)}"></span><b class="lname">${esc(l.name)}</b>${l.bids > 1 ? ` <span class="muted">× ${l.bids}</span>` : ""}</td>
+        <td class="num lamt">${fmtN(l.amount)}</td><td class="num">${st}</td>
+        <td class="users">${users}</td>
+        <td class="act"><button class="icon" data-lotdel="${esc(l.id)}" title="Видалити лот">${ICON_TRASH}</button></td></tr>`;
+    }).join("") + `</tbody></table>`;
+}
+$("auList").addEventListener("click", async e => {
+  const b = e.target.closest("[data-lotdel]"); if(!b) return;
+  const l = lotById(b.dataset.lotdel); if(!l) return;
+  if(!(await confirmBox(`Видалити лот «${l.name}» (${fmtN(l.amount)} балів)?`, "Видалити"))) return;
+  setState(await call("AuctionRemoveLot", l.id));
+});
+
+// ----- стрічка ставок -----
+function renderAuFeed(){
+  const au = AU(), pend = au.feed.filter(b => b.status === "pending").length;
+  $("auFeedHint").innerHTML = pend ? `<span class="aupend">${pend} чекає рішення</span>` : (au.feed.length ? `${au.feed.length}` : "");
+  if(!au.feed.length){ $("auFeed").innerHTML = `<div class="empty small">Тут з'являтимуться ставки по мірі надходження.</div>`; return; }
+  $("auFeed").innerHTML = au.feed.map(b => {
+    const lot = lotById(b.lotId);
+    let st = "";
+    if(b.status === "pending") st = `<div class="fsug">Додати до існуючого <b>«${esc(b.suggestName)}»</b>?
+        <div class="fbtns"><button class="primary small" data-res="${esc(b.id)}" data-ok="1">Додати</button><button class="small" data-res="${esc(b.id)}" data-ok="0" title="Залишити окремим лотом">Ні</button></div></div>`;
+    else if(b.status === "added") st = `<div class="fst">до лота <b>«${esc(lot ? lot.name : b.text)}»</b></div>`;
+    else st = `<div class="fst">${b.status === "rejected" ? "окремий лот" : "новий лот"}</div>`;
+    return `<div class="fbid ${b.status}${auFresh.has(b.id) ? " fresh" : ""}" style="--c:${lotColor(b.lotId || b.suggestId)}">
+      <div class="frow">${userTag(b)}<span class="famt">${POINTS_ICON}${fmtN(b.amount)}</span><span class="ftime">${fmtHM(b.ts)}</span></div>
+      <div class="ftext">${esc(b.text)}</div>${st}</div>`;
+  }).join("");
+}
+$("auFeed").addEventListener("click", async e => {
+  const b = e.target.closest("[data-res]"); if(!b) return;
+  await withLoading(b.closest(".fbid"), async () => setState(await call("AuctionResolve", b.dataset.res, b.dataset.ok === "1")));
+});
+
+// ----- вікно 2: колесо -----
+const wheelCv = $("wheel"), wctx = wheelCv.getContext("2d");
+let wRot = 0, wAnim = null, lastSpinAt = null, wFade = null; // wFade — сектор, що вибуває (згасає)
+function wheelDraw(secs){
+  if(!S) return;
+  if(!secs) secs = wAnim ? wAnim.secs : wheelSectors();
+  const box = $("wheelBox"); if(!box.clientWidth) return;
+  const size = Math.max(60, Math.floor(Math.min(box.clientWidth, box.clientHeight || box.clientWidth)));
+  const dpr = devicePixelRatio || 1;
+  if(wheelCv.width !== size * dpr){ wheelCv.width = wheelCv.height = size * dpr; wheelCv.style.width = wheelCv.style.height = size + "px"; }
+  const c = wctx, R = size / 2 - 6, cx = size / 2, big = auSwapped;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, size, size);
+  // зовнішнє кільце — фірмовий градієнт
+  const ring = c.createLinearGradient(0, 0, size, 0); ring.addColorStop(0, "#00c853"); ring.addColorStop(1, "#9147ff");
+  c.beginPath(); c.arc(cx, cx, R + 4, 0, Math.PI * 2); c.fillStyle = ring; c.fill();
+  if(!secs.length){
+    c.beginPath(); c.arc(cx, cx, R, 0, Math.PI * 2); c.fillStyle = "#1f1f23"; c.fill();
+    c.fillStyle = "#adadb8"; c.font = `600 ${Math.max(12, size / 22)}px Inter, sans-serif`;
+    c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("Немає лотів", cx, cx); return;
+  }
+  const total = secs.reduce((a, s) => a + s.w, 0);
+  let a0 = wRot - Math.PI / 2;
+  for(const s of secs){
+    const a1 = a0 + s.w / total * Math.PI * 2, lot = lotById(s.id), fade = wFade && wFade.id === s.id ? wFade.k : 1;
+    c.beginPath(); c.moveTo(cx, cx); c.arc(cx, cx, R, a0, a1); c.closePath();
+    c.globalAlpha = .25 + .75 * fade; c.fillStyle = lotColor(s.id); c.fill(); c.globalAlpha = 1;
+    c.strokeStyle = "rgba(14,14,16,.55)"; c.lineWidth = secs.length > 60 ? .5 : 1.5; c.stroke();
+    // підпис уздовж радіуса, якщо сектор достатньо широкий
+    const arc = (a1 - a0) * R * .62, fs = big ? Math.min(18, Math.max(11, size / 40)) : Math.min(13, Math.max(10, size / 30));
+    if(arc > fs * 1.15 && lot){
+      const two = big && arc > fs * 2.6;
+      // на лівій половині колеса текст розвертаємо, щоб не читався догори дриґом
+      const mid = (a0 + a1) / 2, norm = ((mid % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2), flip = norm > Math.PI / 2 && norm < Math.PI * 1.5;
+      c.save(); c.translate(cx, cx); c.rotate(flip ? mid + Math.PI : mid);
+      c.fillStyle = "#fff"; c.globalAlpha = fade; c.textAlign = flip ? "left" : "right"; c.textBaseline = "middle";
+      c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 3;
+      c.font = `700 ${fs}px Inter, sans-serif`;
+      const maxW = R * (big ? .62 : .7);
+      let name = lot.name; while(name.length > 1 && c.measureText(name).width > maxW) name = name.slice(0, -2) + "…";
+      const tx = flip ? -(R - 12) : R - 12;
+      c.fillText(name, tx, two ? -fs * .45 : 0);
+      if(two){ c.font = `600 ${fs * .78}px Inter, sans-serif`; c.globalAlpha = .8 * fade; c.fillText(fmtN(lot.amount), tx, fs * .6); }
+      c.restore();
+    }
+    a0 = a1;
+  }
+  // центр
+  c.beginPath(); c.arc(cx, cx, Math.max(14, R * .14), 0, Math.PI * 2); c.fillStyle = "#18181b"; c.fill();
+  c.lineWidth = 3; c.strokeStyle = ring; c.stroke();
+}
+new ResizeObserver(() => wheelDraw()).observe($("wheelBox"));
+const easeSpin = t => 1 - Math.pow(1 - t, 4);
+function animateSpin(sp){
+  const secs = sp.ids.map((id, i) => ({id, w: sp.weights[i]}));
+  const TAU = Math.PI * 2, tgt = -sp.pos * TAU; // точка pos на колі — під стрілкою зверху
+  const from = wRot, delta = ((tgt - from) % TAU + TAU) % TAU + TAU * 6, dur = 7000, t0 = performance.now();
+  wAnim = {secs, sp}; wFade = null; $("wResult").className = "wresult"; renderSpinBtn();
+  let finished = false;
+  const done = () => {
+    if(finished) return; finished = true;
+    wRot = tgt;
+    const lot = lotById(sp.pick);
+    if(sp.mode === "instant" || sp.ids.length <= 1){ wAnim = null; wheelDraw(secs); showWinner(); return; }
+    // вибування: сектор тьмяніє, потім колесо перебудовується без нього
+    $("wResult").innerHTML = `Вибуває: <b>${esc(lot ? lot.name : "?")}</b>`; $("wResult").className = "wresult show out";
+    wFade = {id: sp.pick, k: 1};
+    const f0 = performance.now();
+    const fade = now => { if(!wFade) return; const k = Math.min(1, (now - f0) / 900); wFade.k = 1 - k; wheelDraw(secs); if(k < 1) requestAnimationFrame(fade); };
+    requestAnimationFrame(fade);
+    setTimeout(() => { wAnim = null; wFade = null; wRot = 0; if(!sp.final) $("wResult").className = "wresult"; wheelDraw(); renderSpinBtn(); renderAuList(); if(sp.final) showWinner(); }, 1700);
+  };
+  const step = now => {
+    if(finished) return;
+    const t = Math.min(1, (now - t0) / dur); wRot = from + delta * easeSpin(t); wheelDraw(secs);
+    if(t < 1) requestAnimationFrame(step); else done();
+  };
+  requestAnimationFrame(step);
+  setTimeout(done, dur + 400); // гарантія, якщо кадри призупинено
+}
+async function showWinner(){
+  renderSpinBtn(); renderAuList();
+  const l = lotById(AU().winner); if(!l) return;
+  $("wResult").innerHTML = `Переможець: <b>${esc(l.name)}</b>`; $("wResult").className = "wresult show win";
+  if(mode === "viewing") await sparkles(1500);
+}
+function renderWheel(){
+  const au = AU(), sp = au.spin;
+  $("auModeLbl").textContent = au.cfg.spinMode === "instant" ? "одразу результат" : "на вибування";
+  $("wSrc").textContent = sp && sp.source && sp.source !== "—" ? `Останній оберт: ${sp.source}` : "Випадковість — random.org";
+  if(sp && lastSpinAt !== null && sp.at !== lastSpinAt){ lastSpinAt = sp.at; if(Date.now() - sp.at < 15000){ animateSpin(sp); return; } }
+  if(lastSpinAt === null) lastSpinAt = sp ? sp.at : 0;
+  if(!sp) lastSpinAt = 0;
+  if(wAnim) return;
+  wheelDraw();
+  const w = lotById(au.winner);
+  if(w){ $("wResult").innerHTML = `Переможець: <b>${esc(w.name)}</b>`; $("wResult").className = "wresult show win"; }
+  else $("wResult").className = "wresult";
+}
+function renderSpinBtn(){
+  if(!S) return;
+  const au = AU(), t = au.timer.status, btn = $("auSpin"), act = au.lots.filter(l => !l.out && l.amount > 0).length;
+  if(holding && holding.btn === btn) return;
+  const why = wAnim ? "Колесо крутиться…" : (t === "running" || t === "paused") ? "Спершу завершіть прийом ставок" : au.winner ? "Переможця визначено" : !act ? "На колесі немає лотів" : "";
+  btn.disabled = !!why; btn.title = why || "Затисніть і тримайте, щоб крутити колесо";
+  btn.querySelector(".wl").textContent = au.cfg.spinMode === "instant" || act <= 2 ? "Крутити" : "Крутити на вибування";
+  $("auReset").disabled = !!wAnim || (!au.lots.some(l => l.out) && !au.winner);
+}
+$("auSpin").insertAdjacentHTML("afterbegin", LIQUID);
+$("auReset").onclick = async () => {
+  if(!(await confirmBox("Повернути всі лоти на колесо? Результати обертів буде скасовано.", "Повернути"))) return;
+  setState(await call("AuctionResetSpins"));
+};
+
+// ----- обмін вікон місцями (FLIP-анімація): колесо стає великим і детальним, список — топ-3 -----
+function placeWins(){
+  const wrap = $("auWrap"), side = wrap.querySelector(".auside");
+  if(auSwapped){ side.prepend($("auListWin")); wrap.prepend($("auWheelWin")); }
+  else { side.prepend($("auWheelWin")); wrap.prepend($("auListWin")); }
+  wrap.classList.toggle("swapped", auSwapped);
+}
+document.querySelectorAll("[data-swap]").forEach(b => b.onclick = () => {
+  const wins = [$("auListWin"), $("auWheelWin")], before = wins.map(w => w.getBoundingClientRect());
+  auSwapped = !auSwapped; try{ localStorage.setItem("phillbot-auswap", auSwapped ? "1" : "0"); }catch(e){}
+  placeWins(); renderAuList(); wheelDraw();
+  wins.forEach((w, i) => {
+    const a = before[i], z = w.getBoundingClientRect();
+    w.animate([{transform: `translate(${a.left - z.left}px,${a.top - z.top}px) scale(${a.width / z.width},${a.height / z.height})`, transformOrigin: "0 0"},
+      {transform: "none", transformOrigin: "0 0"}], {duration: 560, easing: "cubic-bezier(.2,.9,.25,1)"});
+    const inner = w.querySelector(".aulist, .wheelbox");
+    if(inner) inner.animate([{opacity: 0}, {opacity: 0, offset: .4}, {opacity: 1}], {duration: 560});
+  });
+});
+placeWins();
+
+// ----- нагороди-ставки (налаштування, як у СабДеї) -----
+let auPending = null, auShowAll = false, auModePending = null;
+function auRewardGrid(animate){
+  const sel = auPending ?? AU().cfg.rewardIds ?? [];
+  const all = [...(S.rewards || [])].sort((a, b) => a.cost - b.cost);
+  sel.forEach(id => { if(!all.some(r => r.id === id)){ const r = rewardById(id); if(r) all.unshift(r); } });
+  let html;
+  if(auShowAll){
+    html = all.filter(r => r.id !== S.settings.rewardId).map((r, i) => rewardTile(r, {button: true, sel: sel.includes(r.id), delay: animate ? i * 45 : null}).replace('class="rtile', `class="rtile${animate ? " appear" : ""}`)).join("");
+    if(!all.length) html = `<div class="hint">Список нагород порожній. Натисніть «Оновити».</div>`;
+  } else {
+    html = sel.map(id => rewardTile(rewardById(id) || {id, title: id}, {button: true, sel: true})).join("")
+      + `<button class="rtile rmore" id="auShowAll" title="Показати всі нагороди каналу"><div class="rimg"><span class="plus"></span></div><div class="rtitle">${sel.length ? "Змінити" : "Вибрати"}<br><span class="muted">${all.length} нагород</span></div></button>`;
+  }
+  $("auRewardGrid").innerHTML = html;
+  $("auRwCount").textContent = `${sel.length} / 5`;
+  $("auRewardsErr").textContent = S.rewardsErr || "";
+}
+$("auRewardGrid").addEventListener("click", e => {
+  if(e.target.closest("#auShowAll")){ auShowAll = true; auRewardGrid(true); return; }
+  const t = e.target.closest("[data-rid]"); if(!t) return;
+  const sel = [...(auPending ?? AU().cfg.rewardIds ?? [])], id = t.dataset.rid, i = sel.indexOf(id);
+  if(i >= 0) sel.splice(i, 1);
+  else if(sel.length >= 5){ toast("Можна вибрати до 5 нагород"); t.classList.remove("denied"); void t.offsetWidth; t.classList.add("denied"); return; }
+  else sel.push(id);
+  auPending = sel; auRewardGrid();
+});
+$("auRewardRefresh").onclick = async () => {
+  await withLoading([$("auctionModal").querySelector(".box"), $("auRewardRefresh")], () => call("RefreshRewards"));
+  auRewardGrid(); toast("Список нагород оновлено");
+};
+function auModeSeg(){
+  const m = auModePending || AU().cfg.spinMode || "elim";
+  document.querySelectorAll("#auModeSeg .tab").forEach(b => b.classList.toggle("active", b.dataset.mode === m));
+  slideSeg($("auModeSeg"));
+  $("auModeHint").textContent = m === "instant" ? "Один оберт — і переможець відомий. Шанс лота пропорційний його сумі."
+    : "Кожен оберт вибуває один лот, останній — переможець. Дешевші лоти вибувають частіше; шанс перемогти пропорційний сумі.";
+}
+document.querySelectorAll("#auModeSeg .tab").forEach(b => b.onclick = () => { auModePending = b.dataset.mode; auModeSeg(); });
+$("auSettingsBtn").onclick = () => {
+  auPending = null; auShowAll = false; auModePending = null;
+  $("auMin").value = AU().cfg.durationMin || 10;
+  auRewardGrid(); openModal("auctionModal"); requestAnimationFrame(auModeSeg);
+  if(!(S.rewards || []).length) withLoading([$("auctionModal").querySelector(".box"), $("auRewardRefresh")], () => call("RefreshRewards")).then(() => auRewardGrid());
+};
+$("auctionSave").onclick = async () => {
+  const cfg = {...AU().cfg, rewardIds: auPending ?? AU().cfg.rewardIds, spinMode: auModePending || AU().cfg.spinMode,
+    durationMin: Math.min(180, Math.max(1, Math.round(n("auMin", 10))))};
+  setState(await call("AuctionSaveSettings", cfg));
+  const noText = cfg.rewardIds.map(rewardById).filter(r => r && r.is_user_input_required === false);
+  closeModal("auctionModal"); auPending = null;
+  toast(noText.length ? "Увага: «" + noText[0].title + "» не вимагає тексту — такі ставки ігноруються" : "Налаштування аукціону збережено", noText.length ? 4500 : 2600);
+};
+function renderAuWarn(){
+  const none = !(AU().cfg.rewardIds || []).length;
+  $("auRewardWarn").classList.toggle("hidden", !none);
+  if(none) $("auRewardWarn").innerHTML = `Нагороди-ставки не вибрано — ставки не записуватимуться. <a href="#" id="pickAuReward">Вибрати</a>`;
+}
+document.addEventListener("click", e => { if(e.target.id === "pickAuReward"){ e.preventDefault(); $("auSettingsBtn").click(); } });
+
+// ----- кнопки таймера, новий аукціон -----
+$("auStart").onclick = async () => {
+  const wasNew = AU().timer.status !== "paused";
+  setState(await call("AuctionStart"));
+  if(wasNew) toast("Ставки приймаються");
+  if(!(AU().cfg.rewardIds || []).length) toast("Увага: нагороди-ставки не вибрано", 4000);
+  else if(S.conn.status !== "on") toast("Увага: немає з'єднання з Twitch", 4000);
+};
+$("auPause").onclick = async () => setState(await call("AuctionPause"));
+$("auStop").onclick = async () => { setState(await call("AuctionFinish")); toast("Прийом ставок завершено — можна крутити колесо"); };
+$("auPlus").onclick = async () => setState(await call("AuctionAddTime", 60000));
+$("auMinus").onclick = async () => setState(await call("AuctionAddTime", -60000));
+$("auNew").onclick = async () => {
+  const t = AU().timer.status;
+  if(!(await confirmBox((t === "running" || t === "paused" ? "Прийом ставок ще йде.\n\n" : "") + "Почати новий аукціон? Поточні лоти й ставки буде збережено в історію.", "Новий аукціон"))) return;
+  setState(await call("AuctionNew")); toast("Почато новий аукціон");
+};
+
+function renderAuction(){
+  const au = AU();
+  $("auLots").textContent = au.lots.filter(l => !l.out).length;
+  $("auBids").textContent = au.feed.length;
+  $("auSum").textContent = fmtN(au.lots.reduce((a, l) => a + l.amount, 0));
+  renderAuWarn(); if(!wAnim) renderAuList(); renderAuFeed(); renderWheel(); renderAuTimer();
+  if($("auctionModal").classList.contains("show")) auRewardGrid();
+}
+// нова ставка — підсвітка й рамка-індикатор навколо стрічки (як нові замовлення в СабДеї)
+let auFlashT = 0;
+function onAuctionBid(id){
+  auFresh.add(id); setTimeout(() => auFresh.delete(id), 3000);
+  if(mode !== "viewing") return;
+  const f = document.querySelector(".aufeedcard"); loadOn(f); clearTimeout(auFlashT); auFlashT = setTimeout(() => loadOff(f), 1300);
+}
+
 /* ---------- старт ---------- */
 function boot(){
   if(!window.go || !window.runtime){ setTimeout(boot, 50); return; }
@@ -895,6 +1226,7 @@ function boot(){
   window.runtime.EventsOn("redeem", d => { const id = d && d.id; if(!id) return; freshIds.add(id); setTimeout(()=>freshIds.delete(id), 3000); flashTable(); });
   window.runtime.EventsOn("chat", m => chatPending.push(m));
   window.runtime.EventsOn("chatdel", chatDelete);
+  window.runtime.EventsOn("auctionbid", onAuctionBid);
   window.runtime.EventsOn("chatters", list => { chatters = list || []; renderChatters(); });
   api().GetChatters().then(list => { chatters = list || []; renderChatters(); });
   api().GetState().then(setState);

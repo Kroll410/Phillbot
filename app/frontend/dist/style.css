@@ -543,7 +543,7 @@ header h1 span{color:transparent}
 .cchip b,.cchip span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* hover кнопок — градієнтна рамка; основні кнопки — градієнтна заливка */
-button:not(:disabled):not(.winbtn):not(.mbtn):not(.rtile):not(.mode-tab):not(.tab):not(.vstart):hover{
+button:not(:disabled):not(.primary):not(.winbtn):not(.mbtn):not(.rtile):not(.mode-tab):not(.tab):not(.vstart):hover{
   border-color:transparent;
   background:linear-gradient(var(--panel2),var(--panel2)) padding-box,var(--grad) border-box}
 button.primary:not(:disabled):not(.mode-tab):not(.tab):hover{border-color:transparent;background:var(--grad)}
@@ -597,3 +597,5 @@ button,.winbtn,.cchip,.mbtn:disabled{border-width:2px}
 /* «Завершити» — під «Старт» і «Пауза», на всю ширину */
 .tctl{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
 #stopBtn{grid-column:1 / -1}
+/* основні кнопки (Старт, Зберегти…) — при наведенні градієнтна заливка, трохи світліша */
+button.primary:not(:disabled):hover{border-color:transparent;background:var(--grad);filter:brightness(1.08);box-shadow:0 4px 14px rgba(145,71,255,.35)}

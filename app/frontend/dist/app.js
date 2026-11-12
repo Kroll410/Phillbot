@@ -980,11 +980,25 @@ function renderAuList(){
   $("auListHint").textContent = au.lots.length ? `${active} на колесі` + (au.lots.length > active ? ` · ${au.lots.length - active} вибуло` : "") : "";
   if(!lots.length){ $("auList").innerHTML = `<div class="empty">Лотів ще немає. Запустіть таймер — ставки з'являться тут.</div>`; return; }
   if(auSwapped){ // стисло: топ-3 та інформація
-    const top = lots.filter(l => !gone(l)).slice(0, 3);
-    $("auList").innerHTML = `<div class="autop">` + top.map((l, i) => `<div class="autop-i${au.winner === l.id ? " win" : ""}" style="--c:${lotColor(l.id)}">
+    // завжди топ-3: переможець — найвище, далі за сумою (вибулі теж, приглушені)
+    const win = lots.find(l => l.id === au.winner);
+    const top = (win ? [win, ...lots.filter(l => l !== win)] : lots).slice(0, 3);
+    // FLIP: запам'ятати, де були рядки, щоб плавно пересунути (переможець «злітає» нагору)
+    const before = {};
+    auListEl.querySelectorAll(".autop-i[data-lot]").forEach(el => before[el.dataset.lot] = el.getBoundingClientRect().top);
+    $("auList").innerHTML = `<div class="autop">` + top.map((l, i) => `<div class="autop-i${au.winner === l.id ? " win wglow" : ""}${gone(l) && au.winner !== l.id ? " out" : ""}" data-lot="${esc(l.id)}" style="--c:${lotColor(l.id)}">
         <span class="rk">${i + 1}</span><span class="nm" title="${esc(l.name)}">${esc(l.name)}</span><span class="am">${POINTS_ICON}${fmtN(l.amount)}</span>
-        <span class="bar"><i style="width:${(chanceOf(l) * 100).toFixed(1)}%"></i></span></div>`).join("")
-      + `</div>` + (active > 3 ? `<div class="auinfo">і ще ${active - 3} ${active - 3 === 1 ? "лот" : "лотів"} на колесі</div>` : "");
+        <span class="bar"><i style="width:${(au.winner === l.id ? 100 : chanceOf(l) * 100).toFixed(1)}%"></i></span></div>`).join("")
+      + `</div>` + (au.lots.length > 3 ? `<div class="auinfo">і ще ${au.lots.length - 3} ${au.lots.length - 3 === 1 ? "лот" : "лотів"}</div>` : "");
+    auListEl.querySelectorAll(".autop-i[data-lot]").forEach(el => {
+      const was = before[el.dataset.lot], now = el.getBoundingClientRect().top;
+      if(was === undefined){ if(Object.keys(before).length) el.animate([{opacity: 0, transform: "translateY(10px)"}, {opacity: 1, transform: "none"}], {duration: 450, easing: "ease-out"}); return; }
+      if(Math.abs(was - now) < 1) return;
+      const up = was > now; // рядок піднімається — над іншими, з легким збільшенням
+      el.style.zIndex = up ? 2 : 1;
+      el.animate([{transform: `translateY(${was - now}px)` + (up ? " scale(1.04)" : "")}, {transform: up ? "scale(1.04)" : "none", offset: .7}, {transform: "none"}],
+        {duration: 750, easing: "cubic-bezier(.2,.9,.25,1)"}).onfinish = () => el.style.zIndex = "";
+    });
     return;
   }
   $("auList").innerHTML = `<table class="autable"><thead><tr><th class="gripcol"></th><th class="num">#</th><th>Лот</th><th class="num">Сума</th><th class="num">Шанс</th><th>Хто ставив</th><th class="acts"><button class="small editbtn${auEdit ? " on" : ""}" data-lotedit>${auEdit ? "Готово" : "Редагувати"}</button></th></tr></thead><tbody>`

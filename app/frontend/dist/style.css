@@ -875,3 +875,16 @@ tr[draggable="true"] input{cursor:text}
 .autable td:has(> input.lnamein){white-space:nowrap}
 .autable input.lnamein{display:inline-block;width:calc(100% - 24px);max-width:320px;vertical-align:middle}
 .autable input.edit{border-color:var(--line);background:var(--panel2)}
+
+/* мінімізовані лоти: переможець нагорі з пульсуючою рамкою (як індикатор завантаження, але повільніше) */
+.autop-i{position:relative}
+.autop-i.out{opacity:.45}
+.autop-i.wglow{border-left-color:transparent}
+.autop-i.wglow::after{content:"";position:absolute;inset:-2px;border-radius:12px;padding:2px;pointer-events:none;z-index:5;
+  background:conic-gradient(from var(--load-angle),#00c853,#4fd27a 18%,#9147ff 48%,rgba(145,71,255,0) 62%,rgba(0,200,83,0) 82%,#00c853);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
+  animation:load-spin 3.2s linear infinite,win-pulse 1.8s ease-in-out infinite}
+@keyframes win-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.autop-i.wglow .nm{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.autop-i.wglow{background:var(--panel2);border:0;border-left:4px solid var(--c)}
+.autop-i.wglow::after{inset:0;border-radius:10px}

@@ -39,12 +39,20 @@ type User struct {
 }
 
 type Reward struct {
-	ID              string `json:"id"`
-	Title           string `json:"title"`
-	Cost            int    `json:"cost"`
-	IsEnabled       bool   `json:"is_enabled"`
-	InputRequired   bool   `json:"is_user_input_required"`
-	BackgroundColor string `json:"background_color"`
+	ID              string       `json:"id"`
+	Title           string       `json:"title"`
+	Cost            int          `json:"cost"`
+	IsEnabled       bool         `json:"is_enabled"`
+	InputRequired   bool         `json:"is_user_input_required"`
+	BackgroundColor string       `json:"background_color"`
+	Image           *RewardImage `json:"image"`
+	DefaultImage    *RewardImage `json:"default_image"`
+}
+
+type RewardImage struct {
+	URL1x string `json:"url_1x"`
+	URL2x string `json:"url_2x"`
+	URL4x string `json:"url_4x"`
 }
 
 var httpc = &http.Client{Timeout: 20 * time.Second}

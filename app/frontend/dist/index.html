@@ -10,29 +10,59 @@
 
 <header>
   <h1>Phill<span>Bot</span></h1>
-  <div class="mode-switch">
-    <button class="active" title="Поточний івент">СабДей</button>
-    <button disabled title="Механіку ще не описано — додамо пізніше">Переглядовий (скоро)</button>
-  </div>
+  <nav class="modes" id="modes">
+    <button class="mode-tab" data-mode="chat">💬 Чат<span class="lock hidden" id="chatLockIcon" title="Чат відкрито в окремому вікні">⧉</span></button>
+    <button class="mode-tab active" data-mode="subday">🎱 СабДей</button>
+    <button class="mode-tab" disabled title="Механіку ще не описано — додамо пізніше">👀 Переглядовий <small>скоро</small></button>
+  </nav>
   <div class="conn">
     <span class="dot" id="connDot"></span>
     <span id="connText" class="muted">Не підключено</span>
     <span id="userBox"></span>
-    <button id="settingsBtn" class="small" title="Налаштування">⚙ Налаштування</button>
+    <button id="generalBtn" class="icon-btn" title="Загальні налаштування">⚙</button>
   </div>
 </header>
 
-<!-- налаштування (окреме вікно) -->
-<div class="modal" id="settingsModal"><div class="box settings">
-  <h2>Налаштування</h2>
+<!-- загальні налаштування -->
+<div class="modal" id="generalModal"><div class="box settings">
+  <h2>Загальні налаштування</h2>
+  <h3>Акаунт Twitch</h3>
+  <div id="accountInfo" class="hint"></div>
+  <div class="row" style="margin-top:8px"><button id="logoutBtn2">Вийти з акаунта</button><button id="changeClient2">Змінити Client ID</button></div>
+  <h3>OBS</h3>
+  <label>Порт локального сервера (127.0.0.1)</label>
+  <input type="number" id="obsPort" min="1024" max="65000" step="1">
+  <div class="hint">Оверлеї для OBS працюють лише на цьому комп'ютері. Після зміни порту оновіть URL у джерелах OBS.</div>
+  <h3>Файли</h3>
+  <div class="row"><button id="openBase">Папка програми</button></div>
+  <div class="row actions" style="margin-top:16px">
+    <button data-close="generalModal">Скасувати</button>
+    <button id="generalSave" class="primary">Зберегти</button>
+  </div>
+</div></div>
+
+<!-- налаштування СабДею -->
+<div class="modal" id="subdayModal"><div class="box settings wide">
+  <h2>Налаштування СабДею</h2>
+  <h3 class="row" style="align-items:center">Нагорода за бали каналу <button id="rewardRefresh" class="small" style="flex:0 0 auto;margin-left:auto" title="Оновити список з Twitch">⟳ Оновити</button></h3>
+  <div class="hint" style="margin:-2px 0 8px">Виберіть нагороду, через яку глядачі надсилають замовлення (з текстом).</div>
+  <div id="rewardGrid" class="rgrid"></div>
+  <div id="rewardsErr" class="hint err"></div>
+  <details>
+    <summary>Отримані погашення / ввести ID вручну</summary>
+    <div id="seenRewards"></div>
+    <div class="row" style="margin-top:6px">
+      <input id="rewardIdInput" placeholder="custom-reward-id">
+      <button id="rewardIdUse" style="flex:0 0 auto">Вибрати</button>
+    </div>
+  </details>
   <h3>Правила балів</h3>
   <div class="row">
     <div><label>Тір 1 ×</label><input type="number" id="m1" min="0" step="1"></div>
     <div><label>Тір 2 ×</label><input type="number" id="m2" min="0" step="1"></div>
     <div><label>Тір 3 ×</label><input type="number" id="m3" min="0" step="1"></div>
+    <div><label>Не-підписник</label><input type="number" id="nonSub" min="0" step="1"></div>
   </div>
-  <label>Бали для не-підписника</label>
-  <input type="number" id="nonSub" min="0" step="1">
   <label>Кілька замовлень від однієї людини</label>
   <select id="dupMode">
     <option value="last">Рахується лише останнє</option>
@@ -40,13 +70,26 @@
     <option value="all">Рахуються всі</option>
   </select>
   <div class="hint">Бали = множник тіра × місяці підписки. Тір — з Twitch API, місяці — з бейджа в чаті.</div>
-  <h3>OBS</h3>
-  <label>Порт локального сервера (127.0.0.1)</label>
-  <input type="number" id="obsPort" min="1024" max="65000" step="1">
   <div class="row actions" style="margin-top:16px">
     <button id="settingsReset" style="margin-right:auto">Скинути правила</button>
-    <button id="settingsCancel">Скасувати</button>
-    <button id="settingsSave" class="primary">Зберегти</button>
+    <button data-close="subdayModal">Скасувати</button>
+    <button id="subdaySave" class="primary">Зберегти</button>
+  </div>
+</div></div>
+
+<!-- налаштування чату -->
+<div class="modal" id="chatModal"><div class="box settings">
+  <h2>Налаштування чату</h2>
+  <h3>Вигляд</h3>
+  <label>Розмір шрифту: <b id="chatFontVal"></b></label>
+  <input type="range" id="chatFont" min="11" max="28" step="1">
+  <label class="chk"><input type="checkbox" id="chatTime"> Показувати час</label>
+  <label class="chk"><input type="checkbox" id="chatBadges"> Показувати бейджі</label>
+  <h3>Чат в OBS</h3>
+  <div id="chatObs" class="hint"></div>
+  <div class="row actions" style="margin-top:16px">
+    <button data-close="chatModal">Скасувати</button>
+    <button id="chatSave" class="primary">Зберегти</button>
   </div>
 </div></div>
 
@@ -82,6 +125,22 @@
 </div>
 
 <main id="mainScreen">
+<section id="modeChat" class="mode hidden">
+  <div class="modebar">
+    <h2 id="chatTitle">Чат</h2>
+    <button id="chatWindowBtn">⧉ Відкрити в окремому вікні</button>
+    <button id="chatSettingsBtn">⚙ Налаштування чату</button>
+  </div>
+  <div class="tablewrap chatwrap" id="chatWrap"><div id="chatList"></div><button id="chatMore" class="hidden">↓ Нові повідомлення</button></div>
+  <div class="locked hidden" id="chatLocked">
+    <div class="lockicon">⧉</div>
+    <h3>Чат відкрито в окремому вікні</h3>
+    <p class="muted">Поки окреме вікно відкрите, ця вкладка заблокована. Закрийте вікно або поверніть чат сюди.</p>
+    <button id="chatReturn" class="primary">↩ Повернути чат у вкладку</button>
+  </div>
+</section>
+
+<div id="modeSubday" class="mode subday">
   <aside>
     <div class="card">
       <h2>Збір замовлень</h2>
@@ -100,21 +159,8 @@
     </div>
 
     <div class="card">
-      <h2>Нагорода за бали каналу</h2>
-      <div id="rewardBound" class="hint">Нагороду ще не вибрано.</div>
-      <div class="row" style="margin-top:6px">
-        <select id="rewardSelect"><option value="">— виберіть нагороду —</option></select>
-        <button id="rewardRefresh" style="flex:0" title="Оновити список">⟳</button>
-      </div>
-      <div id="rewardsErr" class="hint err"></div>
-      <details>
-        <summary>Отримані погашення / ввести ID вручну</summary>
-        <div id="seenRewards"></div>
-        <div class="row" style="margin-top:6px">
-          <input id="rewardIdInput" placeholder="custom-reward-id">
-          <button id="rewardIdSave" style="flex:0">OK</button>
-        </div>
-      </details>
+      <h2 class="row" style="align-items:center">Нагорода<button id="subdaySettingsBtn" class="small" style="flex:0 0 auto;margin-left:auto">⚙ Налаштування СабДею</button></h2>
+      <div id="rewardCurrent"></div>
     </div>
 
     <div class="card">
@@ -133,7 +179,7 @@
     </div>
 
     <div class="card">
-      <h2>OBS</h2>
+      <h2>OBS — оверлеї СабДею</h2>
       <div id="obsStatus" class="hint"></div>
       <div id="obsList"></div>
       <details>
@@ -174,15 +220,13 @@
     <div class="tabs">
       <button class="tab active" data-tab="summary">Підсумок за замовленнями</button>
       <button class="tab" data-tab="entries">Замовлення</button>
-      <button class="tab" data-tab="chat">Чат</button>
       <button class="tab" data-tab="log">Журнал</button>
-      <button id="chatWindowBtn" class="hidden small">⧉ Чат в окремому вікні</button>
       <input id="search" placeholder="Пошук…">
     </div>
     <div class="tablewrap" id="tableWrap"></div>
-    <div class="tablewrap chatwrap hidden" id="chatWrap"><div id="chatList"></div><button id="chatMore" class="hidden">↓ Нові повідомлення</button></div>
     <div class="hint" id="tableHint" style="margin-top:8px">Однакові замовлення (без урахування регістру, зайвих пробілів і розділових знаків у кінці) об'єднуються. Щоб об'єднати схожі замовлення, перетягніть їх за ⠿ одне на одне.</div>
   </section>
+</div>
 </main>
 
 <div class="modal" id="modal"><div class="box"><p id="modalText"></p><div class="row actions"><button id="modalNo">Скасувати</button><button id="modalYes" class="primary">Так</button></div></div></div>

@@ -101,25 +101,47 @@ function renderTimer(){
 }
 setInterval(renderTimer, 250);
 
-/* ---------- нагороди ---------- */
-function renderRewards(){
-  const st = S.settings, bound = st.rewardId;
-  $("rewardBound").innerHTML = bound ? `Вибрано: <b>${esc(st.rewardTitle || "(без назви)")}</b>` : `<span class="err">Нагороду ще не вибрано — замовлення не записуватимуться.</span>`;
-  const sel = $("rewardSelect"), rewards = S.rewards || [];
-  const opts = [`<option value="">— виберіть нагороду —</option>`];
-  let found = false;
-  for(const r of rewards){
-    if(r.id===bound) found = true;
-    opts.push(`<option value="${esc(r.id)}" ${r.id===bound?"selected":""}>${esc(r.title)} (${r.cost})${r.is_enabled?"":" — вимкнена"}${r.is_user_input_required?"":" — без тексту!"}</option>`);
-  }
-  if(bound && !found) opts.push(`<option value="${esc(bound)}" selected>${esc(st.rewardTitle || bound)}</option>`);
-  if(document.activeElement !== sel) sel.innerHTML = opts.join("");
+/* ---------- нагороди (плитки як на Twitch) ---------- */
+const POINTS_ICON = `<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 6a4 4 0 0 1 4 4h-2a2 2 0 0 0-2-2V6z"/><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0zm-2 0a6 6 0 1 1-12 0 6 6 0 0 1 12 0z" clip-rule="evenodd"/></svg>`;
+const DEFAULT_REWARD_IMG = "https://static-cdn.jtvnw.net/custom-reward-images/default-2.png";
+function rewardImg(r){ const im = r.image || r.default_image; return (im && (im.url_2x || im.url_1x)) || DEFAULT_REWARD_IMG; }
+function rewardTile(r, opts={}){
+  const tags = [];
+  if(r.is_enabled===false) tags.push(`<span class="rtag off">вимкнена</span>`);
+  if(r.is_user_input_required===false) tags.push(`<span class="rtag" title="Глядачі не вводять текст — замовлення не записуватимуться">без тексту</span>`);
+  const tag = opts.button ? "button" : "div";
+  return `<${tag} class="rtile${opts.sel?" sel":""}${r.is_enabled===false?" off":""}" ${opts.button?`data-rid="${esc(r.id)}" title="${esc(r.title)}"`:""} style="--rbg:${esc(r.background_color||"#9147ff")}">
+    <div class="rimg"><img src="${esc(rewardImg(r))}" alt="" onerror="this.style.visibility='hidden'">${r.cost!=null?`<span class="rcost">${POINTS_ICON}${Number(r.cost).toLocaleString("uk-UA")}</span>`:""}</div>
+    <div class="rtitle">${esc(r.title||"(без назви)")}</div>${tags.length?`<div class="rtags">${tags.join("")}</div>`:""}</${tag}>`;
+}
+function rewardById(id){
+  const r = (S.rewards||[]).find(x=>x.id===id); if(r) return r;
+  const seen = (S.seenRewards||{})[id];
+  return id ? {id, title: (id===S.settings.rewardId && S.settings.rewardTitle) || (seen && seen.title) || id, background_color:"#3a3a40"} : null;
+}
+function renderRewardCurrent(){
+  const r = rewardById(S.settings.rewardId);
+  $("rewardCurrent").innerHTML = r
+    ? `<div class="rcurrent">${rewardTile(r)}<div class="hint" style="margin:0">Замовлення приймаються через цю нагороду, поки йде таймер.</div></div>`
+    : `<div class="rempty">Нагороду не вибрано — замовлення не записуватимуться. Відкрийте ⚙ Налаштування СабДею.</div>`;
+}
+let pendingReward = null; // вибір у вікні налаштувань до «Зберегти»
+function renderRewardGrid(){
+  const sel = pendingReward ?? S.settings.rewardId;
+  const list = [...(S.rewards||[])].sort((a,b)=>a.cost-b.cost);
+  if(sel && !list.some(r=>r.id===sel)){ const r = rewardById(sel); if(r) list.unshift(r); }
+  $("rewardGrid").innerHTML = list.length ? list.map(r=>rewardTile(r,{button:true, sel:r.id===sel})).join("")
+    : `<div class="hint">Список нагород порожній. Натисніть «⟳ Оновити» або виберіть з отриманих погашень нижче.</div>`;
   $("rewardsErr").textContent = S.rewardsErr || "";
   const seen = Object.values(S.seenRewards || {}).sort((a,b)=>b.ts-a.ts);
-  $("seenRewards").innerHTML = seen.length ? seen.map(r=>`<div class="reward ${r.id===bound?"bound":""}"><div><div><b>${esc(r.title)}</b> — «${esc(r.sample||"(без тексту)")}» ${esc(r.user)} <span class="muted">(${r.count}×)</span></div><code>${esc(r.id)}</code></div>
-      ${r.id===bound?'<span style="color:var(--ok)">✓</span>':`<button class="small" data-bind="${esc(r.id)}" data-title="${esc(r.title)}">Вибрати</button>`}</div>`).join("")
+  $("seenRewards").innerHTML = seen.length ? seen.map(r=>`<div class="reward ${r.id===sel?"bound":""}"><div><div><b>${esc(r.title)}</b> — «${esc(r.sample||"(без тексту)")}» ${esc(r.user)} <span class="muted">(${r.count}×)</span></div><code>${esc(r.id)}</code></div>
+      ${r.id===sel?'<span style="color:var(--ok)">✓</span>':`<button class="small" data-bind="${esc(r.id)}">Вибрати</button>`}</div>`).join("")
     : `<div class="hint">Погашень ще не було.</div>`;
 }
+$("rewardGrid").addEventListener("click", e => { const t = e.target.closest("[data-rid]"); if(!t) return; pendingReward = t.dataset.rid; renderRewardGrid(); });
+$("seenRewards").addEventListener("click", e => { const b = e.target.closest("button[data-bind]"); if(!b) return; pendingReward = b.dataset.bind; renderRewardGrid(); });
+$("rewardIdUse").onclick = () => { const id = $("rewardIdInput").value.trim(); if(id){ pendingReward = id; renderRewardGrid(); } };
+$("rewardRefresh").onclick = async () => { await call("RefreshRewards"); renderRewardGrid(); toast("Список нагород оновлено"); };
 
 /* ---------- OBS ---------- */
 const OVERLAYS = [
@@ -127,7 +149,6 @@ const OVERLAYS = [
   ["Топ замовлень", "/overlay/top", "520×420"],
   ["Кулі / бали", "/overlay/marbles", "620×80"],
   ["Алерт замовлення", "/overlay/last", "800×180"],
-  ["Чат", "/overlay/chat", "420×700"],
 ];
 let obsKey = "";
 function renderObs(){
@@ -136,9 +157,8 @@ function renderObs(){
   if(key === obsKey) return; obsKey = key;
   if(!o.running){
     $("obsStatus").innerHTML = `<span class="err">${esc(o.error || "Сервер для OBS не запущено.")}</span> Змініть порт у ⚙ Налаштуваннях.`;
-    $("obsList").innerHTML = ""; $("chatWindowBtn").disabled = true; return;
+    $("obsList").innerHTML = ""; return;
   }
-  $("chatWindowBtn").disabled = false;
   $("obsStatus").textContent = "Браузерні джерела для OBS (розмір — підказка):";
   $("obsList").innerHTML = OVERLAYS.map(([name, p, size])=>`<div class="obsrow"><span><b>${esc(name)}</b> <span class="muted">${size}</span><code>${esc(o.url + p)}</code></span>
     <button class="small" data-copy="${esc(o.url + p)}">Копіювати</button><button class="small" data-open="${esc(p)}" title="Відкрити в браузері">↗</button></div>`).join("")
@@ -215,11 +235,8 @@ wrapEl.addEventListener("drop", async ev => {
 
 function renderTable(){
   const wrap = $("tableWrap");
-  const isChat = tab==="chat";
-  wrap.classList.toggle("hidden", isChat); $("chatWrap").classList.toggle("hidden", !isChat);
-  $("chatWindowBtn").classList.toggle("hidden", !isChat); $("search").classList.toggle("hidden", isChat || tab==="log");
+  $("search").classList.toggle("hidden", tab==="log");
   $("tableHint").classList.toggle("hidden", tab!=="summary" && tab!=="entries");
-  if(isChat) return;
   // не перемальовувати, поки користувач редагує клітинку
   if(drag || (wrap.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName))){ tableDirty = true; return; }
   tableDirty = false;
@@ -257,58 +274,127 @@ function renderTable(){
   }
 }
 
-/* ---------- чат ---------- */
+/* ---------- вкладка «Чат» ---------- */
 const CHAT_MAX = 300;
-let chatPending = [], chatStick = true, chatLoaded = false;
+let chatMsgs = [], chatPending = [], chatStick = true, chatLoaded = false, chatOptsKey = "";
 const chatWrap = $("chatWrap"), chatList = $("chatList");
+const chatOpts = () => ({ time: !S.settings.chat.hideTime, badges: !S.settings.chat.hideBadges });
 chatWrap.addEventListener("scroll", () => {
   chatStick = chatWrap.scrollTop + chatWrap.clientHeight >= chatWrap.scrollHeight - 30;
   if(chatStick) $("chatMore").classList.add("hidden");
 });
 $("chatMore").onclick = () => { chatWrap.scrollTop = chatWrap.scrollHeight; $("chatMore").classList.add("hidden"); };
 function chatFlush(){
-  if(!chatPending.length) return;
-  const nodes = chatPending.splice(0).map(m => ChatRender.render(m, {time:true}));
-  chatList.append(...nodes);
+  if(!chatPending.length || !S) return;
+  const add = chatPending.splice(0);
+  chatMsgs.push(...add); if(chatMsgs.length > CHAT_MAX) chatMsgs.splice(0, chatMsgs.length - CHAT_MAX);
+  const o = chatOpts();
+  chatList.append(...add.map(m => ChatRender.render(m, o)));
   while(chatList.children.length > CHAT_MAX) chatList.firstChild.remove();
   if(chatStick) chatWrap.scrollTop = chatWrap.scrollHeight; else $("chatMore").classList.remove("hidden");
 }
 setInterval(chatFlush, 150);
+function chatRerender(){ const o = chatOpts(); chatList.replaceChildren(...chatMsgs.map(m => ChatRender.render(m, o))); chatWrap.scrollTop = chatWrap.scrollHeight; }
 function chatDelete(d){
-  if(d.all){ chatList.replaceChildren(); chatPending = []; return; }
-  const ids = new Set(d.ids || []);
-  for(const n of [...chatList.children]) if(ids.has(n.dataset.id) || (d.userId && n.dataset.user === d.userId)) n.remove();
-  chatPending = chatPending.filter(m => !ids.has(m.id) && m.userId !== d.userId);
+  const ids = new Set(d.ids || []), gone = m => d.all || ids.has(m.id) || (d.userId && m.userId === d.userId);
+  chatMsgs = chatMsgs.filter(m => !gone(m)); chatPending = chatPending.filter(m => !gone(m));
+  if(d.all){ chatList.replaceChildren(); return; }
+  for(const nd of [...chatList.children]) if(ids.has(nd.dataset.id) || (d.userId && nd.dataset.user === d.userId)) nd.remove();
+}
+function renderChat(){
+  const c = S.settings.chat, key = JSON.stringify(c);
+  chatList.style.fontSize = c.fontSize + "px";
+  if(key !== chatOptsKey){ chatOptsKey = key; chatRerender(); }
+  const locked = !!S.chatWindow;
+  $("chatLocked").classList.toggle("hidden", !locked); chatWrap.classList.toggle("hidden", locked);
+  $("chatWindowBtn").disabled = locked || !(S.obs && S.obs.running);
+  $("chatLockIcon").classList.toggle("hidden", !locked);
+  $("chatTitle").textContent = "Чат " + (S.auth && S.auth.user ? S.auth.user.display_name : "");
 }
 $("chatWindowBtn").onclick = () => call("OpenChatWindow");
+$("chatReturn").onclick = () => call("CloseChatWindow");
 
-/* ---------- налаштування ---------- */
-function fillSettings(){
-  const st = S.settings;
-  $("m1").value = st.mult["1"]; $("m2").value = st.mult["2"]; $("m3").value = st.mult["3"];
-  $("nonSub").value = st.nonSubPoints; $("dupMode").value = st.dupMode; $("obsPort").value = st.obsPort;
+/* ---------- вкладки-режими: Чат / СабДей / Переглядовий ---------- */
+let mode = "subday";
+try{ mode = localStorage.getItem("phillbot-mode") || "subday"; }catch(e){}
+function showMode(m){
+  mode = m === "chat" ? "chat" : "subday";
+  try{ localStorage.setItem("phillbot-mode", mode); }catch(e){}
+  document.querySelectorAll(".mode-tab[data-mode]").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+  $("modeChat").classList.toggle("hidden", mode !== "chat");
+  $("modeSubday").classList.toggle("hidden", mode !== "subday");
+  if(mode === "chat"){ chatStick = true; chatWrap.scrollTop = chatWrap.scrollHeight; }
 }
-function initInputs(){
-  $("duration").value = S.settings.durationMin;
-}
+document.querySelectorAll(".mode-tab[data-mode]").forEach(b => b.onclick = () => showMode(b.dataset.mode));
+showMode(mode);
+
+/* ---------- налаштування: окремо для кожної вкладки ---------- */
+function initInputs(){ $("duration").value = S.settings.durationMin; }
 const n = (id, d) => { const v = Number($(id).value); return Number.isFinite(v) && $(id).value !== "" ? v : d; };
 async function saveSettings(patch){ setState(await call("SaveSettings", {...S.settings, ...patch})); }
+const openModal = id => $(id).classList.add("show"), closeModal = id => $(id).classList.remove("show");
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { closeModal(b.dataset.close); pendingReward = null; });
 
-$("settingsBtn").onclick = () => { fillSettings(); $("settingsModal").classList.add("show"); };
-$("settingsCancel").onclick = () => $("settingsModal").classList.remove("show");
-$("settingsReset").onclick = () => { $("m1").value = 1; $("m2").value = 2; $("m3").value = 3; $("nonSub").value = 0; $("dupMode").value = "last"; };
-$("settingsSave").onclick = async () => {
-  await saveSettings({
-    mult: {"1": Math.max(0,n("m1",1)), "2": Math.max(0,n("m2",2)), "3": Math.max(0,n("m3",3))},
-    nonSubPoints: Math.max(0, n("nonSub",0)), dupMode: $("dupMode").value, obsPort: Math.round(n("obsPort",17841)) });
-  $("settingsModal").classList.remove("show"); obsKey = ""; renderObs(); toast("Налаштування збережено");
+// Загальні: акаунт, порт OBS
+$("generalBtn").onclick = () => {
+  const u = S.auth && S.auth.user;
+  $("accountInfo").innerHTML = u ? `Канал: <b>${esc(u.display_name)}</b> <span class="muted">(${esc(u.login)})</span>` : "Не увійшли";
+  $("obsPort").value = S.settings.obsPort; openModal("generalModal");
 };
+$("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round(n("obsPort",17841))}); closeModal("generalModal"); obsKey = ""; renderObs(); toast("Збережено"); };
+$("logoutBtn2").onclick = async () => { if(await confirmBox("Вийти з акаунта Twitch?")){ closeModal("generalModal"); call("Logout"); } };
+$("changeClient2").onclick = async () => { if(await confirmBox("Змінити Client ID? Потрібно буде увійти знову.")){ closeModal("generalModal"); call("ChangeClientID"); } };
+$("openBase").onclick = () => call("OpenFolder", "");
+
+// СабДей: нагорода + правила балів
+$("subdaySettingsBtn").onclick = () => {
+  const st = S.settings; pendingReward = null;
+  $("m1").value = st.mult["1"]; $("m2").value = st.mult["2"]; $("m3").value = st.mult["3"];
+  $("nonSub").value = st.nonSubPoints; $("dupMode").value = st.dupMode;
+  renderRewardGrid(); openModal("subdayModal");
+  if(!(S.rewards||[]).length) call("RefreshRewards").then(renderRewardGrid);
+};
+$("settingsReset").onclick = () => { $("m1").value = 1; $("m2").value = 2; $("m3").value = 3; $("nonSub").value = 0; $("dupMode").value = "last"; };
+$("subdaySave").onclick = async () => {
+  if(pendingReward !== null && pendingReward !== S.settings.rewardId){
+    const r = rewardById(pendingReward);
+    setState(await call("SelectReward", pendingReward, r ? r.title : ""));
+    if(r && r.is_user_input_required === false) toast("Увага: ця нагорода не вимагає тексту — замовлення без тексту ігноруються", 4500);
+  }
+  await saveSettings({ mult: {"1": Math.max(0,n("m1",1)), "2": Math.max(0,n("m2",2)), "3": Math.max(0,n("m3",3))},
+    nonSubPoints: Math.max(0, n("nonSub",0)), dupMode: $("dupMode").value });
+  pendingReward = null; closeModal("subdayModal"); toast("Налаштування СабДею збережено");
+};
+
+// Чат: вигляд + URL для OBS
+$("chatSettingsBtn").onclick = () => {
+  const c = S.settings.chat;
+  $("chatFont").value = c.fontSize; $("chatFontVal").textContent = c.fontSize + " px";
+  $("chatTime").checked = !c.hideTime; $("chatBadges").checked = !c.hideBadges;
+  const o = S.obs || {};
+  $("chatObs").innerHTML = o.running ? `<div class="obsrow"><span><b>Оверлей чату</b> <span class="muted">420×700, прозорий</span><code>${esc(o.url)}/overlay/chat</code></span>
+    <button class="small" data-copy="${esc(o.url)}/overlay/chat">Копіювати</button><button class="small" data-open="/overlay/chat">↗</button></div>
+    <div class="hint">Параметри: <code>?fade=30</code> — повідомлення зникають, <code>?hide=nightbot</code> — сховати ботів, <code>?size=20</code> — розмір.</div>` : "Сервер для OBS не запущено.";
+  openModal("chatModal");
+};
+$("chatFont").oninput = () => $("chatFontVal").textContent = $("chatFont").value + " px";
+$("chatObs").addEventListener("click", async e => {
+  const c = e.target.closest("[data-copy]"), o = e.target.closest("[data-open]");
+  if(c){ const ok = await call("CopyText", c.dataset.copy); toast(ok ? "URL скопійовано" : "Не вдалося скопіювати"); }
+  if(o) call("OpenOverlay", o.dataset.open);
+});
+$("chatSave").onclick = async () => {
+  await saveSettings({chat: {fontSize: Math.round(n("chatFont",14)), hideTime: !$("chatTime").checked, hideBadges: !$("chatBadges").checked}});
+  closeModal("chatModal"); toast("Налаштування чату збережено");
+};
+
 $("duration").addEventListener("change", async () => { await saveSettings({durationMin: Math.max(1, Math.round(n("duration",10)))}); initInputs(); });
 function renderAll(){
   if(!inited){ initInputs(); inited = true; }
   renderAuth();
   if(S.auth && S.auth.status==="ok"){
-    renderStats(); renderTable(); renderRewards(); renderObs();
+    renderStats(); renderTable(); renderRewardCurrent(); renderObs(); renderChat();
+    if($("subdayModal").classList.contains("show")) renderRewardGrid();
     if(!chatLoaded){ chatLoaded = true; api().GetChat().then(m => { chatPending = (m||[]).concat(chatPending); }); }
   }
   renderTimer();
@@ -336,18 +422,8 @@ $("stopBtn").onclick = async () => { setState(await call("FinishTimer")); toast(
 $("plusBtn").onclick = async () => setState(await call("AddTime", 60000));
 $("minusBtn").onclick = async () => setState(await call("AddTime", -60000));
 
-$("rewardSelect").onchange = async () => {
-  const id = $("rewardSelect").value, r = (S.rewards||[]).find(x=>x.id===id);
-  setState(await call("SelectReward", id, r ? r.title : ""));
-  if(r && !r.is_user_input_required) toast("Увага: ця нагорода не вимагає тексту — замовлення без тексту ігноруються", 4500);
-};
-$("rewardRefresh").onclick = async () => { await call("RefreshRewards"); toast("Список нагород оновлено"); };
-$("seenRewards").onclick = async e => { const b = e.target.closest("button[data-bind]"); if(!b) return; setState(await call("SelectReward", b.dataset.bind, b.dataset.title)); toast("Нагороду вибрано"); };
-$("rewardIdSave").onclick = async () => { const id = $("rewardIdInput").value.trim(); setState(await call("SelectReward", id, "")); toast(id?"ID збережено":"ID очищено"); };
-
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
   tab = b.dataset.tab; document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b)); renderTable();
-  if(tab==="chat"){ chatStick = true; chatWrap.scrollTop = chatWrap.scrollHeight; }
 });
 $("search").oninput = renderTable;
 

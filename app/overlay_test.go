@@ -107,3 +107,30 @@ func TestOverlayServer(t *testing.T) {
 	}
 	_, _ = io.Copy(io.Discard, io.LimitReader(br, 0))
 }
+
+func TestChatWindowLock(t *testing.T) {
+	a := newTestApp(t)
+	a.overlay = newOverlayServer(a)
+	a.overlay.start(28431)
+	defer a.overlay.stop()
+	if a.GetState().ChatWindow {
+		t.Fatal("locked at start")
+	}
+	resp, err := http.Get(a.overlay.info().URL + "/api/events?window=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	br := bufio.NewReader(resp.Body)
+	br.ReadString('\n') // дочекатися підключення
+	if !a.GetState().ChatWindow {
+		t.Fatal("not locked while window connected")
+	}
+	resp.Body.Close()
+	deadline := time.Now().Add(3 * time.Second)
+	for a.GetState().ChatWindow && time.Now().Before(deadline) {
+		time.Sleep(50 * time.Millisecond)
+	}
+	if a.GetState().ChatWindow {
+		t.Fatal("still locked after window closed")
+	}
+}

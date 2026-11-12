@@ -21,6 +21,14 @@ type Settings struct {
 	Mult         map[string]int `json:"mult"`
 	DupMode      string         `json:"dupMode"` // last | first | all
 	ObsPort      int            `json:"obsPort"` // локальний сервер для OBS (127.0.0.1)
+	Chat         ChatSettings   `json:"chat"`
+}
+
+// Налаштування вкладки «Чат» (вигляд чату в програмі та в окремому вікні).
+type ChatSettings struct {
+	FontSize   int  `json:"fontSize"`
+	HideTime   bool `json:"hideTime"`
+	HideBadges bool `json:"hideBadges"`
 }
 
 type Timer struct {
@@ -95,6 +103,9 @@ func (s *Settings) normalize() {
 	}
 	if s.DupMode != "first" && s.DupMode != "all" {
 		s.DupMode = "last"
+	}
+	if s.Chat.FontSize < 11 || s.Chat.FontSize > 28 {
+		s.Chat.FontSize = 14
 	}
 	if s.ObsPort < 1024 || s.ObsPort > 65000 {
 		s.ObsPort = defaultObsPort

@@ -270,6 +270,10 @@ func (o *overlayServer) serveSSE(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Connection", "keep-alive")
+	if r.URL.Query().Get("window") == "1" { // окреме вікно чату: поки підключене — вкладка «Чат» заблокована
+		o.a.chatWindowDelta(1)
+		defer o.a.chatWindowDelta(-1)
+	}
 	c := o.hub.add()
 	defer o.hub.remove(c)
 	w.Write([]byte("retry: 2000\n\n"))
@@ -354,23 +358,80 @@ func (a *App) OpenOverlay(p string) {
 }
 
 // Чат в окремому вікні: Edge у режимі застосунку (без адресного рядка), інакше — браузер за замовчуванням.
+// Поки вікно відкрите, вкладка «Чат» у програмі заблокована.
 func (a *App) OpenChatWindow() error {
 	u := a.overlayURL("/overlay/chat?window=1")
 	if u == "" {
-		return errors.New("сервер для OBS не запущено — перевірте порт у картці OBS")
+		return errors.New("сервер для OBS не запущено — перевірте порт у загальних налаштуваннях")
 	}
+	a.mu.Lock()
+	if a.chatWinClients > 0 || a.chatWinPending {
+		a.mu.Unlock()
+		return nil
+	}
+	a.chatWinPending = true
+	a.emitLocked()
+	a.mu.Unlock()
+	go func() { // якщо вікно так і не підключилось — розблокувати вкладку
+		time.Sleep(15 * time.Second)
+		a.mu.Lock()
+		if a.chatWinPending {
+			a.chatWinPending = false
+			a.emitLocked()
+		}
+		a.mu.Unlock()
+	}()
 	for _, p := range []string{
 		filepath.Join(os.Getenv("ProgramFiles(x86)"), `Microsoft\Edge\Application\msedge.exe`),
 		filepath.Join(os.Getenv("ProgramFiles"), `Microsoft\Edge\Application\msedge.exe`),
 		filepath.Join(os.Getenv("LocalAppData"), `Microsoft\Edge\Application\msedge.exe`),
 	} {
 		if _, err := os.Stat(p); err == nil {
-			cmd := exec.Command(p, "--app="+u, "--window-size=440,820", "--user-data-dir="+filepath.Join(a.baseDir, "chat-window"))
+			cmd := exec.Command(p, "--app="+u, "--window-size=440,820", "--no-first-run", "--user-data-dir="+filepath.Join(a.baseDir, "chat-window"))
 			if err := cmd.Start(); err == nil {
+				a.mu.Lock()
+				a.chatWinProc = cmd.Process
+				a.mu.Unlock()
+				go cmd.Wait()
 				return nil
 			}
 		}
 	}
 	openURL(u)
 	return nil
+}
+
+// Закрити окреме вікно чату і повернути чат у вкладку.
+func (a *App) CloseChatWindow() {
+	a.overlay.hub.broadcast("closewin", true) // сторінка вікна закриє себе сама
+	a.mu.Lock()
+	p := a.chatWinProc
+	a.chatWinProc = nil
+	a.chatWinPending = false
+	a.mu.Unlock()
+	if p != nil {
+		_ = p.Kill()
+	}
+	go func() { // дати вікну відключитись, потім оновити стан
+		time.Sleep(700 * time.Millisecond)
+		a.mu.Lock()
+		if a.chatWinClients > 0 {
+			a.chatWinClients = 0 // браузер за замовчуванням не дає закрити вкладку — розблоковуємо все одно
+		}
+		a.emitLocked()
+		a.mu.Unlock()
+	}()
+}
+
+func (a *App) chatWindowDelta(d int) {
+	a.mu.Lock()
+	a.chatWinClients += d
+	if a.chatWinClients < 0 {
+		a.chatWinClients = 0
+	}
+	if d > 0 {
+		a.chatWinPending = false
+	}
+	a.emitLocked()
+	a.mu.Unlock()
 }

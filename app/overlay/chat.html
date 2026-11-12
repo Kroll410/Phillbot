@@ -66,6 +66,7 @@
   OV.connect({
     state: s => { document.getElementById("head").textContent = "Чат " + (s.channel || ""); document.title = "Чат " + (s.channel || ""); },
     chat: m => pending.push(m),
+    closewin: () => { if (win) window.close(); },
     chatdel: d => {
       if (d.all) { list.replaceChildren(); pending = []; return; }
       const ids = new Set(d.ids || []);

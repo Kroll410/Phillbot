@@ -12,9 +12,9 @@
 
   let offset = 0;
   function connect(h) {
-    const es = new EventSource("/api/events");
+    const es = new EventSource("/api/events" + (flag("window", false) ? "?window=1" : ""));
     es.addEventListener("state", e => { const s = JSON.parse(e.data); offset = s.serverNow - Date.now(); h.state && h.state(s); });
-    for (const n of ["chat", "chatdel", "redeem"]) es.addEventListener(n, e => h[n] && h[n](JSON.parse(e.data)));
+    for (const n of ["chat", "chatdel", "redeem", "closewin"]) es.addEventListener(n, e => h[n] && h[n](JSON.parse(e.data)));
     es.onerror = () => h.offline && h.offline();
     return es;
   }

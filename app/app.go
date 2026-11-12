@@ -39,6 +39,7 @@ type Snapshot struct {
 	Now        int64       `json:"now"`
 	Log        []string    `json:"log"`
 	Obs        OverlayInfo `json:"obs"`
+	ChatWindow bool        `json:"chatWindow"` // чат відкрито в окремому вікні — вкладка заблокована
 }
 
 type App struct {
@@ -62,6 +63,10 @@ type App struct {
 	badgeMu    sync.Mutex
 	badgeCache map[string]subInfo
 	badgeImgs  map[string]badgeImg
+
+	chatWinClients int         // підключені вікна чату (SSE з ?window=1)
+	chatWinPending bool        // вікно запускається, ще не підключилось
+	chatWinProc    *os.Process // процес Edge --app
 
 	chatMu sync.Mutex
 	chat   []ChatMsg
@@ -138,7 +143,8 @@ func (a *App) snapshotLocked() Snapshot {
 		obs = a.overlay.info()
 	}
 	return Snapshot{State: st, Auth: auth, Conn: a.conn, Rewards: append([]Reward(nil), a.rewards...), RewardsErr: a.rewErr,
-		BaseDir: a.baseDir, ClientID: a.clientID, Now: time.Now().UnixMilli(), Log: append([]string(nil), a.logLines...), Obs: obs}
+		BaseDir: a.baseDir, ClientID: a.clientID, Now: time.Now().UnixMilli(), Log: append([]string(nil), a.logLines...), Obs: obs,
+		ChatWindow: a.chatWinClients > 0 || a.chatWinPending}
 }
 
 // подія для головного вікна і для оверлеїв OBS

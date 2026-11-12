@@ -4,6 +4,7 @@ package main
 // Власний файл копіюється в <база>/wheel/ і віддається інтерфейсу через сервер ресурсів Wails: /userimg/wheel/<файл>.
 
 import (
+	"encoding/base64"
 	"errors"
 	"io"
 	"net/http"
@@ -116,6 +117,29 @@ func (a *App) PickWheelImage() (string, error) {
 		return "", err
 	}
 	return name, out.Close()
+}
+
+// SaveWheelImage — файл, перетягнутий у вікно налаштувань (вміст у base64). Повертає ім'я збереженого файлу.
+func (a *App) SaveWheelImage(name, data string) (string, error) {
+	ext := strings.ToLower(filepath.Ext(name))
+	if !wheelImgExt[ext] {
+		return "", errors.New("підтримуються PNG, JPG, GIF і WEBP")
+	}
+	if i := strings.Index(data, ","); i >= 0 && strings.HasPrefix(data, "data:") {
+		data = data[i+1:]
+	}
+	b, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return "", errors.New("не вдалося прочитати файл")
+	}
+	if len(b) == 0 || len(b) > 15<<20 {
+		return "", errors.New("файл порожній або завеликий (більше 15 МБ)")
+	}
+	if err := os.MkdirAll(a.wheelDir(), 0755); err != nil {
+		return "", err
+	}
+	out := "center_" + time.Now().Format("20060102_150405") + ext
+	return out, os.WriteFile(filepath.Join(a.wheelDir(), out), b, 0644)
 }
 
 // прибрати з теки wheel усі файли, крім поточного (викликається після збереження налаштувань)

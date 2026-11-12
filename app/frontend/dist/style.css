@@ -943,3 +943,13 @@ button.cidnext{flex:0 0 auto;min-width:110px;height:44px;padding:0 22px;font-wei
 /* мінімізовані лоти без нумерації */
 .autop-i{grid-template-columns:minmax(0,1fr) auto}
 .autop-i .bar{grid-column:1 / -1}
+
+/* «Своя картинка або GIF»: зона перетягування файлу */
+.wcdrop{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:6px 14px;padding:14px;border-radius:12px;
+  border:2px dashed #3a3a44;background:var(--panel2);transition:border-color .2s,background .2s}
+.wcdrop.over{border-color:#a970ff;background:linear-gradient(90deg,rgba(0,200,83,.08),rgba(145,71,255,.12))}
+.wcdrop .wcprev{grid-row:1 / span 2}
+.wcdrop-t{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wcdrop-t span{color:var(--muted);font-size:12.5px}
+.wcdrop-h{grid-column:2;margin:0}
+.wcdrop:not(:has(.wcprev)) .wcdrop-t,.wcdrop:not(:has(.wcprev)) .wcdrop-h{grid-column:1 / -1}

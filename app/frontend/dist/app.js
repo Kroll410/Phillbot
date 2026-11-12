@@ -1403,15 +1403,25 @@ document.querySelectorAll("[data-swap]").forEach(b => b.onclick = () => {
   wins.forEach((w, i) => {
     const a = before[i], z = w.getBoundingClientRect();
     // поки летять — над стрічкою «Ставки» (колесо, що мінімізується, не пірнає під неї)
-    w.style.position = "relative"; w.style.zIndex = 5;
-    w.animate([{transform: `translate(${a.left - z.left}px,${a.top - z.top}px) scale(${a.width / z.width},${a.height / z.height})`, transformOrigin: "0 0"},
-      {transform: "none", transformOrigin: "0 0"}], {duration: 560, easing: "cubic-bezier(.2,.9,.25,1)"}).onfinish = () => { w.style.zIndex = ""; };
+    // 3D-ефект: вікно, що стає більшим, на півдорозі «наближається» (більше, яскравіше, з тінню) і летить над іншим;
+    // вікно, що стає меншим, «віддаляється» (менше й темніше)
+    const grows = z.width * z.height > a.width * a.height, k = grows ? 1.06 : .86;
+    const dx = a.left - z.left, dy = a.top - z.top, sx = a.width / z.width, sy = a.height / z.height;
+    const mx = (sx + 1) / 2, my = (sy + 1) / 2;
+    const midT = `translate(${dx / 2 + z.width * mx * (1 - k) / 2}px,${dy / 2 + z.height * my * (1 - k) / 2}px) scale(${mx * k},${my * k})`;
+    w.style.position = "relative"; w.style.zIndex = grows ? 6 : 4;
+    w.animate([
+      {transform: `translate(${dx}px,${dy}px) scale(${sx},${sy})`, transformOrigin: "0 0", filter: "brightness(1)", boxShadow: "0 0 0 rgba(0,0,0,0)"},
+      {transform: midT, transformOrigin: "0 0", offset: .5, filter: grows ? "brightness(1.08)" : "brightness(.6)",
+        boxShadow: grows ? "0 28px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(145,71,255,.35)" : "0 0 0 rgba(0,0,0,0)"},
+      {transform: "none", transformOrigin: "0 0", filter: "brightness(1)", boxShadow: "0 0 0 rgba(0,0,0,0)"}],
+      {duration: 720, easing: "cubic-bezier(.3,.7,.3,1)"}).onfinish = () => { w.style.zIndex = ""; };
     const inner = w.querySelector(".aulist, .wheelbox");
     if(inner) inner.animate([{opacity: .3}, {opacity: 1}], {duration: 180, easing: "ease-out"}); // коротке згасання вмісту, без паузи
   });
   // «Ставки» плавно переповзають на нове місце (верхнє вікно в колонці змінило висоту), а не стрибають
   const fa = feed.getBoundingClientRect(), dy = fb.top - fa.top;
-  if(Math.abs(dy) > 1) feed.animate([{transform: `translateY(${dy}px)`}, {transform: "none"}], {duration: 560, easing: "cubic-bezier(.2,.9,.25,1)"});
+  if(Math.abs(dy) > 1) feed.animate([{transform: `translateY(${dy}px)`}, {transform: "none"}], {duration: 720, easing: "cubic-bezier(.3,.7,.3,1)"});
 });
 placeWins();
 
@@ -1425,7 +1435,7 @@ function auCenterUI(){
   const box = $("auCenterBox"), src = centerSrc(c);
   const prev = src ? `<span class="wcprev${c.kind === "emote" ? " emote" : ""}"><img src="${esc(src)}" alt=""></span>` : "";
   if(!c.kind) box.innerHTML = `<div class="hint">У центрі колеса — звичайний круг.</div>`;
-  else if(c.kind === "file") box.innerHTML = `<div class="wcfile">${prev}<button id="auPickImg">${c.name ? "Вибрати інший файл…" : "Вибрати файл…"}</button><span class="hint" style="margin:0">PNG, JPG, GIF або WEBP. GIF у центрі анімується.</span></div>`;
+  else if(c.kind === "file") box.innerHTML = `<div class="wcdrop" id="wcDrop">${prev}<div class="wcdrop-t"><b>Перетягніть файл сюди</b><span>або</span><button id="auPickImg">${c.name ? "Вибрати інший файл…" : "Вибрати файл…"}</button></div><span class="hint wcdrop-h">PNG, JPG, GIF або WEBP, до 15 МБ. GIF у центрі анімується.</span></div>`;
   else {
     if(!emotes){ box.innerHTML = `<div class="hint">Завантажую емодзі каналу…</div>`; return; }
     if(!emotes.length){ box.innerHTML = `<div class="hint">У каналу немає власних емодзі.</div>`; return; }
@@ -1444,6 +1454,24 @@ document.querySelectorAll("#auCenterSeg .tab").forEach(b => b.onclick = () => {
   auCenterUI();
   if(k === "emote") loadEmotes();
 });
+// перетягування файлу картинки в «Своя картинка або GIF»
+const IMG_RE = /\.(png|jpe?g|gif|webp)$/i;
+$("auCenterBox").addEventListener("dragover", e => {
+  const z = e.target.closest("#wcDrop"); if(!z) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = "copy"; z.classList.add("over");
+});
+$("auCenterBox").addEventListener("dragleave", e => { const z = e.target.closest("#wcDrop"); if(z && !z.contains(e.relatedTarget)) z.classList.remove("over"); });
+$("auCenterBox").addEventListener("drop", async e => {
+  const z = e.target.closest("#wcDrop"); if(!z) return;
+  e.preventDefault(); z.classList.remove("over");
+  const f = [...(e.dataTransfer.files || [])].find(x => IMG_RE.test(x.name)); if(!f) return;
+  if(f.size > 15 * 1024 * 1024) return;
+  const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+  const name = await withLoading(z, () => call("SaveWheelImage", f.name, data));
+  if(name){ auCenterPending = {kind: "file", name}; auCenterUI(); }
+});
+// файл, кинутий повз зону, не відкривається у вікні програми
+["dragover", "drop"].forEach(t => document.addEventListener(t, e => { if(e.dataTransfer && [...(e.dataTransfer.types || [])].includes("Files") && !e.defaultPrevented) e.preventDefault(); }));
 $("auCenterBox").addEventListener("click", async e => {
   const em = e.target.closest("[data-em]");
   if(em){ const x = emotes.find(v => v.id === em.dataset.em); if(x){ auCenterPending = {kind: "emote", url: x.url, name: x.name}; auCenterUI(); } return; }
@@ -1486,7 +1514,7 @@ function auModeSeg(){
   document.querySelectorAll("#auModeSeg .tab").forEach(b => b.classList.toggle("active", b.dataset.mode === m));
   slideSeg($("auModeSeg"));
   $("auModeHint").textContent = m === "instant" ? "Один оберт — і переможець відомий. Шанс лота пропорційний його сумі."
-    : "Кожен оберт вибуває один лот, останній — переможець. Дешевші лоти вибувають частіше; шанс перемогти пропорційний сумі.";
+    : "Кожен оберт вибуває один лот, останній — переможець.";
 }
 document.querySelectorAll("#auModeSeg .tab").forEach(b => b.onclick = () => { auModePending = b.dataset.mode; auModeSeg(); });
 $("auSettingsBtn").onclick = () => {

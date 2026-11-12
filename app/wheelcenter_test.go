@@ -32,3 +32,18 @@ func TestWheelUserAssets(t *testing.T) {
 		t.Fatal("clean")
 	}
 }
+
+func TestSaveWheelImage(t *testing.T) {
+	a := newTestApp(t)
+	a.baseDir = t.TempDir()
+	name, err := a.SaveWheelImage("cat.GIF", "data:image/gif;base64,R0lGODlh")
+	if err != nil || filepath.Ext(name) != ".gif" {
+		t.Fatalf("save %q %v", name, err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(a.wheelDir(), name)); string(b) != "GIF89a" {
+		t.Fatalf("content %q", b)
+	}
+	if _, err := a.SaveWheelImage("x.exe", "AAAA"); err == nil {
+		t.Fatal("exe accepted")
+	}
+}

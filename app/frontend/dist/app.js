@@ -673,7 +673,7 @@ async function holdDone(){
   }
   if(action === "resetspins"){ // повернути всі лоти на колесо
     holding = null;
-    try{ setState(await call("AuctionResetSpins")); toast("Усі лоти знову на колесі"); } catch(e){} finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); renderSpinBtn(); }, 500); }
+    try{ setState(await call("AuctionResetSpins")); toast("Колесо скинуто"); } catch(e){} finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); renderSpinBtn(); }, 500); }
     return;
   }
   if(action === "spin"){ // колесо: результат від Go (random.org), тут лише анімація
@@ -1183,7 +1183,7 @@ function renderSpinBtn(){
   $("auReset").disabled = !!wAnim || (!au.lots.some(l => l.out) && !au.winner);
 }
 $("auSpin").insertAdjacentHTML("afterbegin", LIQUID);
-// «Повернути лоти» — затисканням, червона «фарба» (як «Завершити гру»)
+// «Скинути колесо» — затисканням, червона «фарба» (як «Завершити гру»)
 $("auReset").insertAdjacentHTML("afterbegin", LIQUID);
 $("auReset").querySelector(".liquid").insertAdjacentHTML("beforeend", `<span class="ink"><i></i><i></i><i></i></span>`);
 

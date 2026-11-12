@@ -36,7 +36,8 @@ type Lot struct {
 	Amount int       `json:"amount"`
 	Bids   int       `json:"bids"`
 	Users  []LotUser `json:"users"`
-	Out    int       `json:"out,omitempty"` // вибув у N-му оберті (режим «на вибування»)
+	Out    int       `json:"out,omitempty"`    // вибув у N-му оберті (режим «на вибування»)
+	Hidden bool      `json:"hidden,omitempty"` // приховано стрімером — не на колесі (можна повернути)
 }
 
 // Bid — ставка у стрічці праворуч.
@@ -560,6 +561,15 @@ func (a *App) AuctionUndoMerge() (Snapshot, error) {
 	return snap, err
 }
 
+// Приховати / показати лот: прихований лишається в таблиці, але не бере участі в колесі.
+func (a *App) AuctionToggleLot(id string) Snapshot {
+	return a.mutate(func(st *State) {
+		if i := st.Auction.lotIndex(id); i >= 0 {
+			st.Auction.Lots[i].Hidden = !st.Auction.Lots[i].Hidden
+		}
+	})
+}
+
 func (a *App) AuctionRemoveLot(id string) Snapshot {
 	return a.mutate(func(st *State) {
 		au := &st.Auction
@@ -604,7 +614,7 @@ func (a *App) AuctionSpin() (Snapshot, error) {
 	var w []float64
 	total := 0.0
 	for _, l := range au.Lots {
-		if l.Out > 0 || l.Amount <= 0 {
+		if l.Out > 0 || l.Hidden || l.Amount <= 0 {
 			continue
 		}
 		x := float64(l.Amount)

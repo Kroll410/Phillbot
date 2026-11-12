@@ -822,3 +822,20 @@ button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--gr
 
 .winbtn.resetbtn{width:100%;min-width:0;height:38px}
 .winbtn.resetbtn:disabled{opacity:.45;cursor:default}
+
+/* рядки перетягуються за будь-яке місце */
+tr[draggable="true"]{cursor:grab}
+tr[draggable="true"] :is(button,input,select,a){cursor:pointer}
+tr[draggable="true"] input{cursor:text}
+/* аукціон: прихований лот, видалення затисканням */
+.autable tr.off td{opacity:.42}
+.autable td.acts{white-space:nowrap;width:76px;text-align:right}
+.winbtn.iconhold{min-width:0;width:30px;height:28px;padding:0;border-radius:7px;margin-left:4px;vertical-align:middle;
+  display:inline-flex;align-items:center;justify-content:center;background:transparent;border-color:transparent;box-shadow:none;color:var(--muted)}
+.winbtn.iconhold:hover{background:var(--panel2)!important;border-color:rgba(235,64,52,.55);color:#ff8a80}
+.winbtn.iconhold .wl{display:inline-flex}
+.winbtn.iconhold.pressed .wl,.winbtn.iconhold.full .wl{color:#fff}
+/* шапка «Лоти»: замість «N на колесі» — лоти · ставки · бали одразу після заголовка */
+#auListHint{display:none}
+#auListWin .austats{margin-left:4px}
+#auListWin .auundo{margin-left:auto}

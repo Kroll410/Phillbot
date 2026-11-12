@@ -148,3 +148,23 @@ func TestAuctionUndoMerge(t *testing.T) {
 		t.Fatal("nothing to undo")
 	}
 }
+
+func TestAuctionHiddenLot(t *testing.T) {
+	a := newTestApp(t)
+	a.AuctionSaveSettings(AuctionSettings{RewardIDs: []string{"q"}, SpinMode: "instant"})
+	a.AuctionStart()
+	a.onRedemption(bid("1", "q", "Квиток", "u1", "Elden Ring", 1000), User{})
+	a.onRedemption(bid("2", "q", "Квиток", "u2", "Hades", 1000), User{})
+	au := &a.st.Auction
+	a.AuctionToggleLot(au.Lots[0].ID)
+	a.AuctionFinish()
+	randomUnit = func() (float64, string) { return 0, "test" }
+	a.AuctionSpin()
+	if au.Winner != au.Lots[1].ID || len(au.Spin.IDs) != 1 {
+		t.Fatalf("hidden lot on the wheel: %+v", au.Spin)
+	}
+	a.AuctionToggleLot(au.Lots[0].ID)
+	if au.Lots[0].Hidden {
+		t.Fatal("toggle back")
+	}
+}

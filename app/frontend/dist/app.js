@@ -321,7 +321,16 @@ const svg = d => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" st
 const ICON_EYE = svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>');
 const ICON_EYE_OFF = svg('<path d="M17.9 17.9A10.4 10.4 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 4.1-5.1M9.9 5.2A9.6 9.6 0 0 1 12 5c6.4 0 10 7 10 7a18.6 18.6 0 0 1-2.2 3.2M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/>');
 const ICON_TRASH = svg('<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/>');
-const GRIP = `<span class="grip" draggable="true" title="Перетягніть на інше замовлення, щоб об'єднати їх">⠿</span>`;
+const GRIP = `<span class="grip" title="Перетягніть рядок на інше замовлення, щоб об'єднати їх">⠿</span>`;
+const DRAG = () => D().live ? ' draggable="true"' : ""; // рядок можна тягнути за будь-яке місце
+// натиснули на кнопку / поле в рядку — рядок тимчасово не перетягується (виділення тексту, затискання працюють як звичайно)
+document.addEventListener("pointerdown", e => {
+  const f = e.target.closest && e.target.closest("input,select,textarea,button,a"), tr = f && f.closest("tr[draggable]");
+  if(!tr) return;
+  tr.draggable = false;
+  const back = () => { tr.draggable = true; document.removeEventListener("pointerup", back, true); document.removeEventListener("pointercancel", back, true); };
+  document.addEventListener("pointerup", back, true); document.addEventListener("pointercancel", back, true);
+}, true);
 
 /* ---------- drag-n-drop: об'єднання схожих замовлень ---------- */
 let drag = null; // {ids, label}
@@ -336,8 +345,8 @@ function dragInfo(tr){
 }
 const wrapEl = $("tableWrap");
 wrapEl.addEventListener("dragstart", ev => {
-  const g = ev.target.closest && ev.target.closest(".grip"); if(!g){ ev.preventDefault(); return; }
-  const tr = g.closest("tr"); drag = dragInfo(tr); if(!drag) return;
+  const tr = ev.target.closest && ev.target.closest("tr[draggable]"); if(!tr){ ev.preventDefault(); return; }
+  drag = dragInfo(tr); if(!drag){ ev.preventDefault(); return; }
   tr.classList.add("dragging"); ev.dataTransfer.effectAllowed = "move";
   try{ ev.dataTransfer.setData("text/plain", drag.label); ev.dataTransfer.setDragImage(tr, 20, 16); }catch(e){}
 });
@@ -389,7 +398,7 @@ function renderTable(){
     wrap.innerHTML = `<table class="dnd summary"><thead><tr><th class="gripcol"></th><th style="width:44px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:220px">Частка</th>${th("Людей","count","num")}<th style="width:1%"></th><th style="width:44px"></th></tr></thead><tbody>${
       rows.map((g,i)=>{
         const open = openGroups.has(g.key);
-        const main = `<tr class="grow${open?" open":""}" data-key="${esc(g.key)}" data-name="${esc(g.name)}"><td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
+        const main = `<tr class="grow${open?" open":""}" data-key="${esc(g.key)}" data-name="${esc(g.name)}"${DRAG()}><td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
         <td class="num pts">${g.points}</td><td><div class="share"><div class="track"><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div></div><span>${(g.points/total*100).toFixed(0)}%</span></div></td>
         <td class="num">${g.count}</td><td class="wincell">${canPickWinner() && g.points>0 ? `<button class="winbtn" data-win="${esc(g.name)}" title="Затисніть і тримайте, щоб вибрати переможцем">${LIQUID}<span class="wl">Переможець</span></button>` : ""}</td><td class="chev" title="${open?"Згорнути":"Показати замовлення"}"><span></span></td></tr>`;
         if(!open) return main;
@@ -410,7 +419,7 @@ function renderTable(){
     rows = sortRows(rows, sortKey.entries);
     if(!rows.length){ wrap.innerHTML = `<div class="empty">${D().entries.length?"Нічого не знайдено":"Замовлень поки немає."}</div>`; return; }
     wrap.innerHTML = `<table class="dnd"><thead><tr><th class="gripcol"></th>${th("Час","ts")}${th("Чатерс","user")}${th("Тір сабки","tier")}${th("Має сабку","months","num")}${th("Бали","points","num")}${th("Замовлення","text")}<th class="acts">${D().live?`<button class="small editbtn${editMode?" on":""}" data-act="editmode">${editMode?"Готово":"Редагувати"}</button>`:""}</th></tr></thead><tbody>${
-      rows.map(e=>`<tr data-id="${e.id}" class="${e.excluded?"off":!e.counted?"replaced":""} ${freshIds.has(e.id)?"fresh":""}" title="${esc(e.excluded?"Приховано — не рахується":!e.counted?"Не рахується: від цього чатерса враховано інше замовлення":(e.source||""))}">
+      rows.map(e=>`<tr data-id="${e.id}"${DRAG()} class="${e.excluded?"off":!e.counted?"replaced":""} ${freshIds.has(e.id)?"fresh":""}" title="${esc(e.excluded?"Приховано — не рахується":!e.counted?"Не рахується: від цього чатерса враховано інше замовлення":(e.source||""))}">
         <td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${fmtClock(e.ts)}</td>
         <td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
         ${editMode ? `<td><select data-f="tier"><option value="0" ${!e.tier?"selected":""}>—</option>${[1,2,3].map(t=>`<option value="${t}" ${e.tier===t?"selected":""}>T${t}</option>`).join("")}</select></td>
@@ -646,16 +655,22 @@ function holdCancel(){
     const t = Math.min(1, (now - t0) / dur), lvl = from * (1 - (1 - Math.pow(1 - t, 3)));
     setLevel(h.btn, lvl); h.p = 0;
     if(t < 1) h.raf = requestAnimationFrame(step);
-    else { h.btn.classList.remove("drain"); holding = null; if(tableDirty) renderTable(); }
+    else { h.btn.classList.remove("drain"); holding = null; if(tableDirty) renderTable(); if(auListDirty) renderAuList(); }
   };
   h.raf = requestAnimationFrame(step);
-  setTimeout(() => { if(holding === h){ setLevel(h.btn, 0); holding = null; if(tableDirty) renderTable(); } }, dur + 200);
+  setTimeout(() => { if(holding === h){ setLevel(h.btn, 0); holding = null; if(tableDirty) renderTable(); if(auListDirty) renderAuList(); } }, dur + 200);
 }
 async function holdDone(){
   const {btn, name} = holding; holding.mode = "done";
   setLevel(btn, 1); btn.classList.remove("pressed","near"); btn.classList.add("full");
   await new Promise(r => setTimeout(r, 380)); // «вистрибнула» і спалахнула
   const action = btn.dataset.hold;
+  if(action === "dellot"){ // видалити лот
+    holding = null;
+    const l = lotById(btn.dataset.lot);
+    try{ setState(await call("AuctionRemoveLot", btn.dataset.lot)); if(l) toast(`Лот «${l.name}» видалено`); } catch(e){ renderAuList(); }
+    return;
+  }
   if(action === "resetspins"){ // повернути всі лоти на колесо
     holding = null;
     try{ setState(await call("AuctionResetSpins")); toast("Усі лоти знову на колесі"); } catch(e){} finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); renderSpinBtn(); }, 500); }
@@ -939,25 +954,28 @@ setInterval(renderAuTimer, 250);
 // частки на колесі: «одразу результат» — пропорційно сумі; «на вибування» — 1/сума (дешевші вибувають частіше)
 function wheelSectors(){
   const au = AU(), elim = au.cfg.spinMode !== "instant";
-  return au.lots.filter(l => !l.out && l.amount > 0).map(l => ({id: l.id, w: elim ? 1 / l.amount : l.amount}));
+  return au.lots.filter(l => !l.out && !l.hidden && l.amount > 0).map(l => ({id: l.id, w: elim ? 1 / l.amount : l.amount}));
 }
 function chanceOf(lot){
-  const act = AU().lots.filter(l => !l.out && l.amount > 0); if(lot.out || !act.length) return 0;
+  const act = AU().lots.filter(l => !l.out && !l.hidden && l.amount > 0); if(lot.out || lot.hidden || !act.length) return 0;
   return lot.amount / act.reduce((a, l) => a + l.amount, 0); // шанс перемогти пропорційний сумі
 }
 
 // ----- вікно 1: лоти -----
 const auFresh = new Set();
 let auDrag = null, auListDirty = false; // id лота, який перетягують
+const LIQUID_RED = LIQUID.replace(/<\/span>$/, `<span class="ink"><i></i><i></i><i></i></span></span>`); // рідина + червона «фарба»
 function renderAuList(){
-  if(auDrag){ auListDirty = true; return; } // не перемальовуємо таблицю посеред перетягування
+  // не перемальовуємо таблицю посеред перетягування чи затискання кнопки в ній
+  if(auDrag || (holding && auListEl.contains(holding.btn))){ auListDirty = true; return; }
   auListDirty = false;
-  const au = AU(), lots = [...au.lots].sort((a, b) => (a.out ? 1 : 0) - (b.out ? 1 : 0) || b.amount - a.amount);
-  const total = au.lots.reduce((a, l) => a + l.amount, 0), active = au.lots.filter(l => !l.out).length;
+  const gone = l => l.out || l.hidden ? 1 : 0;
+  const au = AU(), lots = [...au.lots].sort((a, b) => gone(a) - gone(b) || b.amount - a.amount);
+  const active = au.lots.filter(l => !gone(l)).length;
   $("auListHint").textContent = au.lots.length ? `${active} на колесі` + (au.lots.length > active ? ` · ${au.lots.length - active} вибуло` : "") : "";
   if(!lots.length){ $("auList").innerHTML = `<div class="empty">Лотів ще немає. Запустіть таймер — ставки з'являться тут.</div>`; return; }
   if(auSwapped){ // стисло: топ-3 та інформація
-    const top = lots.filter(l => !l.out).slice(0, 3);
+    const top = lots.filter(l => !gone(l)).slice(0, 3);
     $("auList").innerHTML = `<div class="autop">` + top.map((l, i) => `<div class="autop-i${au.winner === l.id ? " win" : ""}" style="--c:${lotColor(l.id)}">
         <span class="rk">${i + 1}</span><span class="nm" title="${esc(l.name)}">${esc(l.name)}</span><span class="am">${POINTS_ICON}${fmtN(l.amount)}</span>
         <span class="bar"><i style="width:${(chanceOf(l) * 100).toFixed(1)}%"></i></span></div>`).join("")
@@ -968,28 +986,26 @@ function renderAuList(){
     + lots.map((l, i) => {
       const who = [...l.users].sort((a, b) => b.amount - a.amount);
       const users = who.slice(0, 6).map(u => `${userTag(u)}<span class="muted uam">${fmtN(u.amount)}</span>`).join(" ") + (who.length > 6 ? ` <span class="muted">+${who.length - 6}</span>` : "");
-      const st = au.winner === l.id ? `<span class="lwin">Переможець</span>` : l.out ? `<span class="lout">вибув · ${l.out}-й оберт</span>` : `${(chanceOf(l) * 100).toFixed(1)}%`;
-      return `<tr data-lot="${esc(l.id)}" class="${l.out ? "out" : ""}${au.winner === l.id ? " win" : ""}${auFresh.has(l.id) ? " fresh" : ""}">
-        <td class="gripcol"><span class="grip" draggable="true" title="Перетягніть на інший лот, щоб об'єднати їх">⠿</span></td>
+      const st = au.winner === l.id ? `<span class="lwin">Переможець</span>` : l.hidden ? `<span class="muted">приховано</span>` : l.out ? `<span class="lout">вибув · ${l.out}-й оберт</span>` : `${(chanceOf(l) * 100).toFixed(1)}%`;
+      return `<tr data-lot="${esc(l.id)}" draggable="true" class="${l.hidden ? "off " : ""}${l.out ? "out" : ""}${au.winner === l.id ? " win" : ""}${auFresh.has(l.id) ? " fresh" : ""}">
+        <td class="gripcol"><span class="grip" title="Перетягніть рядок на інший лот, щоб об'єднати їх">⠿</span></td>
         <td class="num">${l.out ? "" : i + 1}</td>
         <td><span class="ldot" style="background:${lotColor(l.id)}"></span><b class="lname">${esc(l.name)}</b><span class="mtag"></span></td>
         <td class="num lamt">${fmtN(l.amount)}</td><td class="num">${st}</td>
         <td class="users">${users}</td>
-        <td class="act"><button class="icon" data-lotdel="${esc(l.id)}" title="Видалити лот">${ICON_TRASH}</button></td></tr>`;
+        <td class="acts"><button class="icon${l.hidden ? " on" : ""}" data-lothide="${esc(l.id)}" title="${l.hidden ? "Показати — повернути на колесо" : "Приховати — прибрати з колеса (можна повернути)"}">${l.hidden ? ICON_EYE_OFF : ICON_EYE}</button><button class="winbtn holdend iconhold" data-hold="dellot" data-lot="${esc(l.id)}" title="Затисніть і тримайте, щоб видалити лот">${LIQUID_RED}<span class="wl">${ICON_TRASH}</span></button></td></tr>`;
     }).join("") + `</tbody></table>`;
 }
+// приховати / показати лот (прихований не бере участі в колесі)
 $("auList").addEventListener("click", async e => {
-  const b = e.target.closest("[data-lotdel]"); if(!b) return;
-  const l = lotById(b.dataset.lotdel); if(!l) return;
-  if(!(await confirmBox(`Видалити лот «${l.name}» (${fmtN(l.amount)} балів)?`, "Видалити"))) return;
-  setState(await call("AuctionRemoveLot", l.id));
+  const b = e.target.closest("[data-lothide]"); if(!b) return;
+  setState(await call("AuctionToggleLot", b.dataset.lothide));
 });
 
 /* drag-n-drop: перетягніть лот на інший, щоб об'єднати (як замовлення в СабДеї) */
 const auListEl = $("auList");
 auListEl.addEventListener("dragstart", ev => {
-  const g = ev.target.closest && ev.target.closest(".grip"); if(!g){ ev.preventDefault(); return; }
-  const tr = g.closest("tr[data-lot]"); if(!tr) return;
+  const tr = ev.target.closest && ev.target.closest("tr[data-lot][draggable]"); if(!tr){ ev.preventDefault(); return; }
   auDrag = tr.dataset.lot; tr.classList.add("dragging"); ev.dataTransfer.effectAllowed = "move";
   try{ ev.dataTransfer.setData("text/plain", (lotById(auDrag) || {}).name || ""); ev.dataTransfer.setDragImage(tr, 20, 16); }catch(e){}
 });
@@ -1159,7 +1175,7 @@ function renderWheel(){
 }
 function renderSpinBtn(){
   if(!S) return;
-  const au = AU(), t = au.timer.status, btn = $("auSpin"), act = au.lots.filter(l => !l.out && l.amount > 0).length;
+  const au = AU(), t = au.timer.status, btn = $("auSpin"), act = au.lots.filter(l => !l.out && !l.hidden && l.amount > 0).length;
   if(holding && (holding.btn === btn || holding.btn === $("auReset"))) return;
   const why = wAnim ? "Колесо крутиться…" : (t === "running" || t === "paused") ? "Спершу завершіть прийом ставок" : au.winner ? "Переможця визначено" : !act ? "На колесі немає лотів" : "";
   btn.disabled = !!why; btn.title = why || "Затисніть і тримайте, щоб крутити колесо";
@@ -1272,7 +1288,7 @@ $("auNew").onclick = async () => {
 
 function renderAuction(){
   const au = AU();
-  $("auLots").textContent = au.lots.filter(l => !l.out).length;
+  $("auLots").textContent = au.lots.filter(l => !l.out && !l.hidden).length;
   $("auBids").textContent = au.feed.length;
   $("auSum").textContent = fmtN(au.lots.reduce((a, l) => a + l.amount, 0));
   renderAuWarn(); renderAuUndo(); if(!wAnim) renderAuList(); renderAuFeed(); renderWheel(); renderAuTimer();

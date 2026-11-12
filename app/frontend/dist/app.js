@@ -109,6 +109,7 @@ function fmtStream(m){
 function ordersOf(c){ return countedSet({entries: c.entries || [], settings: c.settings || S.settings}).size; }
 async function loadStreams(){ try{ streams = await api().ListStreams() || []; }catch(e){ streams = []; } renderStreamBar(); }
 function renderStreamBar(){
+  if(resetting) return;
   if(!S || !S.stream) return;
   const curId = pastStream ? pastStream.id : S.stream.id;
   const meta = streams.find(m => m.id === curId) || {id:curId, startedAt: pastStream ? pastStream.startedAt : S.stream.startedAt, collections: streamColls().length + (!pastStream && S.entries.length ? 1 : 0), current: !pastStream};
@@ -285,6 +286,7 @@ $("obsWidget").addEventListener("click", async e => {
 
 /* ---------- статистика і таблиці ---------- */
 function renderStats(){
+  if(resetting) return;
   const counted = countedSet(), groups = aggregate();
   const cEntries = D().entries.filter(e=>counted.has(e.id));
   $("sEntries").textContent = cEntries.length;
@@ -378,6 +380,7 @@ wrapEl.addEventListener("drop", async ev => {
 });
 
 function renderTable(){
+  if(resetting) return;
   const wrap = $("tableWrap");
   $("search").classList.toggle("hidden", tab==="log");
   // не перемальовувати, поки користувач редагує клітинку
@@ -613,15 +616,45 @@ $("chatSave").onclick = async () => {
 };
 
 let lastStreamKey = "", lastCollKey = "";
-$("newStreamBtn").onclick = async () => {
-  const st = S.session.status;
-  const msg = (st==="running"||st==="paused" ? "Збір ще йде — його буде завершено.\n\n" : "") +
-    "Завершити цей стрім і почати новий? Усі збори цього стріму збережено, їх можна переглянути у списку стрімів.";
-  closeModal("streamsModal");
-  if(!(await confirmBox(msg, "Новий стрім", "Скасувати"))) return;
-  pastStream = null; view = null;
-  setState(await call("NewStream")); loadStreams(); toast("Почато новий стрім");
-};
+/* ---------- анімація «скидання» (новий стрім / новий аукціон) ----------
+   картки зборів падають, числа біжать до нуля, рядки таблиці з'їжджають; лише потім — новий стан */
+let resetting = false, auResetting = false; // поки йде анімація — відповідні частини не перемальовуються
+function countTo0(el, fmt = v => String(v), ms = 650){
+  const from = Number(String(el.textContent).replace(/[^\d]/g, "")) || 0;
+  if(!from) return Promise.resolve();
+  return new Promise(res => {
+    let done = false; const t0 = performance.now();
+    const fin = () => { if(done) return; done = true; el.textContent = fmt(0); res(); };
+    const step = now => { if(done) return; const k = Math.min(1, (now - t0) / ms); el.textContent = fmt(Math.round(from * Math.pow(1 - k, 3))); if(k < 1) requestAnimationFrame(step); else fin(); };
+    requestAnimationFrame(step); setTimeout(fin, ms + 300);
+  });
+}
+function animOut(els, frames, {dur = 420, stagger = 30, max = 14} = {}){
+  return Promise.all([...els].map((el, i) => new Promise(res => {
+    const delay = Math.min(i, max) * stagger, kf = typeof frames === "function" ? frames(el, i) : frames;
+    el.animate(kf, {duration: dur, delay, easing: "cubic-bezier(.5,0,.75,0)", fill: "forwards"}).onfinish = res;
+    setTimeout(res, dur + delay + 200);
+  })));
+}
+const ROW_OUT = [{transform: "none", opacity: 1}, {transform: "translateX(-48px)", opacity: 0}];
+const CHIP_DROP = (el, i) => [{transform: "none", opacity: 1}, {transform: `translateY(28px) rotate(${i % 2 ? 9 : -9}deg)`, opacity: 0}];
+async function resetAnimSubday(){
+  resetting = true;
+  await Promise.all([
+    animOut($("tableWrap").querySelectorAll("tbody > tr"), ROW_OUT),
+    animOut($("collChips").querySelectorAll(".cchip"), CHIP_DROP, {dur: 460, stagger: 55}),
+    countTo0($("sEntries")), countTo0($("sUsers")), countTo0($("sPoints")),
+  ]);
+}
+async function resetAnimAuction(){
+  auResetting = true;
+  await Promise.all([
+    animOut($("auList").querySelectorAll("tbody > tr, .autop-i"), ROW_OUT),
+    animOut($("auFeed").querySelectorAll(".fbid"), [{transform: "none", opacity: 1}, {transform: "translateX(48px)", opacity: 0}]),
+    $("wheel").animate([{opacity: 1}, {opacity: .15}], {duration: 450, fill: "forwards"}).finished.catch(() => {}),
+    countTo0($("auLots")), countTo0($("auBids")), countTo0($("auSum"), fmtN),
+  ]);
+}
 /* ---------- етапи СабДею: 1 збір → 2 гра переможця ---------- */
 // переможця можна вибрати раз на збір: після експорту в Marbles і поки його ще не вибрано
 const canPickWinner = () => D().live && S.exported && S.phase !== "play" && !S.winner;
@@ -672,7 +705,29 @@ async function holdDone(){
   const action = btn.dataset.hold;
   if(action === "newauction"){
     holding = null;
-    try{ setState(await call("AuctionNew")); toast("Почато новий аукціон"); } catch(e){} finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); }, 500); }
+    try{
+      await resetAnimAuction();
+      const snap = await call("AuctionNew");
+      auResetting = false; setState(snap);
+      $("wheel").getAnimations().forEach(a => a.cancel());
+      $("wheel").animate([{opacity: .15}, {opacity: 1}], {duration: 450, easing: "ease-out"});
+      toast("Почато новий аукціон");
+    } catch(e){ auResetting = false; $("wheel").getAnimations().forEach(a => a.cancel()); renderAuction(); }
+    finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); }, 500); }
+    return;
+  }
+  if(action === "newstream"){
+    holding = null;
+    try{
+      if(pastStream || view){ pastStream = null; view = null; renderAll(); } // з перегляду — спершу до поточного
+      await resetAnimSubday();
+      const snap = await call("NewStream");
+      resetting = false; setState(snap); loadStreams();
+      const w = $("tableWrap"); w.classList.remove("slidein"); void w.offsetWidth; w.classList.add("slidein");
+      $("collChips").querySelectorAll(".cchip").forEach(c => c.animate([{transform: "translateY(-10px)", opacity: 0}, {transform: "none", opacity: 1}], {duration: 380, easing: "ease-out"}));
+      toast("Почато новий стрім");
+    } catch(e){ resetting = false; renderAll(); }
+    finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); }, 500); }
     return;
   }
   if(action === "logout"){ holding = null; call("Logout"); return; }
@@ -1387,10 +1442,12 @@ $("auPause").onclick = async () => setState(await call("AuctionPause"));
 $("auStop").onclick = async () => { setState(await call("AuctionFinish")); toast("Прийом ставок завершено — можна крутити колесо"); };
 $("auPlus").onclick = async () => setState(await call("AuctionAddTime", 60000));
 $("auMinus").onclick = async () => setState(await call("AuctionAddTime", -60000));
-// «Новий аукціон» — затисканням з червоною «фарбою» (поточний аукціон зберігається в історію)
+// «Новий стрім» і «Новий аукціон» — затисканням з червоною «фарбою» (попередні зберігаються)
+$("newStreamHold").insertAdjacentHTML("afterbegin", LIQUID_RED);
 $("auNew").insertAdjacentHTML("afterbegin", LIQUID_RED);
 
 function renderAuction(){
+  if(auResetting) return;
   const au = AU();
   $("auLots").textContent = au.lots.filter(l => !l.out && !l.hidden).length;
   $("auBids").textContent = au.feed.length;

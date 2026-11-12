@@ -99,7 +99,6 @@
   <div class="hint" style="margin:0 0 12px">Кожен стрім — це всі збори замовлень за один СабДей. Виберіть стрім, щоб переглянути його збори.</div>
   <div id="streamList" class="slist"></div>
   <div class="row actions" style="margin-top:18px">
-    <button id="newStreamBtn" style="margin-right:auto" title="Завершити цей стрім і почати новий">Почати новий стрім</button>
     <button data-close="streamsModal">Закрити</button>
   </div>
 </div></div>
@@ -271,7 +270,10 @@
     <div class="card scard">
       <h2>Стрім</h2>
       <div class="scur" id="streamCur">—</div>
-      <button id="openJournal" class="wide-btn">Відкрити журнал стрімів</button>
+      <div class="scardbtns">
+        <button id="openJournal">Журнал стрімів</button>
+        <button id="newStreamHold" class="winbtn holdend newstreambtn" data-hold="newstream" title="Затисніть і тримайте, щоб завершити цей стрім і почати новий (усі збори збережуться в журналі)"><span class="wl">Новий стрім</span></button>
+      </div>
     </div>
   </aside>
 

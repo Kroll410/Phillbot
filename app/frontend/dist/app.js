@@ -507,12 +507,7 @@ function denyMode(btn){
     setTimeout(() => { ind.classList.add("deny"); btn.classList.add("denied"); }, 260);
     setTimeout(() => { ind.classList.remove("deny"); btn.classList.remove("denied"); slideSeg(box); denyBusy = false; }, 820);
   } else denyBusy = false;
-  // таймер, що зараз іде, блимає градієнтом
   if(mode !== "subday") showMode("subday");
-  const t = S.phase === "play" ? (S.vote && S.vote.status === "running" ? $("vTimer") : $("gTimer")) : $("timer");
-  blinkUntil = Date.now() + 1700; // таймери перемальовуються щочверть секунди — блимання переживає це
-  t.classList.remove("gblink"); void t.offsetWidth; t.classList.add("gblink");
-  setTimeout(() => t.classList.remove("gblink"), 1700);
   toast(S.phase === "play" ? "Спершу завершіть гру в СабДеї" : "Спершу завершіть збір у СабДеї");
 }
 document.querySelectorAll(".mode-tab[data-mode]").forEach(b => b.onclick = () => {

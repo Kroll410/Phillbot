@@ -914,3 +914,4 @@ tr[draggable="true"] input{cursor:text}
 #clientIdInput{flex:1 1 auto;min-width:0;height:44px}
 button.cidnext{flex:0 0 auto;min-width:110px;height:44px;padding:0 22px;font-weight:600;border-radius:8px}
 .autable td.users .utag{margin-right:8px}
+.aufeedcard{position:relative;z-index:1}

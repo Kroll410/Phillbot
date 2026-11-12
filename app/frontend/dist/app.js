@@ -1263,8 +1263,10 @@ document.querySelectorAll("[data-swap]").forEach(b => b.onclick = () => {
   placeWins(); renderAuList(); wheelDraw(); renderSpinBtn();
   wins.forEach((w, i) => {
     const a = before[i], z = w.getBoundingClientRect();
+    // поки летять — над стрічкою «Ставки» (колесо, що мінімізується, не пірнає під неї)
+    w.style.position = "relative"; w.style.zIndex = 5;
     w.animate([{transform: `translate(${a.left - z.left}px,${a.top - z.top}px) scale(${a.width / z.width},${a.height / z.height})`, transformOrigin: "0 0"},
-      {transform: "none", transformOrigin: "0 0"}], {duration: 560, easing: "cubic-bezier(.2,.9,.25,1)"});
+      {transform: "none", transformOrigin: "0 0"}], {duration: 560, easing: "cubic-bezier(.2,.9,.25,1)"}).onfinish = () => { w.style.zIndex = ""; };
     const inner = w.querySelector(".aulist, .wheelbox");
     if(inner) inner.animate([{opacity: .3}, {opacity: 1}], {duration: 180, easing: "ease-out"}); // коротке згасання вмісту, без паузи
   });

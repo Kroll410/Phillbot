@@ -114,6 +114,7 @@ func (a *App) startup(ctx context.Context) {
 	} else {
 		go a.authFlow(false)
 	}
+	a.freshStart()
 	go a.ticker(ctx)
 	a.overlay = newOverlayServer(a)
 	a.mu.Lock()

@@ -46,7 +46,7 @@ type Snapshot struct {
 type App struct {
 	ctx context.Context
 
-	baseDir, configFile, tokensFile, stateFile, historyDir, exportsDir string
+	baseDir, configFile, tokensFile, stateFile, historyDir, exportsDir, streamsDir string
 
 	mu       sync.Mutex
 	st       State
@@ -96,8 +96,10 @@ func NewApp() *App {
 	a.tokensFile = filepath.Join(a.baseDir, "tokens.json")
 	a.stateFile = filepath.Join(a.baseDir, "subday_state.json")
 	a.historyDir = filepath.Join(a.baseDir, "history")
+	a.streamsDir = filepath.Join(a.baseDir, "streams")
 	a.exportsDir = filepath.Join(a.baseDir, "exports")
 	a.st = loadState(a.stateFile)
+	a.initStreamLocked()
 	a.conn = ConnInfo{Status: "off", Text: "Не підключено"}
 	return a
 }
@@ -257,7 +259,7 @@ func (a *App) ticker(ctx context.Context) {
 			s := &a.st.Session
 			if s.Status == "running" && s.EndsAt <= time.Now().UnixMilli() {
 				s.Status, s.RemainingMs, s.FinishedAt = "finished", 0, time.Now().UnixMilli()
-				a.writeCSVLocked()
+				a.persistCollectionLocked()
 				a.saveLocked()
 				a.emitLocked()
 				a.mu.Unlock()
@@ -454,8 +456,10 @@ func (a *App) StartTimer() Snapshot {
 			return
 		case "paused":
 			s.EndsAt = now + s.RemainingMs
-		default: // idle / finished — кожен «Старт» починає НОВИЙ збір
+		default: // idle / finished — кожен «Старт» починає НОВИЙ збір цього стріму
 			a.archiveLocked()
+			a.ensureStreamLocked(time.UnixMilli(now)) // довга перерва — новий стрім
+			st.CollN = len(st.Past) + 1
 			st.Entries = []Entry{}
 			st.SeenRedeems = []string{}
 			a.lastOrd = nil
@@ -487,7 +491,7 @@ func (a *App) FinishTimer() Snapshot {
 			return
 		}
 		s.Status, s.RemainingMs, s.FinishedAt = "finished", 0, time.Now().UnixMilli()
-		a.writeCSVLocked()
+		a.persistCollectionLocked()
 	})
 }
 

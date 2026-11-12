@@ -1,25 +1,87 @@
 package main
 
-// Кожен «Старт» — окремий збір. Після завершення збір автоматично зберігається:
-//   exports/subday_<дата-час старту>.csv — таблиця для Excel (UTF-8 з BOM, роздільник «;»);
-//   history/subday_<…>.json — повна копія (налаштування, таймер, замовлення).
-// Перед новим «Старт» обидва файли перезаписуються востаннє (з правками, зробленими після завершення).
+// Модель «стрім → збори».
+// СабДей — це стрім. Кожен «Старт» відкриває наступний збір замовлень цього стріму (Збір 1, Збір 2…).
+// Новий стрім починається автоматично, якщо від останньої активності минуло понад streamGap, або вручну (NewStream).
+//
+// Збереження:
+//   streams/<id стріму>.json            — увесь стрім: усі збори з налаштуваннями балів і замовленнями;
+//   exports/<id стріму>/збір_NN.csv     — таблиця кожного збору для Excel (UTF-8 з BOM, роздільник «;»).
+// Файли перезаписуються, коли збір завершується, і востаннє — перед наступним «Старт» (з правками після завершення).
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func (a *App) collectionName(ext string) string {
-	t := time.UnixMilli(a.st.Session.StartedAt)
-	if a.st.Session.StartedAt == 0 {
-		t = time.Now()
+const streamGap = 6 * time.Hour
+
+type StreamInfo struct {
+	ID        string `json:"id"`
+	StartedAt int64  `json:"startedAt"`
+}
+
+// Collection — завершений (або архівований) збір замовлень.
+type Collection struct {
+	N          int      `json:"n"`
+	StartedAt  int64    `json:"startedAt"`
+	FinishedAt int64    `json:"finishedAt"`
+	Settings   Settings `json:"settings"` // правила балів на момент збору
+	Entries    []Entry  `json:"entries"`
+}
+
+type StreamFile struct {
+	ID          string       `json:"id"`
+	StartedAt   int64        `json:"startedAt"`
+	Collections []Collection `json:"collections"`
+}
+
+type StreamMeta struct {
+	ID          string `json:"id"`
+	StartedAt   int64  `json:"startedAt"`
+	Collections int    `json:"collections"`
+	Orders      int    `json:"orders"`
+	Current     bool   `json:"current"`
+}
+
+func newStreamInfo(t time.Time) StreamInfo {
+	return StreamInfo{ID: t.Format("2006-01-02_15-04-05"), StartedAt: t.UnixMilli()}
+}
+
+// остання активність стріму: старт/завершення збору, останнє замовлення
+func (a *App) lastActivityLocked() int64 {
+	st := &a.st
+	last := st.Stream.StartedAt
+	for _, v := range []int64{st.Session.StartedAt, st.Session.FinishedAt} {
+		if v > last {
+			last = v
+		}
 	}
-	return "subday_" + t.Format("2006-01-02_15-04-05") + ext
+	for _, e := range st.Entries {
+		if e.Ts > last {
+			last = e.Ts
+		}
+	}
+	for _, c := range st.Past {
+		if c.FinishedAt > last {
+			last = c.FinishedAt
+		}
+	}
+	return last
+}
+
+// поточний збір як Collection (для збереження)
+func (a *App) currentCollectionLocked() Collection {
+	return Collection{N: a.st.CollN, StartedAt: a.st.Session.StartedAt, FinishedAt: a.st.Session.FinishedAt,
+		Settings: a.st.Settings, Entries: append([]Entry(nil), a.st.Entries...)}
 }
 
 func csvCell(v string) string {
@@ -68,15 +130,16 @@ func collectionCSV(s Settings, entries []Entry) string {
 	return b.String()
 }
 
-// CSV поточного збору в exports/. Викликати під a.mu. Порожній збір не зберігається.
+// CSV поточного збору: exports/<стрім>/збір_NN.csv. Викликати під a.mu. Порожній збір не зберігається.
 func (a *App) writeCSVLocked() string {
-	if len(a.st.Entries) == 0 {
+	if len(a.st.Entries) == 0 || a.st.Stream.ID == "" {
 		return ""
 	}
-	if err := os.MkdirAll(a.exportsDir, 0755); err != nil {
+	dir := filepath.Join(a.exportsDir, a.st.Stream.ID)
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return ""
 	}
-	p := filepath.Join(a.exportsDir, a.collectionName(".csv"))
+	p := filepath.Join(dir, fmt.Sprintf("збір_%02d.csv", a.st.CollN))
 	data := append([]byte{0xEF, 0xBB, 0xBF}, []byte(collectionCSV(a.st.Settings, a.st.Entries))...)
 	if err := os.WriteFile(p, data, 0644); err != nil {
 		go a.logf("Не вдалося записати %s — можливо, файл відкритий в Excel", p)
@@ -85,16 +148,159 @@ func (a *App) writeCSVLocked() string {
 	return p
 }
 
-// Остаточно зберегти поточний збір (CSV + JSON) перед очищенням. Викликати під a.mu.
+// streams/<стрім>.json — усі збори стріму, включно з поточним (якщо в ньому є замовлення).
+func (a *App) writeStreamLocked() {
+	if a.st.Stream.ID == "" {
+		return
+	}
+	f := StreamFile{ID: a.st.Stream.ID, StartedAt: a.st.Stream.StartedAt, Collections: append([]Collection(nil), a.st.Past...)}
+	if len(a.st.Entries) > 0 {
+		f.Collections = append(f.Collections, a.currentCollectionLocked())
+	}
+	if len(f.Collections) == 0 {
+		return
+	}
+	if err := os.MkdirAll(a.streamsDir, 0755); err != nil {
+		return
+	}
+	b, _ := json.MarshalIndent(f, "", "  ")
+	_ = writeFileAtomic(filepath.Join(a.streamsDir, a.st.Stream.ID+".json"), b)
+}
+
+// зберегти поточний збір (CSV + файл стріму). Викликати під a.mu.
+func (a *App) persistCollectionLocked() string {
+	a.initStreamLocked() // замовлення без стріму (старий стан / додано вручну до старту)
+	if a.st.CollN == 0 && len(a.st.Entries) > 0 {
+		a.st.CollN = len(a.st.Past) + 1
+	}
+	csv := a.writeCSVLocked()
+	a.writeStreamLocked()
+	return csv
+}
+
+// Перенести поточний збір у минулі збори стріму (після остаточного збереження). Викликати під a.mu.
 func (a *App) archiveLocked() string {
 	if len(a.st.Entries) == 0 {
 		return ""
 	}
-	csv := a.writeCSVLocked()
-	if err := os.MkdirAll(a.historyDir, 0755); err == nil {
-		b, _ := json.MarshalIndent(map[string]any{"archivedAt": time.Now().Format(time.RFC3339), "settings": a.st.Settings,
-			"session": a.st.Session, "entries": a.st.Entries}, "", "  ")
-		_ = writeFileAtomic(filepath.Join(a.historyDir, a.collectionName(".json")), b)
-	}
+	csv := a.persistCollectionLocked()
+	a.st.Past = append(a.st.Past, a.currentCollectionLocked())
 	return csv
 }
+
+// Почати новий стрім (попередній уже збережено). Викликати під a.mu.
+func (a *App) beginStreamLocked(now time.Time) {
+	info := newStreamInfo(now)
+	base := info.ID
+	for i := 2; info.ID == a.st.Stream.ID || fileExists(filepath.Join(a.streamsDir, info.ID+".json")); i++ {
+		info.ID = base + "-" + strconv.Itoa(i) // ніколи не перезаписувати інший стрім
+	}
+	a.st.Stream = info
+	a.st.Past = nil
+	a.st.CollN = 0
+}
+
+// Перед новим збором: якщо стріму немає або була довга перерва — новий стрім. Викликати під a.mu.
+func (a *App) ensureStreamLocked(now time.Time) {
+	if a.st.Stream.ID == "" || now.Sub(time.UnixMilli(a.lastActivityLocked())) > streamGap {
+		a.beginStreamLocked(now)
+	}
+}
+
+// Старі стани (до появи стрімів): поточний збір стає «Збір 1» нового стріму.
+func (a *App) initStreamLocked() {
+	if a.st.Stream.ID != "" {
+		return
+	}
+	t := time.Now()
+	if a.st.Session.StartedAt > 0 {
+		t = time.UnixMilli(a.st.Session.StartedAt)
+	}
+	a.beginStreamLocked(t)
+	if len(a.st.Entries) > 0 || a.st.Session.Status != "idle" {
+		a.st.CollN = 1
+	}
+}
+
+// ---------- методи для інтерфейсу ----------
+
+// NewStream — завершити поточний стрім і почати новий (поточний збір зберігається в старий стрім).
+func (a *App) NewStream() Snapshot {
+	return a.mutate(func(st *State) {
+		s := &st.Session
+		if s.Status == "running" || s.Status == "paused" {
+			s.Status, s.RemainingMs, s.FinishedAt = "finished", 0, time.Now().UnixMilli()
+		}
+		a.archiveLocked()
+		a.writeStreamLocked()
+		st.Entries = []Entry{}
+		st.SeenRedeems = []string{}
+		a.lastOrd = nil
+		a.beginStreamLocked(time.Now())
+		st.Session = Timer{Status: "idle", RemainingMs: int64(st.Settings.DurationMin) * 60000}
+	})
+}
+
+var streamIDRe = regexp.MustCompile(`^[0-9_-]{8,32}$`)
+
+// ListStreams — усі збережені стріми (найновіші зверху), включно з поточним.
+func (a *App) ListStreams() []StreamMeta {
+	a.mu.Lock()
+	cur := a.st.Stream
+	curColls, curOrders := len(a.st.Past), 0
+	for _, c := range a.st.Past {
+		curOrders += len(c.Entries)
+	}
+	if len(a.st.Entries) > 0 {
+		curColls++
+		curOrders += len(a.st.Entries)
+	}
+	a.mu.Unlock()
+
+	out := []StreamMeta{}
+	seen := map[string]bool{}
+	files, _ := filepath.Glob(filepath.Join(a.streamsDir, "*.json"))
+	for _, p := range files {
+		id := strings.TrimSuffix(filepath.Base(p), ".json")
+		if !streamIDRe.MatchString(id) || id == cur.ID {
+			continue
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		var f StreamFile
+		if json.Unmarshal(b, &f) != nil {
+			continue
+		}
+		m := StreamMeta{ID: id, StartedAt: f.StartedAt, Collections: len(f.Collections)}
+		for _, c := range f.Collections {
+			m.Orders += len(c.Entries)
+		}
+		out = append(out, m)
+		seen[id] = true
+	}
+	if cur.ID != "" {
+		out = append(out, StreamMeta{ID: cur.ID, StartedAt: cur.StartedAt, Collections: curColls, Orders: curOrders, Current: true})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].StartedAt > out[j].StartedAt })
+	return out
+}
+
+// GetStream — збори минулого стріму для перегляду.
+func (a *App) GetStream(id string) (StreamFile, error) {
+	if !streamIDRe.MatchString(id) {
+		return StreamFile{}, errors.New("невідомий стрім")
+	}
+	b, err := os.ReadFile(filepath.Join(a.streamsDir, id+".json"))
+	if err != nil {
+		return StreamFile{}, errors.New("файл стріму не знайдено")
+	}
+	var f StreamFile
+	if err := json.Unmarshal(b, &f); err != nil {
+		return StreamFile{}, err
+	}
+	return f, nil
+}
+
+func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }

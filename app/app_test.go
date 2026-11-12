@@ -33,6 +33,7 @@ func newTestApp(t *testing.T) *App {
 	a.stateFile = filepath.Join(dir, "subday_state.json")
 	a.historyDir = filepath.Join(dir, "history")
 	a.exportsDir = filepath.Join(dir, "exports")
+	a.streamsDir = filepath.Join(dir, "streams")
 	a.st = defaultState()
 	return a
 }
@@ -106,7 +107,7 @@ func TestManualAndArchive(t *testing.T) {
 		t.Fatal(s.Entries[0])
 	}
 	p, err := a.NewSession()
-	if err != nil || p == "" || len(a.st.Entries) != 0 {
+	if err != nil || p == "" || len(a.st.Entries) != 0 || len(a.st.Past) != 1 {
 		t.Fatal(p, err)
 	}
 }
@@ -208,12 +209,13 @@ func TestEachStartIsNewCollection(t *testing.T) {
 	a.AddManual("Phill", 3, 46, "Dark Souls")
 	a.AddManual("kroll", 1, 20, "dark souls!")
 	a.PauseTimer()
-	if s := a.StartTimer(); len(s.Entries) != 2 { // «Продовжити» після паузи — той самий збір
-		t.Fatal("resume cleared entries")
+	if s := a.StartTimer(); len(s.Entries) != 2 || s.CollN != 1 { // «Продовжити» після паузи — той самий збір
+		t.Fatal("resume changed collection", s.CollN)
 	}
 	a.FinishTimer()
-	files, _ := filepath.Glob(filepath.Join(a.exportsDir, "subday_*.csv"))
-	if len(files) != 1 {
+	streamID := a.st.Stream.ID
+	files, _ := filepath.Glob(filepath.Join(a.exportsDir, streamID, "*.csv"))
+	if len(files) != 1 || filepath.Base(files[0]) != "збір_01.csv" {
 		t.Fatal("no csv after finish", files)
 	}
 	b, _ := os.ReadFile(files[0])
@@ -221,21 +223,49 @@ func TestEachStartIsNewCollection(t *testing.T) {
 	if !strings.HasPrefix(txt, "\xEF\xBB\xBFsep=;\r\n") || !strings.Contains(txt, "Dark Souls;158;2;") {
 		t.Fatalf("%q", txt)
 	}
-	s := a.AddTime(60000) // +1 хв після завершення — продовжує той самий збір
+	s := a.AddTime(60000) // +1 хв після завершення — той самий збір
 	if s.Session.Status != "running" || len(s.Entries) != 2 {
 		t.Fatal("+1 after finish")
 	}
 	a.FinishTimer()
-	s = a.StartTimer() // новий збір
-	if len(s.Entries) != 0 || s.Session.Status != "running" {
-		t.Fatal("start did not begin a new collection")
+	s = a.StartTimer() // наступний збір того ж стріму
+	if len(s.Entries) != 0 || s.CollN != 2 || len(s.Past) != 1 || s.Stream.ID != streamID {
+		t.Fatalf("second collection: coll=%d past=%d stream=%s", s.CollN, len(s.Past), s.Stream.ID)
 	}
-	if h, _ := filepath.Glob(filepath.Join(a.historyDir, "subday_*.json")); len(h) != 1 {
-		t.Fatal("history not archived", h)
+	a.AddManual("Zoryana", 2, 3, "Hades")
+	a.FinishTimer()
+	f, err := a.GetStream(streamID)
+	if err != nil || len(f.Collections) != 2 || f.Collections[0].N != 1 || f.Collections[1].N != 2 {
+		t.Fatal("stream file", err, len(f.Collections))
 	}
-	a.FinishTimer() // порожній збір — CSV не створюється
-	if files, _ := filepath.Glob(filepath.Join(a.exportsDir, "subday_*.csv")); len(files) != 1 {
-		t.Fatal("empty collection produced csv", files)
+	if list := a.ListStreams(); len(list) != 1 || !list[0].Current || list[0].Collections != 2 || list[0].Orders != 3 {
+		t.Fatalf("%+v", list)
+	}
+	// довга перерва — новий стрім, збори знову з 1
+	a.mu.Lock()
+	a.st.Session.FinishedAt -= int64(7 * time.Hour / time.Millisecond)
+	for i := range a.st.Entries {
+		a.st.Entries[i].Ts -= int64(7 * time.Hour / time.Millisecond)
+	}
+	a.st.Stream.StartedAt -= int64(8 * time.Hour / time.Millisecond)
+	a.st.Session.StartedAt -= int64(8 * time.Hour / time.Millisecond)
+	for i := range a.st.Past {
+		a.st.Past[i].FinishedAt -= int64(8 * time.Hour / time.Millisecond)
+	}
+	a.mu.Unlock()
+	s = a.StartTimer()
+	if s.Stream.ID == streamID || s.CollN != 1 || len(s.Past) != 0 {
+		t.Fatalf("new stream expected: %s coll=%d past=%d", s.Stream.ID, s.CollN, len(s.Past))
+	}
+	if list := a.ListStreams(); len(list) != 2 {
+		t.Fatalf("streams: %+v", list)
+	}
+	s = a.NewStream() // вручну
+	if s.Session.Status != "idle" || len(s.Past) != 0 {
+		t.Fatal("manual new stream")
+	}
+	if _, err := a.GetStream("../x"); err == nil {
+		t.Fatal("bad id accepted")
 	}
 }
 

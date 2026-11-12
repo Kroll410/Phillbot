@@ -72,6 +72,10 @@ type State struct {
 	Entries     []Entry               `json:"entries"`
 	SeenRewards map[string]SeenReward `json:"seenRewards"`
 	SeenRedeems []string              `json:"seenRedeems"`
+	// стрім (СабДей) і його збори: Past — завершені збори, поточний — Session/Entries з номером CollN
+	Stream StreamInfo   `json:"stream"`
+	Past   []Collection `json:"past"`
+	CollN  int          `json:"collN"`
 }
 
 func defaultSettings() Settings {

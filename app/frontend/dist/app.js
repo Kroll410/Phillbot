@@ -25,31 +25,39 @@ async function call(fn, ...args){
 }
 function setState(snap){ if(snap && snap.settings) { S = snap; renderAll(); } }
 
+/* ---------- дані: поточний збір або збір, вибраний для перегляду ---------- */
+let view = null;        // null — поточний збір; {n} — завершений збір (лише перегляд)
+let pastStream = null;  // StreamFile минулого стріму, який переглядаємо (null — поточний стрім)
+const LIVE = () => ({entries: S.entries, settings: S.settings, live: true});
+function streamColls(){ return pastStream ? (pastStream.collections || []) : (S.past || []); }
+function viewColl(){ return view ? streamColls().find(c => c.n === view.n) : null; }
+function D(){ const c = viewColl(); return c ? {entries: c.entries || [], settings: c.settings || S.settings, live: false, coll: c} : LIVE(); }
+
 /* ---------- бали ---------- */
-function pointsOf(e){
-  if(!e.tier) return Number(S.settings.nonSubPoints)||0;
-  return (Number(S.settings.mult[String(e.tier)])||0) * Math.max(1, Number(e.months)||1);
+function pointsOf(e, st = D().settings){
+  if(!e.tier) return Number(st.nonSubPoints)||0;
+  return (Number(st.mult[String(e.tier)])||0) * Math.max(1, Number(e.months)||1);
 }
 // «діюче» замовлення кожного чатерса (останнє / перше / усі), включно з прихованими — лише вони є в таблиці
-function effectiveSet(){
-  const mode = S.settings.dupMode;
-  if(mode==="all") return new Set(S.entries.map(e=>e.id));
+function effectiveSet(d = D()){
+  const mode = d.settings.dupMode;
+  if(mode==="all") return new Set(d.entries.map(e=>e.id));
   const byUser = new Map();
-  for(const e of [...S.entries].sort((a,b)=>a.ts-b.ts)){
+  for(const e of [...d.entries].sort((a,b)=>a.ts-b.ts)){
     const k = (e.userId || e.login || e.user).toLowerCase();
     if(mode==="first"){ if(!byUser.has(k)) byUser.set(k,e.id); } else byUser.set(k,e.id);
   }
   return new Set(byUser.values());
 }
 // рахується «діюче» замовлення, якщо воно не приховане
-function countedSet(){ const eff = effectiveSet(); return new Set(S.entries.filter(e=>eff.has(e.id) && !e.excluded).map(e=>e.id)); }
-function aggregate(){
-  const counted = countedSet(), groups = new Map();
-  for(const e of S.entries){
+function countedSet(d = D()){ const eff = effectiveSet(d); return new Set(d.entries.filter(e=>eff.has(e.id) && !e.excluded).map(e=>e.id)); }
+function aggregate(d = D()){
+  const counted = countedSet(d), groups = new Map();
+  for(const e of d.entries){
     if(!counted.has(e.id)) continue;
     const k = norm(e.text); if(!k) continue;
     if(!groups.has(k)) groups.set(k,{key:k, variants:new Map(), points:0, count:0, users:[]});
-    const g = groups.get(k), p = pointsOf(e);
+    const g = groups.get(k), p = pointsOf(e, d.settings);
     g.points += p; g.count++; g.users.push({name:e.user, p, login:e.login, color:e.color, badges:e.badges});
     g.variants.set(e.text.trim(), (g.variants.get(e.text.trim())||0)+1);
   }
@@ -59,12 +67,55 @@ function aggregate(){
     return {...g, name};
   });
 }
-// кількість куль = сума балів (кожен бал — одна куля)
+// кількість куль поточного збору = сума балів (кожен бал — одна куля)
 function marbleInfo(){
-  const groups = aggregate().filter(g=>g.points>0);
+  const groups = aggregate(LIVE()).filter(g=>g.points>0);
   const total = groups.reduce((a,g)=>a+g.points,0);
   return {count: total, total, groups: groups.length};
 }
+
+/* ---------- стрім і його збори ---------- */
+let streams = [];
+const fmtHM = ts => ts ? new Date(ts).toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-digit"}) : "—";
+function fmtStream(m){
+  const d = new Date(m.startedAt), today = new Date();
+  const day = d.toDateString() === today.toDateString() ? "Сьогодні" : d.toLocaleDateString("uk-UA",{day:"numeric",month:"long"});
+  const n = m.collections, word = n%10===1&&n%100!==11 ? "збір" : [2,3,4].includes(n%10)&&![12,13,14].includes(n%100) ? "збори" : "зборів";
+  return `${day}, ${fmtHM(m.startedAt)} · ${n} ${word}${m.current?" (поточний)":""}`;
+}
+function ordersOf(c){ return countedSet({entries: c.entries || [], settings: c.settings || S.settings}).size; }
+async function loadStreams(){ try{ streams = await api().ListStreams() || []; }catch(e){ streams = []; } renderStreamBar(); }
+function renderStreamBar(){
+  if(!S || !S.stream) return;
+  const sel = $("streamSel"), curId = pastStream ? pastStream.id : S.stream.id;
+  const list = streams.length ? streams : [{id:S.stream.id, startedAt:S.stream.startedAt, collections:(S.past||[]).length + (S.entries.length?1:0), current:true}];
+  if(document.activeElement !== sel) sel.innerHTML = list.map(m => `<option value="${esc(m.id)}" ${m.id===curId?"selected":""}>${esc(fmtStream(m))}</option>`).join("");
+  const chips = streamColls().map(c => `<button class="cchip${view&&view.n===c.n?" active":""}" data-n="${c.n}"><b>Збір ${c.n}</b><span>${fmtHM(c.startedAt)} · ${ordersOf(c)} замовл.</span></button>`);
+  if(!pastStream){
+    const st = S.session.status, n = S.collN || (S.past||[]).length + 1;
+    const sub = st==="running" ? "іде зараз" : st==="paused" ? "пауза" : st==="finished" ? `${countedSet(LIVE()).size} замовл.` : "ще не почато";
+    chips.push(`<button class="cchip live${!view?" active":""}${st==="running"?" on":""}" data-n="live"><b>Збір ${n}</b><span>${sub}</span></button>`);
+  }
+  $("collChips").innerHTML = chips.join("") || `<span class="muted">У цьому стрімі ще немає зборів.</span>`;
+  $("viewNote").classList.toggle("hidden", D().live);
+  if(!D().live){ const c = D().coll; $("viewNote").innerHTML = `Перегляд: <b>Збір ${c.n}</b> · ${fmtHM(c.startedAt)}–${fmtHM(c.finishedAt)} · лише перегляд <a href="#" id="backLive">До поточного збору</a>`; }
+}
+$("collChips").addEventListener("click", e => {
+  const b = e.target.closest(".cchip"); if(!b) return;
+  view = b.dataset.n === "live" ? null : {n: Number(b.dataset.n)};
+  editMode = false; openGroups.clear(); renderAll();
+});
+$("streamSel").addEventListener("change", async () => {
+  const id = $("streamSel").value;
+  if(!id || id === S.stream.id){ pastStream = null; view = null; }
+  else {
+    try{ pastStream = await api().GetStream(id); }catch(e){ toast("Не вдалося відкрити стрім"); return; }
+    const cs = pastStream.collections || []; view = cs.length ? {n: cs[cs.length-1].n} : null;
+  }
+  editMode = false; openGroups.clear(); renderAll();
+});
+$("streamSel").addEventListener("focus", loadStreams);
+document.addEventListener("click", e => { if(e.target.id==="backLive"){ e.preventDefault(); pastStream = null; view = null; renderAll(); } });
 
 /* ---------- auth / header ---------- */
 let lastAuthStatus = "";
@@ -190,7 +241,7 @@ $("obsList").addEventListener("click", async e => {
 /* ---------- статистика і таблиці ---------- */
 function renderStats(){
   const counted = countedSet(), groups = aggregate();
-  const cEntries = S.entries.filter(e=>counted.has(e.id));
+  const cEntries = D().entries.filter(e=>counted.has(e.id));
   $("sEntries").textContent = cEntries.length;
   $("sUsers").textContent = new Set(cEntries.map(e=>(e.userId||e.login).toLowerCase())).size;
   $("sPoints").textContent = groups.reduce((a,g)=>a+g.points,0);
@@ -292,16 +343,16 @@ function renderTable(){
     let rows = aggregate().filter(g=>!q || g.name.toLowerCase().includes(q) || g.users.some(u=>u.name.toLowerCase().includes(q)));
     rows = sortRows(rows, sortKey.summary);
     const max = Math.max(1,...rows.map(r=>r.points)), total = rows.reduce((a,r)=>a+r.points,0)||1;
-    if(!rows.length){ wrap.innerHTML = `<div class="empty">${S.entries.length?"Нічого не знайдено":"Замовлень поки немає. Виберіть нагороду і натисніть «Почати збір»."}</div>`; return; }
+    if(!rows.length){ wrap.innerHTML = `<div class="empty">${D().entries.length?"Нічого не знайдено":"Замовлень поки немає. Виберіть нагороду і натисніть «Почати збір»."}</div>`; return; }
     const counted = countedSet();
     wrap.innerHTML = `<table class="dnd summary"><thead><tr><th class="gripcol"></th><th style="width:44px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:220px">Частка</th>${th("Людей","count","num")}<th style="width:44px"></th></tr></thead><tbody>${
       rows.map((g,i)=>{
         const open = openGroups.has(g.key);
-        const main = `<tr class="grow${open?" open":""}" data-key="${esc(g.key)}" data-name="${esc(g.name)}"><td class="gripcol">${GRIP}</td><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
+        const main = `<tr class="grow${open?" open":""}" data-key="${esc(g.key)}" data-name="${esc(g.name)}"><td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
         <td class="num pts">${g.points}</td><td><div class="share"><div class="track"><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div></div><span>${(g.points/total*100).toFixed(0)}%</span></div></td>
         <td class="num">${g.count}</td><td class="chev" title="${open?"Згорнути":"Показати замовлення"}"><span></span></td></tr>`;
         if(!open) return main;
-        const list = S.entries.filter(e=>counted.has(e.id) && norm(e.text)===g.key).sort((a,b)=>pointsOf(b)-pointsOf(a) || a.ts-b.ts);
+        const list = D().entries.filter(e=>counted.has(e.id) && norm(e.text)===g.key).sort((a,b)=>pointsOf(b)-pointsOf(a) || a.ts-b.ts);
         return main + `<tr class="gdetail"><td colspan="7"><table class="subtable"><thead><tr><th>Час</th><th>Чатерс</th><th>Тір сабки</th><th class="num">Має сабку</th><th class="num">Бали</th><th>Замовлення</th></tr></thead><tbody>${
           list.map(e=>`<tr><td class="muted">${fmtClock(e.ts)}</td><td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
             <td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td>
@@ -313,20 +364,20 @@ function renderTable(){
   } else {
     const counted = countedSet();
     const eff = effectiveSet();
-    let rows = S.entries.filter(e=>eff.has(e.id)).map(e=>({...e, points:pointsOf(e), counted:counted.has(e.id)}))
+    let rows = D().entries.filter(e=>eff.has(e.id)).map(e=>({...e, points:pointsOf(e), counted:counted.has(e.id)}))
       .filter(e=>!q || e.text.toLowerCase().includes(q) || e.user.toLowerCase().includes(q));
     rows = sortRows(rows, sortKey.entries);
-    if(!rows.length){ wrap.innerHTML = `<div class="empty">${S.entries.length?"Нічого не знайдено":"Замовлень поки немає."}</div>`; return; }
-    wrap.innerHTML = `<table class="dnd"><thead><tr><th class="gripcol"></th>${th("Час","ts")}${th("Чатерс","user")}${th("Тір сабки","tier")}${th("Має сабку","months","num")}${th("Бали","points","num")}${th("Замовлення","text")}<th class="acts"><button class="small editbtn${editMode?" on":""}" data-act="editmode">${editMode?"Готово":"Редагувати"}</button></th></tr></thead><tbody>${
+    if(!rows.length){ wrap.innerHTML = `<div class="empty">${D().entries.length?"Нічого не знайдено":"Замовлень поки немає."}</div>`; return; }
+    wrap.innerHTML = `<table class="dnd"><thead><tr><th class="gripcol"></th>${th("Час","ts")}${th("Чатерс","user")}${th("Тір сабки","tier")}${th("Має сабку","months","num")}${th("Бали","points","num")}${th("Замовлення","text")}<th class="acts">${D().live?`<button class="small editbtn${editMode?" on":""}" data-act="editmode">${editMode?"Готово":"Редагувати"}</button>`:""}</th></tr></thead><tbody>${
       rows.map(e=>`<tr data-id="${e.id}" class="${e.excluded?"off":!e.counted?"replaced":""} ${freshIds.has(e.id)?"fresh":""}" title="${esc(e.excluded?"Приховано — не рахується":!e.counted?"Не рахується: від цього чатерса враховано інше замовлення":(e.source||""))}">
-        <td class="gripcol">${GRIP}</td><td class="muted">${fmtClock(e.ts)}</td>
+        <td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${fmtClock(e.ts)}</td>
         <td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
         ${editMode ? `<td><select data-f="tier"><option value="0" ${!e.tier?"selected":""}>—</option>${[1,2,3].map(t=>`<option value="${t}" ${e.tier===t?"selected":""}>T${t}</option>`).join("")}</select></td>
         <td class="num"><span class="subcell">${subBadgeFor(e)}<input class="mo" type="number" min="1" data-f="months" value="${e.months||""}" ${!e.tier?"disabled":""}></span></td>`
         : `<td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td><td class="num">${e.tier?`<span class="subcell">${subBadgeFor(e)}${e.months} міс.</span>`:'<span class="muted">—</span>'}</td>`}
         <td class="num pts">${e.points}</td>
         <td>${editMode ? `<input class="edit" data-f="text" value="${esc(e.text)}">` : `<span class="otext">${esc(e.text)}</span>`}</td>
-        <td class="acts"><button class="icon${e.excluded?" on":""}" data-act="toggle" title="${e.excluded?"Показати — знову рахувати":"Приховати — не рахувати (можна повернути)"}">${e.excluded?ICON_EYE_OFF:ICON_EYE}</button>${editMode?`<button class="icon danger" data-act="del" title="Видалити назавжди">${ICON_TRASH}</button>`:""}</td></tr>`).join("")
+        <td class="acts">${D().live?`<button class="icon${e.excluded?" on":""}" data-act="toggle" title="${e.excluded?"Показати — знову рахувати":"Приховати — не рахувати (можна повернути)"}">${e.excluded?ICON_EYE_OFF:ICON_EYE}</button>${editMode?`<button class="icon danger" data-act="del" title="Видалити назавжди">${ICON_TRASH}</button>`:""}`:""}</td></tr>`).join("")
     }</tbody></table>`;
   }
 }
@@ -471,10 +522,24 @@ $("chatSave").onclick = async () => {
   closeModal("chatModal"); toast("Налаштування чату збережено");
 };
 
+let lastStreamKey = "", lastCollKey = "";
+$("newStreamBtn").onclick = async () => {
+  const st = S.session.status;
+  const msg = (st==="running"||st==="paused" ? "Збір ще йде — його буде завершено.\n\n" : "") +
+    "Завершити цей стрім і почати новий? Усі збори цього стріму збережено, їх можна переглянути у списку стрімів.";
+  if(!(await confirmBox(msg, "Новий стрім", "Скасувати"))) return;
+  pastStream = null; view = null;
+  setState(await call("NewStream")); loadStreams(); toast("Почато новий стрім");
+};
 function renderAll(){
   if(!inited){ initInputs(); inited = true; }
   renderAuth();
   if(S.auth && S.auth.status==="ok"){
+    if(view && !viewColl()) view = null;             // збір зник (новий стрім) — до поточного
+    if(S.stream && S.stream.id !== lastStreamKey){ lastStreamKey = S.stream.id; loadStreams(); }
+    const ck = (S.past||[]).length + ":" + S.collN + ":" + S.session.status;
+    if(ck !== lastCollKey){ lastCollKey = ck; if(streams.length) loadStreams(); }
+    renderStreamBar();
     renderStats(); renderTable(); renderRewardCurrent(); renderObs(); renderChat();
     if($("subdayModal").classList.contains("show")) renderRewardGrid();
     if(!chatLoaded){ chatLoaded = true; api().GetChat().then(m => { chatPending = (m||[]).concat(chatPending); }); }
@@ -497,7 +562,7 @@ $("changeClient").onclick = e => { e.preventDefault(); call("ChangeClientID"); }
 $("startBtn").onclick = async () => {
   const wasNew = S.session.status !== "paused", hadOrders = S.entries.length > 0;
   setState(await call("StartTimer"));
-  if(wasNew && hadOrders) toast("Новий збір. Попередній збережено в теку з .csv");
+  if(wasNew) toast(`Почато Збір ${S.collN}` + (hadOrders ? ". Попередній збережено" : ""));
   if(!S.settings.rewardId) toast("Увага: нагороду не вибрано — замовлення не записуватимуться", 4000);
   else if(S.conn.status!=="on") toast("Увага: немає з'єднання з Twitch", 4000);
 };

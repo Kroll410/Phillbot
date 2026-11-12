@@ -28,7 +28,11 @@ wails build -clean -skipbindings -trimpath -ldflags "-s -w"
 Результат — `app/build/bin/SubDay.exe`. Сам exe в git не комітиться (`*.exe` у `.gitignore`).
 
 ## GitHub Actions і релізи
-`.github/workflows/build.yml` на кожен пуш у `main` і PR проганяє тести й збирає exe (артефакт запуску, 14 днів).
+Розробка йде в `main`, збірка — через гілку `build` (`.github/workflows/build.yml`):
+- PR `main → build` — лише тести;
+- мердж PR у `build` — тести + збірка `SubDay.exe` (артефакт у вкладці Actions, 30 днів);
+- пуші в `main` нічого не збирають.
+
 Реліз — пушнути тег, Action сам створить GitHub Release з `SubDay.exe`:
 ```
 git tag v0.1.0

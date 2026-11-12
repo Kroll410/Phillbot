@@ -546,7 +546,7 @@ header h1 span{color:transparent}
 button:not(:disabled):not(.primary):not(.winbtn):not(.mbtn):not(.rtile):not(.mode-tab):not(.tab):not(.vstart):hover{
   border-color:transparent;
   background:linear-gradient(var(--panel2),var(--panel2)) padding-box,var(--grad) border-box}
-button.primary:not(:disabled):not(.mode-tab):not(.tab):hover{border-color:transparent;background:var(--grad)}
+button.primary:not(:disabled):not(.mode-tab):not(.tab):hover{border-color:transparent;background:var(--grad) border-box no-repeat}
 .tab:not(.active):hover{color:#fff}
 
 button.icon:not(:disabled):hover{color:var(--text)}
@@ -598,4 +598,6 @@ button,.winbtn,.cchip,.mbtn:disabled{border-width:2px}
 .tctl{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
 #stopBtn{grid-column:1 / -1}
 /* основні кнопки (Старт, Зберегти…) — при наведенні градієнтна заливка, трохи світліша */
-button.primary:not(:disabled):hover{border-color:transparent;background:var(--grad);filter:brightness(1.08);box-shadow:0 4px 14px rgba(145,71,255,.35)}
+button.primary:not(:disabled):hover{border-color:transparent;background:var(--grad) border-box no-repeat;filter:brightness(1.08);box-shadow:0 4px 14px rgba(145,71,255,.35)}
+/* градієнтна заливка рахується від зовнішнього краю (з рамкою) і не повторюється — без «чужих» смуг по боках */
+button.primary:not(:disabled):hover{background:var(--grad) border-box no-repeat;background-origin:border-box}

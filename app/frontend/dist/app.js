@@ -455,6 +455,18 @@ $("chatReturn").onclick = () => call("CloseChatWindow");
 /* ---------- вкладки-режими: Чат / СабДей / Переглядовий ---------- */
 let mode = "subday";
 try{ mode = localStorage.getItem("phillbot-mode") || "subday"; }catch(e){}
+/* перемикачі вкладок: градієнтна підкладка ковзає під активну вкладку */
+function slideSeg(box){
+  if(!box) return;
+  let ind = box.querySelector(":scope > .seg-ind");
+  if(!ind){ ind = document.createElement("span"); ind.className = "seg-ind"; box.prepend(ind); }
+  const a = box.querySelector(":scope > .active"); if(!a){ ind.style.opacity = 0; return; }
+  if(!a.offsetWidth) return; // вкладка схована — підкладку виставить наступний рендер
+  ind.style.opacity = 1;
+  ind.style.transform = `translateX(${a.offsetLeft}px)`; ind.style.width = a.offsetWidth + "px";
+}
+function slideAll(){ slideSeg($("modes")); slideSeg(document.querySelector(".tabs .seg")); }
+addEventListener("resize", slideAll);
 function showMode(m){
   mode = m === "chat" ? "chat" : "subday";
   try{ localStorage.setItem("phillbot-mode", mode); }catch(e){}
@@ -462,6 +474,9 @@ function showMode(m){
   $("modeChat").classList.toggle("hidden", mode !== "chat");
   $("modeSubday").classList.toggle("hidden", mode !== "subday");
   if(mode === "chat"){ chatStick = true; chatWrap.scrollTop = chatWrap.scrollHeight; }
+  slideAll();
+  const pane = mode === "chat" ? $("modeChat") : $("modeSubday"); // вміст вкладки теж «прослизає»
+  pane.classList.remove("slidein"); void pane.offsetWidth; pane.classList.add("slidein");
 }
 document.querySelectorAll(".mode-tab[data-mode]").forEach(b => b.onclick = () => showMode(b.dataset.mode));
 showMode(mode);
@@ -707,7 +722,7 @@ function renderAll(){
     const ck = (S.past||[]).length + ":" + S.collN + ":" + S.session.status;
     if(ck !== lastCollKey){ lastCollKey = ck; if(streams.length) loadStreams(); }
     renderStreamBar();
-    renderStats(); renderTable(); renderRewardCurrent(); renderObs(); renderChat(); renderSteps();
+    renderStats(); renderTable(); renderRewardCurrent(); renderObs(); renderChat(); renderSteps(); slideAll();
     if($("subdayModal").classList.contains("show")) renderRewardGrid();
     if(!chatLoaded){ chatLoaded = true; api().GetChat().then(m => { chatPending = (m||[]).concat(chatPending); }); }
   }
@@ -740,7 +755,10 @@ $("minusBtn").onclick = async () => setState(await call("AddTime", -60000));
 
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
   tab = b.dataset.tab; document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b)); renderTable();
+  slideSeg(document.querySelector(".tabs .seg"));
+  const w = $("tableWrap"); w.classList.remove("slidein"); void w.offsetWidth; w.classList.add("slidein");
 });
+document.fonts && document.fonts.ready.then(slideAll); // після завантаження шрифтів ширини вкладок уточнюються
 $("search").oninput = renderTable;
 
 $("tableWrap").addEventListener("click", async e => {

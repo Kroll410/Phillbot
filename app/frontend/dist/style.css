@@ -12,6 +12,9 @@
   --font-mono:"Cascadia Mono","Cascadia Code",Consolas,monospace;
   /* шрифти Twitch: Roobert (комерційний, лише якщо встановлений), Inter — відкрита заміна, яку використовує сам Twitch */
   --font-twitch:"Roobert","Inter","Helvetica Neue",Helvetica,Arial,sans-serif;
+  /* фірмовий градієнт PhillBot: зелений → фіолетовий */
+  --grad:linear-gradient(90deg,#00c853,#9147ff);
+  --grad-soft:linear-gradient(90deg,rgba(0,200,83,.22),rgba(145,71,255,.22));
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -517,3 +520,39 @@ h1,h2,h3,h4{font-family:var(--font-display)}
 .step[data-step="1"] .num{padding-left:1.5px}
 .owidget .obsrow{background:var(--panel2);border:1px solid var(--line);margin:0;padding:10px 12px}
 .owidget .obsrow code{font-size:12.5px;color:#c9a6ff}
+
+/* ---------- фірмовий градієнт: логотип, шнурочок зборів, hover кнопок ---------- */
+header h1{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:.3px}
+header h1 span{color:transparent}
+
+/* збори стріму: однакова ширина, з'єднані градієнтним шнурочком */
+.cchips{gap:0;align-items:center;padding:4px 2px}
+.cchip{width:156px;flex:0 0 156px;position:relative}
+.cchip + .cchip{margin-left:26px}
+.cchip + .cchip::before{content:"";position:absolute;right:100%;top:50%;width:28px;height:3px;margin-right:-1px;transform:translateY(-50%);
+  border-radius:3px;background:var(--grad);box-shadow:0 0 6px rgba(145,71,255,.45);pointer-events:none}
+.cchip + .cchip::after{content:"";position:absolute;right:calc(100% + 11px);top:50%;width:7px;height:7px;border-radius:50%;transform:translateY(-50%);
+  background:#5fb98a;box-shadow:0 0 0 2px var(--bg);pointer-events:none}
+.cchip b,.cchip span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* hover кнопок — градієнтна рамка; основні кнопки — градієнтна заливка */
+button:not(:disabled):not(.winbtn):not(.mbtn):not(.rtile):not(.mode-tab):not(.tab):not(.vstart):hover{
+  border-color:transparent;
+  background:linear-gradient(var(--panel2),var(--panel2)) padding-box,var(--grad) border-box}
+button.primary:not(:disabled):not(.mode-tab):not(.tab):hover,.tab:not(.active):hover{border-color:transparent;background:var(--grad)}
+.tab:not(.active):hover{color:#fff}
+.mode-tab:not(:disabled):not(.active):hover{background:var(--grad-soft);color:var(--text)}
+button.icon:not(:disabled):hover{color:var(--text)}
+.cchip:not(:disabled):hover{background:linear-gradient(#1c1a22,#1c1a22) padding-box,var(--grad) border-box!important}
+.cchip.active{background:linear-gradient(rgba(36,28,52,1),rgba(36,28,52,1)) padding-box,var(--grad) border-box;border-color:transparent}
+
+/* ---------- вкладки: градієнтна підкладка, що ковзає ---------- */
+.modes,.tabs .seg{position:relative;isolation:isolate}
+.seg-ind{position:absolute;left:0;top:3px;bottom:3px;width:0;border-radius:7px;background:var(--grad);z-index:0;pointer-events:none;
+  box-shadow:0 2px 10px rgba(145,71,255,.35);transition:transform .42s cubic-bezier(.45,1.35,.5,1),width .42s cubic-bezier(.45,1.35,.5,1),opacity .2s}
+.modes>.mode-tab,.tabs .seg>.tab{position:relative;z-index:1;transition:color .3s}
+.mode-tab.active,.tab.active,.mode-tab.active:hover,.tab.active:hover{background:transparent!important;color:#fff}
+/* вміст вкладки прослизає слідом */
+.slidein{animation:slidein .38s cubic-bezier(.2,.9,.3,1)}
+@keyframes slidein{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+.cchips{scrollbar-width:thin}.cchips::-webkit-scrollbar{height:4px}.cchips::-webkit-scrollbar-thumb{background:linear-gradient(90deg,#00c853,#9147ff);border-radius:4px}

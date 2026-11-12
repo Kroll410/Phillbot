@@ -608,3 +608,14 @@ button.primary:not(:disabled):hover{background:var(--grad) border-box no-repeat;
 .mode-tab.denied{color:#ff9a95!important}
 .gblink,.timer.gblink,.gtimer.gblink,.vtimer.gblink{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:gblink .42s ease-in-out 4}
 @keyframes gblink{0%,100%{filter:brightness(1);opacity:1}50%{filter:brightness(1.6) drop-shadow(0 0 12px rgba(145,71,255,.7));opacity:.55}}
+
+/* етап 2: назва гри, збір і замовники — над карткою; керування — під нею */
+.gwrap{width:min(720px,100%);display:flex;flex-direction:column;align-items:stretch;gap:18px}
+.ghead{text-align:center}
+.ghead .gname{margin:6px 0 8px;font-size:44px}
+.gwho{font:600 12px/1 var(--font-ui);text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-right:4px}
+.gamecard{width:100%;padding:26px 32px}
+.gamecard .gtimerbox{margin:0 0 4px}
+.gamecard #gPlay .gstatus{margin-bottom:0}
+.gplayctl{justify-content:center}
+.gplayctl button{min-width:180px;height:44px}

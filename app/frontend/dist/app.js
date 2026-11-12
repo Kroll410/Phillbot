@@ -701,10 +701,10 @@ function renderSteps(){
     shownStep = step;
   }
   if(!play) return;
-  $("gLabel").textContent = `Гра · Збір ${S.collN || ""}` + (S.round > 1 ? ` · раунд ${S.round}` : "");
+  $("gLabel").textContent = `Збір №${S.collN || ""}` + (S.round > 1 ? ` · раунд ${S.round}` : "");
   $("gName").textContent = S.winner || "—";
   const g = aggregate(LIVE()).find(x => x.name === S.winner || x.key === norm(S.winner||""));
-  $("gUsers").innerHTML = g ? g.users.map(u => `${userTag(u)} <span class="muted">(${u.p})</span>`).join(" ") : "";
+  $("gUsers").innerHTML = g && g.users.length ? `<span class="gwho">${g.users.length > 1 ? "Замовили:" : "Замовив:"}</span> ` + g.users.map(u => `${userTag(u)} <span class="muted">(${u.p})</span>`).join(" ") : "";
   $("vStart").textContent = `Почати голосування · ${S.settings.voteMin || 3} хв`;
   renderGameTimer();
 }
@@ -719,6 +719,7 @@ function renderGameTimer(){
   if(!S || S.phase !== "play") return;
   const sec = gameSection();
   document.querySelectorAll("#pane2 .gsec").forEach(x => x.classList.toggle("on", x.id === sec));
+  $("gPlayCtl").classList.toggle("hidden", sec !== "gPlay"); // Пауза / Завершити — під карткою, лише поки гра йде
   const g = S.game || {}, v = S.vote || {};
   if(sec === "gPlay"){
     const r = remainOf(g);

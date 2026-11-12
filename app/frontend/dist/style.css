@@ -860,3 +860,18 @@ tr[draggable="true"] input{cursor:text}
 #auListWin .austats{margin-left:0}
 .auMode{font:700 12.5px/1 var(--font-ui);letter-spacing:.3px;color:#fff;padding:6px 12px;border-radius:999px;
   background:linear-gradient(#2a2236,#2a2236) padding-box,var(--grad) border-box;border:2px solid transparent;box-shadow:0 2px 10px rgba(145,71,255,.25)}
+
+/* бейдж режиму колеса: без рамки й жирності — не схожий на кнопку */
+.auMode{font:500 12.5px/1 var(--font-ui);letter-spacing:.2px;color:#fff;padding:6px 12px;border:0;box-shadow:none;
+  background:linear-gradient(90deg,rgba(0,200,83,.32),rgba(145,71,255,.38))}
+/* редагування лотів — як у СабДеї */
+.autable input.edit{font:inherit;font-weight:600}
+.autable input.lnamein{width:min(320px,100%)}
+.autable input.lamtin{width:110px;text-align:right;font-variant-numeric:tabular-nums}
+.autable th.acts{text-align:right}
+.autable td.acts{width:auto}
+/* «Вийти» в шапці — затисканням, як «Завершити гру» */
+.winbtn.logoutbtn{min-width:0;height:30px;padding:0 14px;border-radius:8px;font-size:12.5px}
+.autable td:has(> input.lnamein){white-space:nowrap}
+.autable input.lnamein{display:inline-block;width:calc(100% - 24px);max-width:320px;vertical-align:middle}
+.autable input.edit{border-color:var(--line);background:var(--panel2)}

@@ -189,7 +189,9 @@ function renderAuth(){
   const c = S.conn || {status:"off", text:"Не підключено"};
   $("connDot").className = "dot " + (c.status==="on"?"on":c.status==="wait"?"wait":"");
   $("connDot").title = c.text;
-  $("userBox").innerHTML = ok && a.user ? `<b class="uname">${esc(a.user.display_name)}</b><button class="small" id="logoutBtn">Вийти</button>` : "";
+  // «Вийти» — затисканням з червоною «фарбою»; перемальовуємо лише при зміні акаунта (щоб не перервати затискання)
+  const ub = ok && a.user ? `<b class="uname">${esc(a.user.display_name)}</b><button class="winbtn holdend logoutbtn" id="logoutBtn" data-hold="logout" title="Затисніть і тримайте, щоб вийти з акаунта Twitch">${LIQUID_RED}<span class="wl">Вийти</span></button>` : "";
+  if($("userBox")._k !== ub){ $("userBox")._k = ub; $("userBox").innerHTML = ub; }
   if(ok && a.user && lastAuthStatus !== "ok") showWelcome(a.user.display_name);
   lastAuthStatus = a.status;
 }
@@ -627,6 +629,7 @@ const HOLD_MS = 1500;
 const LIQUID = `<span class="liquid"><span class="lq-fill"><b class="bub"></b><b class="bub"></b><b class="bub"></b><b class="bub"></b></span>`
   + `<svg class="lq-edge" viewBox="0 0 12 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0 H5 C12 5 12 10 5 15 C-2 20 -2 25 5 30 C12 35 12 40 5 45 L0 45 Z"/><path class="e2" d="M0 0 H4 C9 6 9 12 4 18 C-1 24 -1 30 4 36 C9 42 9 48 4 54 L0 54 Z"/></svg>`
   + `<span class="lq-gloss"></span></span>`;
+const LIQUID_RED = LIQUID.replace(/<\/span>$/, `<span class="ink"><i></i><i></i><i></i></span></span>`); // рідина + червона «фарба»
 let holding = null; // {btn, name, p, t0, raf, mode:"fill"|"drain"}
 const easeFill = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; // плавно розганяється і плавно доходить
 function setLevel(btn, p){ btn.style.setProperty("--p", p.toFixed(4)); btn.style.setProperty("--w", btn.offsetWidth + "px"); }
@@ -666,6 +669,7 @@ async function holdDone(){
   setLevel(btn, 1); btn.classList.remove("pressed","near"); btn.classList.add("full");
   await new Promise(r => setTimeout(r, 380)); // «вистрибнула» і спалахнула
   const action = btn.dataset.hold;
+  if(action === "logout"){ holding = null; call("Logout"); return; }
   if(action === "dellot"){ // видалити лот
     holding = null;
     const l = lotById(btn.dataset.lot);
@@ -832,7 +836,6 @@ function renderAll(){
 document.addEventListener("click", e => {
   const a = e.target.closest("a[data-url]");
   if(a){ e.preventDefault(); if(a.dataset.url) call("OpenURL", a.dataset.url); }
-  if(e.target.id==="logoutBtn") confirmBox("Вийти з акаунта Twitch?").then(ok=>ok && call("Logout"));
 });
 $("clientIdSave").onclick = () => call("SetClientID", $("clientIdInput").value);
 $("clientIdInput").addEventListener("keydown", e=>{ if(e.key==="Enter") $("clientIdSave").click(); });
@@ -965,11 +968,11 @@ function chanceOf(lot){
 
 // ----- вікно 1: лоти -----
 const auFresh = new Set();
-let auDrag = null, auListDirty = false; // id лота, який перетягують
-const LIQUID_RED = LIQUID.replace(/<\/span>$/, `<span class="ink"><i></i><i></i><i></i></span></span>`); // рідина + червона «фарба»
+let auDrag = null, auListDirty = false, auEdit = false; // id лота, який перетягують; режим редагування
 function renderAuList(){
   // не перемальовуємо таблицю посеред перетягування чи затискання кнопки в ній
-  if(auDrag || (holding && auListEl.contains(holding.btn))){ auListDirty = true; return; }
+  const typing = document.activeElement && document.activeElement.matches("input.edit") && auListEl.contains(document.activeElement);
+  if(auDrag || typing || (holding && auListEl.contains(holding.btn))){ auListDirty = true; return; }
   auListDirty = false;
   const gone = l => l.out || l.hidden ? 1 : 0;
   const au = AU(), lots = [...au.lots].sort((a, b) => gone(a) - gone(b) || b.amount - a.amount);
@@ -984,22 +987,34 @@ function renderAuList(){
       + `</div>` + (active > 3 ? `<div class="auinfo">і ще ${active - 3} ${active - 3 === 1 ? "лот" : "лотів"} на колесі</div>` : "");
     return;
   }
-  $("auList").innerHTML = `<table class="autable"><thead><tr><th class="gripcol"></th><th class="num">#</th><th>Лот</th><th class="num">Сума</th><th class="num">Шанс</th><th>Хто ставив</th><th></th></tr></thead><tbody>`
+  $("auList").innerHTML = `<table class="autable"><thead><tr><th class="gripcol"></th><th class="num">#</th><th>Лот</th><th class="num">Сума</th><th class="num">Шанс</th><th>Хто ставив</th><th class="acts"><button class="small editbtn${auEdit ? " on" : ""}" data-lotedit>${auEdit ? "Готово" : "Редагувати"}</button></th></tr></thead><tbody>`
     + lots.map((l, i) => {
       const who = [...l.users].sort((a, b) => b.amount - a.amount);
       const users = who.slice(0, 6).map(u => `${userTag(u)}<span class="muted uam">${fmtN(u.amount)}</span>`).join(" ") + (who.length > 6 ? ` <span class="muted">+${who.length - 6}</span>` : "");
       const st = au.winner === l.id ? `<span class="lwin">Переможець</span>` : l.hidden ? `<span class="muted">приховано</span>` : l.out ? `<span class="lout">вибув · ${l.out}-й оберт</span>` : `${(chanceOf(l) * 100).toFixed(1)}%`;
-      return `<tr data-lot="${esc(l.id)}" draggable="true" class="${l.hidden ? "off " : ""}${l.out ? "out" : ""}${au.winner === l.id ? " win" : ""}${auFresh.has(l.id) ? " fresh" : ""}">
+      return `<tr data-lot="${esc(l.id)}"${au.winner ? "" : ' draggable="true"'} class="${l.hidden ? "off " : ""}${l.out ? "out" : ""}${au.winner === l.id ? " win" : ""}${auFresh.has(l.id) ? " fresh" : ""}">
         <td class="gripcol"><span class="grip" title="Перетягніть рядок на інший лот, щоб об'єднати їх">⠿</span></td>
         <td class="num">${l.out ? "" : i + 1}</td>
-        <td><span class="ldot" style="background:${lotColor(l.id)}"></span><b class="lname">${esc(l.name)}</b><span class="mtag"></span></td>
-        <td class="num lamt">${fmtN(l.amount)}</td><td class="num">${st}</td>
+        <td><span class="ldot" style="background:${lotColor(l.id)}"></span>${auEdit ? `<input class="edit lnamein" data-lf="name" value="${esc(l.name)}">` : `<b class="lname">${esc(l.name)}</b>`}<span class="mtag"></span></td>
+        <td class="num lamt">${auEdit ? `<input class="edit lamtin" data-lf="amount" type="number" min="0" step="100" value="${l.amount}">` : fmtN(l.amount)}</td><td class="num">${st}</td>
         <td class="users">${users}</td>
-        <td class="acts"><button class="icon${l.hidden ? " on" : ""}" data-lothide="${esc(l.id)}" title="${l.hidden ? "Показати — повернути на колесо" : "Приховати — прибрати з колеса (можна повернути)"}">${l.hidden ? ICON_EYE_OFF : ICON_EYE}</button><button class="winbtn holdend iconhold" data-hold="dellot" data-lot="${esc(l.id)}" title="Затисніть і тримайте, щоб видалити лот">${LIQUID_RED}<span class="wl">${ICON_TRASH}</span></button></td></tr>`;
+        <td class="acts"><button class="icon${l.hidden ? " on" : ""}" data-lothide="${esc(l.id)}" title="${l.hidden ? "Показати — повернути на колесо" : "Приховати — прибрати з колеса (можна повернути)"}">${l.hidden ? ICON_EYE_OFF : ICON_EYE}</button>${auEdit ? `<button class="winbtn holdend iconhold" data-hold="dellot" data-lot="${esc(l.id)}" title="Затисніть і тримайте, щоб видалити лот">${LIQUID_RED}<span class="wl">${ICON_TRASH}</span></button>` : ""}</td></tr>`;
     }).join("") + `</tbody></table>`;
 }
+// пряме редагування: назва і сума (Enter або вихід з поля — зберегти)
+$("auList").addEventListener("change", async e => {
+  const f = e.target.dataset.lf; if(!f) return;
+  const id = e.target.closest("tr[data-lot]").dataset.lot, l = lotById(id); if(!l) return;
+  const v = e.target.value.trim();
+  e.target.blur();
+  if(f === "name"){ if(!v || v === l.name){ e.target.value = l.name; return; } setState(await call("AuctionUpdateLot", id, v, -1)); }
+  if(f === "amount"){ const n = Math.max(0, Math.round(Number(v))); if(!Number.isFinite(n) || n === l.amount){ e.target.value = l.amount; return; } setState(await call("AuctionUpdateLot", id, "", n)); }
+});
+$("auList").addEventListener("keydown", e => { if(e.key === "Enter" && e.target.matches("input.edit")) e.target.blur(); });
+$("auList").addEventListener("focusout", () => setTimeout(() => { if(auListDirty) renderAuList(); }, 0));
 // приховати / показати лот (прихований не бере участі в колесі)
 $("auList").addEventListener("click", async e => {
+  if(e.target.closest("[data-lotedit]")){ auEdit = !auEdit; renderAuList(); return; }
   const b = e.target.closest("[data-lothide]"); if(!b) return;
   setState(await call("AuctionToggleLot", b.dataset.lothide));
 });
@@ -1045,7 +1060,7 @@ auListEl.addEventListener("drop", async ev => {
 // «Скасувати об'єднання» — останнє об'єднання повертається
 function renderAuUndo(){
   const m = AU().merges || [], last = m[m.length - 1], b = $("auUndo");
-  b.disabled = !last;
+  b.disabled = !last || !!AU().winner;
   const to = last && lotById(last.to);
   b.title = last ? `Скасувати лише останнє: «${last.src.name}» → «${to ? to.name : "?"}». «${last.src.name}» знову стане окремим лотом` + (m.length > 1 ? ` (ще ${m.length - 1} об'єднань можна скасувати далі)` : "") : "Немає об'єднань";
 }

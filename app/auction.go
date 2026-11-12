@@ -479,9 +479,14 @@ func (a *App) AuctionResolve(bidID string, accept bool) (Snapshot, error) {
 }
 
 // Об'єднати лот from у лот to (перетягування, як у СабДеї).
-func (a *App) AuctionMergeLots(from, to string) Snapshot {
-	return a.mutate(func(st *State) {
+func (a *App) AuctionMergeLots(from, to string) (Snapshot, error) {
+	var err error
+	snap := a.mutate(func(st *State) {
 		au := &st.Auction
+		if au.Winner != "" { // переможця вже визначено — лоти не змінюємо
+			err = errors.New("переможця вже визначено — щоб об'єднувати лоти, скиньте колесо")
+			return
+		}
 		i, j := au.lotIndex(from), au.lotIndex(to)
 		if i < 0 || j < 0 || i == j {
 			return
@@ -513,6 +518,33 @@ func (a *App) AuctionMergeLots(from, to string) Snapshot {
 			au.Merges = au.Merges[len(au.Merges)-50:]
 		}
 	})
+	return snap, err
+}
+
+// AuctionUpdateLot — пряме редагування лота: назва і (за потреби) сума. amount < 0 — суму не змінювати.
+func (a *App) AuctionUpdateLot(id, name string, amount int) (Snapshot, error) {
+	var err error
+	snap := a.mutate(func(st *State) {
+		au := &st.Auction
+		i := au.lotIndex(id)
+		if i < 0 {
+			err = errors.New("лот не знайдено")
+			return
+		}
+		l := &au.Lots[i]
+		if n := strings.TrimSpace(name); n != "" {
+			l.Name, l.Key = n, normKey(n)
+			for k := range au.Feed { // пропозиції «Додати до X?» показують нову назву
+				if au.Feed[k].SuggestID == id {
+					au.Feed[k].SuggestName = n
+				}
+			}
+		}
+		if amount >= 0 {
+			l.Amount = amount
+		}
+	})
+	return snap, err
 }
 
 // AuctionUndoMerge — скасувати останнє об'єднання: лот повертається на своє місце з усіма ставками,
@@ -521,6 +553,10 @@ func (a *App) AuctionUndoMerge() (Snapshot, error) {
 	var err error
 	snap := a.mutate(func(st *State) {
 		au := &st.Auction
+		if au.Winner != "" {
+			err = errors.New("переможця вже визначено — щоб скасувати об'єднання, скиньте колесо")
+			return
+		}
 		for len(au.Merges) > 0 {
 			rec := au.Merges[len(au.Merges)-1]
 			au.Merges = au.Merges[:len(au.Merges)-1]

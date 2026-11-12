@@ -121,12 +121,13 @@ function rewardById(id){
   const seen = (S.seenRewards||{})[id];
   return id ? {id, title: (id===S.settings.rewardId && S.settings.rewardTitle) || (seen && seen.title) || id, background_color:"#3a3a40"} : null;
 }
+// нагорода вибирається в налаштуваннях СабДею; тут — лише попередження, якщо її немає
 function renderRewardCurrent(){
-  const r = rewardById(S.settings.rewardId);
-  $("rewardCurrent").innerHTML = r
-    ? `<div class="rcurrent">${rewardTile(r)}<div class="hint" style="margin:0">Замовлення приймаються через цю нагороду, поки йде таймер.</div></div>`
-    : `<div class="rempty">Нагороду не вибрано — замовлення не записуватимуться. Відкрийте налаштування СабДею (шестерня справа вгорі).</div>`;
+  const none = !S.settings.rewardId;
+  $("rewardCurrent").classList.toggle("hidden", !none);
+  if(none) $("rewardCurrent").innerHTML = `Нагороду не вибрано — замовлення не записуватимуться. <a href="#" id="pickReward">Вибрати</a>`;
 }
+document.addEventListener("click", e => { if(e.target.id==="pickReward"){ e.preventDefault(); $("subdaySettingsBtn").click(); } });
 let pendingReward = null; // вибір у вікні налаштувань до «Зберегти»
 function renderRewardGrid(){
   const sel = pendingReward ?? S.settings.rewardId;

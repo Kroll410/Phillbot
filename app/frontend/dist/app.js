@@ -752,6 +752,7 @@ function renderGameTimer(){
 }
 setInterval(renderGameTimer, 250);
 $("gFinish").insertAdjacentHTML("afterbegin", LIQUID);
+$("gFinish").querySelector(".liquid").insertAdjacentHTML("beforeend", `<span class="ink"><i></i><i></i><i></i></span>`); // червона «фарба»
 $("gPause").onclick = async () => setState(await call(S.game.status==="paused" ? "GameResume" : "GamePause"));
 $("gPlus").onclick = async () => setState(await call("GameAddTime", 60000));
 $("gMinus").onclick = async () => setState(await call("GameAddTime", -60000));

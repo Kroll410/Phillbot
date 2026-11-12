@@ -644,6 +644,22 @@ button.vstart:not(:disabled):hover{filter:brightness(1.1);box-shadow:0 6px 18px 
 /* «Завершити гру»: у градієнті рідини спершу червоний — червоний → зелений → фіолетовий */
 .winbtn.holdend{border-color:rgba(235,64,52,.55)}
 .winbtn.holdend:hover{border-color:#ff6b61}
-.winbtn.holdend .lq-fill{background:linear-gradient(90deg,#ff3b30,#ff7a3d 18%,#00c853 48%,#7a6cff 78%,#9147ff) 0 0 / var(--w) 100% no-repeat}
 .winbtn.holdend.pressed{border-color:#ff8a80;box-shadow:0 0 0 0 rgba(0,0,0,0),inset 0 3px 10px rgba(0,0,0,.55),0 0 0 4px rgba(255,59,48,.18)}
 .winbtn.holdend.full{box-shadow:0 0 0 4px rgba(255,59,48,.3),0 0 22px rgba(0,200,83,.45),0 0 40px rgba(145,71,255,.5)}
+/* «Завершити гру»: на початку натиску червона фарба пирскає вперед і розчиняється (як зі шприца у воду), далі — звичний градієнт */
+.winbtn .ink{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;border-radius:inherit}
+.winbtn .ink i{position:absolute;left:-12%;top:50%;width:46%;height:120%;border-radius:50%;opacity:0;
+  background:radial-gradient(ellipse at 30% 50%,rgba(255,45,35,.95),rgba(255,60,40,.6) 38%,rgba(255,80,60,0) 70%);filter:blur(2px);transform:translate(0,-50%) scale(.25)}
+.winbtn .ink i:nth-child(2){top:30%;height:70%;width:34%}
+.winbtn .ink i:nth-child(3){top:72%;height:60%;width:30%}
+.winbtn.pressed .ink i{animation:inkburst .9s cubic-bezier(.12,.9,.25,1) forwards}
+.winbtn.pressed .ink i:nth-child(2){animation-duration:1.05s;animation-delay:.04s}
+.winbtn.pressed .ink i:nth-child(3){animation-duration:1.15s;animation-delay:.08s}
+@keyframes inkburst{
+  0%{opacity:0;transform:translate(0,-50%) scale(.25);filter:blur(1px)}
+  14%{opacity:1}
+  45%{opacity:.85;transform:translate(120%,-50%) scale(1.15,1.05);filter:blur(4px)}
+  100%{opacity:0;transform:translate(190%,-50%) scale(1.6,1.3);filter:blur(10px)}}
+/* основні кнопки (Старт, Зберегти, Продовжити гру…) — градієнт уже в спокої; при наведенні лише світлішають, фон не підміняється (не «блимає») */
+button.primary:not(.mode-tab):not(.tab){background:var(--grad) border-box no-repeat;border-color:transparent;transition:filter .2s ease,box-shadow .2s ease,transform .15s ease}
+button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--grad) border-box no-repeat;filter:brightness(1.1);box-shadow:0 6px 18px rgba(145,71,255,.35);transform:translateY(-1px)}

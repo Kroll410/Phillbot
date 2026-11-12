@@ -83,7 +83,7 @@ function renderAuth(){
 
   const c = S.conn || {status:"off", text:"Не підключено"};
   $("connDot").className = "dot " + (c.status==="on"?"on":c.status==="wait"?"wait":"");
-  $("connText").textContent = c.text;
+  $("connDot").title = c.text;
   $("userBox").innerHTML = ok && a.user ? `<b>${esc(a.user.display_name)}</b> <button class="small" id="logoutBtn">Вийти</button>` : "";
 }
 

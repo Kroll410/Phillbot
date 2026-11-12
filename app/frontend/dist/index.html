@@ -70,6 +70,9 @@
     <option value="all">Рахуються всі</option>
   </select>
   <div class="hint">Бали = множник тіра × місяці підписки. Тір — з Twitch API, місяці — з бейджа в чаті.</div>
+  <h3>Дані</h3>
+  <div class="row" style="align-items:center"><button id="openCsv" style="flex:0 0 auto">Відкрити теку з .csv</button>
+    <span class="hint" style="margin:0">Після кожного збору таблиця зберігається сюди автоматично.</span></div>
   <div class="row actions" style="margin-top:16px">
     <button id="settingsReset" style="margin-right:auto">Скинути правила</button>
     <button data-close="subdayModal">Скасувати</button>
@@ -156,11 +159,10 @@
       <div class="mexport">
         <button id="exportMarbles" class="mbtn"><span class="mfill"></span><span class="mlabel" id="mLabel">Експорт у Marbles</span><span class="mcount" id="mCount"></span></button>
       </div>
-      <div class="hint">Замовлення записуються лише поки йде таймер.</div>
     </div>
 
     <div class="card">
-      <h2 class="row" style="align-items:center">Нагорода<button id="subdaySettingsBtn" class="small" style="flex:0 0 auto;margin-left:auto">Налаштування СабДею</button></h2>
+      <h2>Нагорода</h2>
       <div id="rewardCurrent"></div>
     </div>
 
@@ -174,34 +176,14 @@
       </details>
     </div>
 
-    <div class="card">
-      <h2>Дані</h2>
-      <div class="btns">
-        <button id="exportCsv">Excel (.csv)</button>
-        <button id="exportJson">JSON</button>
-        <button id="openExports">Папка експорту</button>
-        <button id="openHistory">Історія зборів</button>
-        <button id="newSession" class="danger wide">Новий збір (архівувати й очистити)</button>
-      </div>
-      <details>
-        <summary>Додати замовлення вручну</summary>
-        <label>Нік</label><input id="mUser">
-        <div class="row">
-          <div><label>Тір</label><select id="mTier"><option value="0">не саб</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
-          <div><label>Місяці</label><input id="mMonths" type="number" min="1" value="1"></div>
-        </div>
-        <label>Замовлення</label><input id="mText">
-        <button id="mAdd" style="margin-top:8px;width:100%">Додати</button>
-      </details>
-    </div>
   </aside>
 
   <section>
     <div class="stats">
       <div class="stat"><b id="sEntries">0</b><span>замовлень</span></div>
       <div class="stat"><b id="sUsers">0</b><span>чатерсів</span></div>
-      <div class="stat"><b id="sUnique">0</b><span>унікальних варіантів</span></div>
       <div class="stat"><b id="sPoints">0</b><span>балів усього</span></div>
+      <button id="subdaySettingsBtn" class="icon-btn corner" title="Налаштування СабДею"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
     </div>
     <div class="tabs">
       <button class="tab active" data-tab="summary">Підсумок</button>

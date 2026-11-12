@@ -102,16 +102,15 @@ func (a *App) onChatMessage(raw json.RawMessage) {
 	if json.Unmarshal(raw, &ev) != nil {
 		return
 	}
+	msg := a.buildChatMsg(ev)
 	t, mo := subFromBadges(ev.Badges)
 	a.badgeMu.Lock()
-	si := subInfo{tier: t, months: mo, ts: time.Now()}
+	si := subInfo{tier: t, months: mo, ts: time.Now(), color: msg.Color, badges: msg.Badges}
 	a.badgeCache[ev.ChatterUserID] = si
 	if ev.RewardID != "" { // точний зв'язок redeem ↔ повідомлення
 		a.badgeCache[ev.ChatterUserID+"|"+ev.RewardID] = si
 	}
 	a.badgeMu.Unlock()
-
-	msg := a.buildChatMsg(ev)
 	a.chatMu.Lock()
 	a.chat = append(a.chat, msg)
 	if len(a.chat) > chatBufferSize {

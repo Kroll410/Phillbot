@@ -37,7 +37,7 @@ type Snapshot struct {
 	BaseDir    string      `json:"baseDir"`
 	ClientID   string      `json:"clientId"`
 	Now        int64       `json:"now"`
-	Log        []string    `json:"log"`
+	Log        []LogLine   `json:"log"`
 	Obs        OverlayInfo `json:"obs"`
 	ChatWindow bool        `json:"chatWindow"` // чат відкрито в окремому вікні — вкладка заблокована
 }
@@ -53,7 +53,7 @@ type App struct {
 	conn     ConnInfo
 	rewards  []Reward
 	rewErr   string
-	logLines []string
+	logLines []LogLine
 	bc       User
 
 	clientID string
@@ -143,7 +143,7 @@ func (a *App) snapshotLocked() Snapshot {
 		obs = a.overlay.info()
 	}
 	return Snapshot{State: st, Auth: auth, Conn: a.conn, Rewards: append([]Reward(nil), a.rewards...), RewardsErr: a.rewErr,
-		BaseDir: a.baseDir, ClientID: a.clientID, Now: time.Now().UnixMilli(), Log: append([]string(nil), a.logLines...), Obs: obs,
+		BaseDir: a.baseDir, ClientID: a.clientID, Now: time.Now().UnixMilli(), Log: append([]LogLine(nil), a.logLines...), Obs: obs,
 		ChatWindow: a.chatWinClients > 0 || a.chatWinPending}
 }
 
@@ -200,14 +200,42 @@ func (a *App) setConn(status, text string) {
 	a.mu.Unlock()
 }
 
-func (a *App) logf(format string, args ...any) {
+// Рядок журналу. Для подій від глядача — нік як у чаті Twitch (колір і бейджі з його повідомлення).
+type LogLine struct {
+	Ts     int64       `json:"ts"`
+	Text   string      `json:"text"`
+	User   string      `json:"user,omitempty"`
+	Login  string      `json:"login,omitempty"`
+	Color  string      `json:"color,omitempty"`
+	Badges []ChatBadge `json:"badges,omitempty"`
+}
+
+func (a *App) addLog(l LogLine) {
+	l.Ts = time.Now().UnixMilli()
 	a.mu.Lock()
-	a.logLines = append(a.logLines, time.Now().Format("15:04:05")+"  "+fmt.Sprintf(format, args...))
+	a.logLines = append(a.logLines, l)
 	if len(a.logLines) > 200 {
 		a.logLines = a.logLines[len(a.logLines)-200:]
 	}
 	a.emitLocked()
 	a.mu.Unlock()
+}
+
+func (a *App) logf(format string, args ...any) { a.addLog(LogLine{Text: fmt.Sprintf(format, args...)}) }
+
+// подія від глядача: колір і бейджі беремо з останнього його повідомлення в чаті (якщо є)
+func (a *App) logUser(userID, name, login, rewardID, format string, args ...any) {
+	l := LogLine{Text: fmt.Sprintf(format, args...), User: name, Login: login}
+	a.badgeMu.Lock()
+	c, ok := a.badgeCache[userID+"|"+rewardID]
+	if !ok {
+		c, ok = a.badgeCache[userID]
+	}
+	a.badgeMu.Unlock()
+	if ok {
+		l.Color, l.Badges = c.color, c.badges
+	}
+	a.addLog(l)
 }
 
 func (a *App) ticker(ctx context.Context) {
@@ -222,6 +250,7 @@ func (a *App) ticker(ctx context.Context) {
 			s := &a.st.Session
 			if s.Status == "running" && s.EndsAt <= time.Now().UnixMilli() {
 				s.Status, s.RemainingMs, s.FinishedAt = "finished", 0, time.Now().UnixMilli()
+				a.writeCSVLocked()
 				a.saveLocked()
 				a.emitLocked()
 				a.mu.Unlock()
@@ -417,14 +446,16 @@ func (a *App) StartTimer() Snapshot {
 			return
 		case "paused":
 			s.EndsAt = now + s.RemainingMs
-		case "idle":
-			s.EndsAt = now + max64(s.RemainingMs, 1000)
-			s.StartedAt = now
-		default: // finished — новий відрізок збору, замовлення зберігаються
-			s.EndsAt = now + int64(st.Settings.DurationMin)*60000
-			if s.StartedAt == 0 {
-				s.StartedAt = now
+		default: // idle / finished — кожен «Старт» починає НОВИЙ збір
+			a.archiveLocked()
+			st.Entries = []Entry{}
+			st.SeenRedeems = []string{}
+			a.lastOrd = nil
+			dur := int64(st.Settings.DurationMin) * 60000
+			if s.Status == "idle" && s.RemainingMs > 0 {
+				dur = s.RemainingMs // ±1 хв до старту
 			}
+			*s = Timer{StartedAt: now, EndsAt: now + max64(dur, 1000)}
 		}
 		s.Status = "running"
 	})
@@ -448,6 +479,7 @@ func (a *App) FinishTimer() Snapshot {
 			return
 		}
 		s.Status, s.RemainingMs, s.FinishedAt = "finished", 0, time.Now().UnixMilli()
+		a.writeCSVLocked()
 	})
 }
 
@@ -511,23 +543,23 @@ func (a *App) onRedemption(ev Redemption, bc User) {
 	a.mu.Unlock()
 
 	if ev.Reward.ID != bound {
-		a.logf("Redeem іншої нагороди «%s» від %s — не враховано", ev.Reward.Title, ev.UserName)
+		a.logUser(ev.UserID, ev.UserName, ev.UserLogin, ev.Reward.ID, "Нагорода «%s» — не враховано (інша нагорода)", ev.Reward.Title)
 		return
 	}
 	if !running {
-		a.logf("Redeem від %s («%s») — збір не йде, не враховано", ev.UserName, ev.UserInput)
+		a.logUser(ev.UserID, ev.UserName, ev.UserLogin, ev.Reward.ID, "«%s» — збір не йде, не враховано", ev.UserInput)
 		return
 	}
 	if !accept {
 		return
 	}
-	tier, months, source := a.lookupSub(bc.ID, ev.UserID, ev.Reward.ID)
+	tier, months, source, color, badges := a.lookupSub(bc.ID, ev.UserID, ev.Reward.ID)
 	login := ev.UserLogin
 	if login == "" {
 		login = strings.ToLower(ev.UserName)
 	}
 	e := Entry{ID: newID(), Ts: time.Now().UnixMilli(), User: ev.UserName, Login: login, UserID: ev.UserID,
-		Tier: tier, Months: months, Text: strings.TrimSpace(ev.UserInput), Source: source}
+		Tier: tier, Months: months, Text: strings.TrimSpace(ev.UserInput), Source: source, Color: color, Badges: badges}
 	a.mu.Lock()
 	pts := pointsOf(a.st.Settings, e)
 	a.lastOrd = &LastOrder{User: e.User, Text: e.Text, Points: pts, Tier: tier, Months: months, Ts: e.Ts}
@@ -539,7 +571,7 @@ func (a *App) onRedemption(ev Redemption, bc User) {
 	if tier > 0 {
 		sub = fmt.Sprintf("T%d, %d міс.", tier, months)
 	}
-	a.logf("★ %s: «%s» — %s", ev.UserName, e.Text, sub)
+	a.addLog(LogLine{Text: fmt.Sprintf("Замовлення «%s» — %s", e.Text, sub), User: e.User, Login: e.Login, Color: e.Color, Badges: e.Badges})
 }
 
 func (a *App) UpdateEntry(e Entry) Snapshot {
@@ -620,23 +652,11 @@ func (a *App) AddManual(user string, tier, months int, text string) (Snapshot, e
 func (a *App) NewSession() (string, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	archived := ""
-	if len(a.st.Entries) > 0 {
-		if err := os.MkdirAll(a.historyDir, 0755); err != nil {
-			return "", err
-		}
-		p := archiveName(a.historyDir, time.Now())
-		b, _ := json.MarshalIndent(map[string]any{"archivedAt": time.Now().Format(time.RFC3339), "settings": a.st.Settings,
-			"session": a.st.Session, "entries": a.st.Entries}, "", "  ")
-		if err := writeFileAtomic(p, b); err != nil {
-			return "", err
-		}
-		archived = p
-	}
+	p := a.archiveLocked()
 	a.st.Entries = []Entry{}
 	a.st.SeenRedeems = []string{}
 	a.st.Session = Timer{Status: "idle", RemainingMs: int64(a.st.Settings.DurationMin) * 60000}
 	a.saveLocked()
 	a.emitLocked()
-	return archived, nil
+	return p, nil
 }

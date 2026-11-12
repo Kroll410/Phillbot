@@ -48,7 +48,7 @@ function aggregate(){
     const k = norm(e.text); if(!k) continue;
     if(!groups.has(k)) groups.set(k,{key:k, variants:new Map(), points:0, count:0, users:[]});
     const g = groups.get(k), p = pointsOf(e);
-    g.points += p; g.count++; g.users.push({name:e.user, p});
+    g.points += p; g.count++; g.users.push({name:e.user, p, login:e.login, color:e.color, badges:e.badges});
     g.variants.set(e.text.trim(), (g.variants.get(e.text.trim())||0)+1);
   }
   return [...groups.values()].map(g=>{
@@ -123,7 +123,7 @@ function renderRewardCurrent(){
   const r = rewardById(S.settings.rewardId);
   $("rewardCurrent").innerHTML = r
     ? `<div class="rcurrent">${rewardTile(r)}<div class="hint" style="margin:0">Замовлення приймаються через цю нагороду, поки йде таймер.</div></div>`
-    : `<div class="rempty">Нагороду не вибрано — замовлення не записуватимуться. Відкрийте «Налаштування СабДею».</div>`;
+    : `<div class="rempty">Нагороду не вибрано — замовлення не записуватимуться. Відкрийте налаштування СабДею (шестерня справа вгорі).</div>`;
 }
 let pendingReward = null; // вибір у вікні налаштувань до «Зберегти»
 function renderRewardGrid(){
@@ -176,10 +176,17 @@ function renderStats(){
   const cEntries = S.entries.filter(e=>counted.has(e.id));
   $("sEntries").textContent = cEntries.length;
   $("sUsers").textContent = new Set(cEntries.map(e=>(e.userId||e.login).toLowerCase())).size;
-  $("sUnique").textContent = groups.length;
   $("sPoints").textContent = groups.reduce((a,g)=>a+g.points,0);
   renderExportBtn();
 }
+
+// нік як у чаті Twitch: бейджі + колір ніку (з повідомлення, що прийшло разом із замовленням)
+function userTag(u){
+  const badges = (u.badges||[]).filter(b=>/^https:\/\//.test(b.url||"")).map(b=>`<img class="cbadge" src="${esc(b.url)}" alt="" title="${esc(b.title||b.setId)}">`).join("");
+  const name = u.name || u.user || u.login || "";
+  return `<span class="utag">${badges}<span class="cname" style="color:${esc(ChatRender.nameColor(u.login||name, u.color))}">${esc(name)}</span></span>`;
+}
+let editMode = false; // режим редагування у вкладці «Замовлення»
 
 function sortRows(rows, [k,dir]){ return rows.sort((a,b)=>{ const x=a[k], y=b[k]; return (typeof x==="string" ? x.localeCompare(y,"uk") : (x-y))*dir; }); }
 function th(label, key, cls=""){ const [k,d]=sortKey[tab]; return `<th class="${cls}" data-sort="${key}">${label}${k===key?(d>0?" ▲":" ▼"):""}</th>`; }
@@ -242,8 +249,12 @@ function renderTable(){
   const q = $("search").value.trim().toLowerCase();
   if(tab==="log"){
     const log = (S.log||[]).slice().reverse();
-    wrap.innerHTML = `<div class="log">${log.length ? log.map(esc).join("\n") : "Подій поки немає."}</div>`; return;
+    wrap.innerHTML = log.length ? `<table class="logtable"><thead><tr><th style="width:1%">Час</th><th style="width:1%">Чатерс</th><th>Подія</th></tr></thead><tbody>${
+      log.map(l=>`<tr><td class="muted" style="white-space:nowrap">${fmtClock(l.ts)}</td><td style="white-space:nowrap;padding-right:24px">${l.user?userTag({name:l.user, login:l.login, color:l.color, badges:l.badges}):""}</td><td>${esc(l.text)}</td></tr>`).join("")
+    }</tbody></table>` : `<div class="empty">Подій поки немає.</div>`;
+    return;
   }
+
   if(tab==="summary"){
     let rows = aggregate().filter(g=>!q || g.name.toLowerCase().includes(q) || g.users.some(u=>u.name.toLowerCase().includes(q)));
     rows = sortRows(rows, sortKey.summary);
@@ -252,7 +263,7 @@ function renderTable(){
     wrap.innerHTML = `<table class="dnd"><thead><tr><th class="gripcol"></th><th style="width:40px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:140px">Частка</th>${th("Людей","count","num")}<th>Хто замовив</th></tr></thead><tbody>${
       rows.map((g,i)=>`<tr data-key="${esc(g.key)}" data-name="${esc(g.name)}"><td class="gripcol">${GRIP}</td><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
         <td class="num pts">${g.points}</td><td><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div><span class="muted" style="font-size:11px">${(g.points/total*100).toFixed(1)}%</span></td>
-        <td class="num">${g.count}</td><td class="users">${g.users.map(u=>`${esc(u.name)} <span class="muted">(${u.p})</span>`).join(", ")}</td></tr>`).join("")
+        <td class="num">${g.count}</td><td class="users">${g.users.map(u=>`${userTag(u)} <span class="muted">(${u.p})</span>`).join(" ")}</td></tr>`).join("")
     }</tbody></table>`;
   } else {
     const counted = countedSet();
@@ -260,15 +271,16 @@ function renderTable(){
       .filter(e=>!q || e.text.toLowerCase().includes(q) || e.user.toLowerCase().includes(q));
     rows = sortRows(rows, sortKey.entries);
     if(!rows.length){ wrap.innerHTML = `<div class="empty">${S.entries.length?"Нічого не знайдено":"Замовлень поки немає."}</div>`; return; }
-    wrap.innerHTML = `<table class="dnd"><thead><tr><th class="gripcol"></th>${th("Час","ts")}${th("Чатерс","user")}${th("Тір","tier")}${th("Місяці","months","num")}${th("Бали","points","num")}${th("Замовлення","text")}<th></th></tr></thead><tbody>${
+    wrap.innerHTML = `<table class="dnd"><thead><tr><th class="gripcol"></th>${th("Час","ts")}${th("Чатерс","user")}${th("Тір сабки","tier")}${th("Має сабку","months","num")}${th("Бали","points","num")}${th("Замовлення","text")}<th class="acts"><button class="small editbtn${editMode?" on":""}" data-act="editmode">${editMode?"Готово":"Редагувати"}</button></th></tr></thead><tbody>${
       rows.map(e=>`<tr data-id="${e.id}" class="${e.excluded?"off":!e.counted?"replaced":""} ${freshIds.has(e.id)?"fresh":""}" title="${esc(e.excluded?"Приховано — не рахується":!e.counted?"Не рахується: від цього чатерса враховано інше замовлення":(e.source||""))}">
         <td class="gripcol">${GRIP}</td><td class="muted">${fmtClock(e.ts)}</td>
-        <td>${esc(e.user)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
-        <td><select data-f="tier"><option value="0" ${!e.tier?"selected":""}>—</option>${[1,2,3].map(t=>`<option value="${t}" ${e.tier===t?"selected":""}>T${t}</option>`).join("")}</select></td>
-        <td class="num"><input class="mo" type="number" min="1" data-f="months" value="${e.months||""}" ${!e.tier?"disabled":""}></td>
-        <td class="num pts">${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span> `:""}${e.points}</td>
-        <td><input class="edit" data-f="text" value="${esc(e.text)}"></td>
-        <td class="acts"><button class="icon${e.excluded?" on":""}" data-act="toggle" title="${e.excluded?"Показати — знову рахувати":"Приховати — не рахувати (можна повернути)"}">${e.excluded?ICON_EYE_OFF:ICON_EYE}</button><button class="icon danger" data-act="del" title="Видалити назавжди">${ICON_TRASH}</button></td></tr>`).join("")
+        <td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
+        ${editMode ? `<td><select data-f="tier"><option value="0" ${!e.tier?"selected":""}>—</option>${[1,2,3].map(t=>`<option value="${t}" ${e.tier===t?"selected":""}>T${t}</option>`).join("")}</select></td>
+        <td class="num"><input class="mo" type="number" min="1" data-f="months" value="${e.months||""}" ${!e.tier?"disabled":""}></td>`
+        : `<td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td><td class="num">${e.tier?`${e.months} міс.`:'<span class="muted">—</span>'}</td>`}
+        <td class="num pts">${e.points}</td>
+        <td>${editMode ? `<input class="edit" data-f="text" value="${esc(e.text)}">` : `<span class="otext">${esc(e.text)}</span>`}</td>
+        <td class="acts"><button class="icon${e.excluded?" on":""}" data-act="toggle" title="${e.excluded?"Показати — знову рахувати":"Приховати — не рахувати (можна повернути)"}">${e.excluded?ICON_EYE_OFF:ICON_EYE}</button>${editMode?`<button class="icon danger" data-act="del" title="Видалити назавжди">${ICON_TRASH}</button>`:""}</td></tr>`).join("")
     }</tbody></table>`;
   }
 }
@@ -344,6 +356,7 @@ $("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round
 $("logoutBtn2").onclick = async () => { if(await confirmBox("Вийти з акаунта Twitch?")){ closeModal("generalModal"); call("Logout"); } };
 $("changeClient2").onclick = async () => { if(await confirmBox("Змінити Client ID? Потрібно буде увійти знову.")){ closeModal("generalModal"); call("ChangeClientID"); } };
 $("openBase").onclick = () => call("OpenFolder", "");
+$("openCsv").onclick = () => call("OpenFolder", "exports");
 
 // СабДей: нагорода + правила балів
 $("subdaySettingsBtn").onclick = () => {
@@ -411,7 +424,9 @@ $("cancelLogin").onclick = () => call("CancelLogin");
 $("changeClient").onclick = e => { e.preventDefault(); call("ChangeClientID"); };
 
 $("startBtn").onclick = async () => {
+  const wasNew = S.session.status !== "paused", hadOrders = S.entries.length > 0;
   setState(await call("StartTimer"));
+  if(wasNew && hadOrders) toast("Новий збір. Попередній збережено в теку з .csv");
   if(!S.settings.rewardId) toast("Увага: нагороду не вибрано — замовлення не записуватимуться", 4000);
   else if(S.conn.status!=="on") toast("Увага: немає з'єднання з Twitch", 4000);
 };
@@ -429,6 +444,7 @@ $("tableWrap").addEventListener("click", async e => {
   const h = e.target.closest("th[data-sort]");
   if(h){ const k=h.dataset.sort, cur=sortKey[tab]; sortKey[tab] = [k, cur[0]===k ? -cur[1] : (k==="name"||k==="user"||k==="text"?1:-1)]; renderTable(); return; }
   const btn = e.target.closest("button[data-act]"); if(!btn) return;
+  if(btn.dataset.act==="editmode"){ editMode = !editMode; renderTable(); return; }
   const id = btn.closest("tr").dataset.id, ent = S.entries.find(x=>x.id===id); if(!ent) return;
   if(btn.dataset.act==="toggle") setState(await call("UpdateEntry", {...ent, excluded: !ent.excluded}));
   if(btn.dataset.act==="del"){ if(!(await confirmBox(`Видалити замовлення «${ent.text}» від ${ent.user}?`))) return; setState(await call("DeleteEntry", id)); }
@@ -446,7 +462,6 @@ $("tableWrap").addEventListener("change", async e => {
 $("tableWrap").addEventListener("focusout", () => setTimeout(()=>{ if(tableDirty) renderTable(); }, 0));
 
 /* ---------- експорт ---------- */
-const stamp = () => { const d=new Date(), p=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`; };
 
 /* ---------- експорт у Marbles: одна кнопка під таймером, анімація замість модалки ---------- */
 let mBusy = false;
@@ -483,38 +498,6 @@ async function exportMarbles(){
 }
 $("exportMarbles").onclick = exportMarbles;
 setInterval(renderExportBtn, 500); // таймер може завершитися сам
-$("openExports").onclick = () => call("OpenFolder", "exports");
-$("openHistory").onclick = () => call("OpenFolder", "history");
-
-$("exportCsv").onclick = async () => {
-  const counted = countedSet();
-  // Excel в українській локалі очікує «;» як роздільник
-  const cell = v => { const s = String(v ?? ""); return /[";\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
-  const head = ["Час","Чатерс","Логін","Тір","Місяці","Бали","Замовлення","Рахується"];
-  const rows = S.entries.map(e=>[new Date(e.ts).toLocaleString("uk-UA"), e.user, e.login, e.tier||"—", e.tier?e.months:"", pointsOf(e), e.text, e.excluded?"виключено":counted.has(e.id)?"так":"ні (дубль)"]);
-  const sum = aggregate().sort((a,b)=>b.points-a.points).map(g=>[g.name, g.points, g.count, g.users.map(u=>`${u.name} (${u.p})`).join(", ")]);
-  const csv = "sep=;\r\n" + [head, ...rows].map(r=>r.map(cell).join(";")).join("\r\n")
-    + "\r\n\r\nПідсумок\r\n" + [["Замовлення","Бали","Людей","Хто"], ...sum].map(r=>r.map(cell).join(";")).join("\r\n") + "\r\n";
-  const p = await call("SaveExport", `subday_${stamp()}.csv`, csv);
-  toast("Збережено: " + p, 4000); call("RevealFile", p);
-};
-$("exportJson").onclick = async () => {
-  const data = JSON.stringify({exportedAt:new Date().toISOString(), settings:S.settings, session:S.session,
-    entries:S.entries.map(e=>({...e, points:pointsOf(e)})), summary:aggregate().map(({variants,...g})=>g)}, null, 2);
-  const p = await call("SaveExport", `subday_${stamp()}.json`, data);
-  toast("Збережено: " + p, 4000); call("RevealFile", p);
-};
-$("newSession").onclick = async () => {
-  if(S.entries.length && !(await confirmBox("Почати новий збір? Поточні замовлення буде збережено в папку history і очищено з таблиці."))) return;
-  const p = await call("NewSession");
-  toast(p ? "Архів: " + p : "Новий збір", 4000);
-};
-$("mAdd").onclick = async () => {
-  const tier = Number($("mTier").value);
-  setState(await call("AddManual", $("mUser").value, tier, Math.max(1, Number($("mMonths").value)||1), $("mText").value));
-  $("mText").value = ""; toast("Додано");
-};
-
 /* ---------- старт ---------- */
 function boot(){
   if(!window.go || !window.runtime){ setTimeout(boot, 50); return; }

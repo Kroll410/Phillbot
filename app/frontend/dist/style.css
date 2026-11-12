@@ -49,7 +49,8 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .status{text-align:center;color:var(--muted);margin-bottom:10px}
 .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .btns .wide{grid-column:span 2}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:10px;margin-bottom:16px;align-items:start}
+.icon-btn.corner{width:40px;height:40px;border-radius:10px}
 .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .stat b{display:block;font:600 24px/1.2 var(--font-display);font-variant-numeric:tabular-nums}
 .stat span{color:var(--muted);font-size:12px}
@@ -208,3 +209,12 @@ input[type=range]{padding:0;accent-color:var(--accent);background:transparent;bo
 .mbtn.fail:disabled{background:#5a1a1a;color:#ffb3b3}
 
 .icon-btn svg{display:block}
+
+/* нік як у чаті Twitch */
+.utag{display:inline-flex;align-items:center;gap:0;white-space:nowrap}
+.utag .cbadge{height:16px;width:auto;margin-right:3px}
+.utag .cname{font-weight:700}
+.users .utag{margin-right:2px}
+/* режим редагування замовлень */
+.editbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.otext{display:inline-block;padding:3px 0}

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -189,5 +190,42 @@ func TestRenameEntries(t *testing.T) {
 	}
 	if s = a.RenameEntries(ids, " "); s.Entries[1].Text != "dark souls 3" {
 		t.Fatal("empty rename applied")
+	}
+}
+
+func TestEachStartIsNewCollection(t *testing.T) {
+	a := newTestApp(t)
+	a.StartTimer()
+	a.AddManual("Phill", 3, 46, "Dark Souls")
+	a.AddManual("kroll", 1, 20, "dark souls!")
+	a.PauseTimer()
+	if s := a.StartTimer(); len(s.Entries) != 2 { // «Продовжити» після паузи — той самий збір
+		t.Fatal("resume cleared entries")
+	}
+	a.FinishTimer()
+	files, _ := filepath.Glob(filepath.Join(a.exportsDir, "subday_*.csv"))
+	if len(files) != 1 {
+		t.Fatal("no csv after finish", files)
+	}
+	b, _ := os.ReadFile(files[0])
+	txt := string(b)
+	if !strings.HasPrefix(txt, "\xEF\xBB\xBFsep=;\r\n") || !strings.Contains(txt, "Dark Souls;158;2;") {
+		t.Fatalf("%q", txt)
+	}
+	s := a.AddTime(60000) // +1 хв після завершення — продовжує той самий збір
+	if s.Session.Status != "running" || len(s.Entries) != 2 {
+		t.Fatal("+1 after finish")
+	}
+	a.FinishTimer()
+	s = a.StartTimer() // новий збір
+	if len(s.Entries) != 0 || s.Session.Status != "running" {
+		t.Fatal("start did not begin a new collection")
+	}
+	if h, _ := filepath.Glob(filepath.Join(a.historyDir, "subday_*.json")); len(h) != 1 {
+		t.Fatal("history not archived", h)
+	}
+	a.FinishTimer() // порожній збір — CSV не створюється
+	if files, _ := filepath.Glob(filepath.Join(a.exportsDir, "subday_*.csv")); len(files) != 1 {
+		t.Fatal("empty collection produced csv", files)
 	}
 }

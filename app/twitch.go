@@ -300,6 +300,8 @@ type Badge struct {
 type subInfo struct {
 	tier, months int
 	ts           time.Time
+	color        string      // колір ніку з чату
+	badges       []ChatBadge // бейджі з чату (картинки)
 }
 
 func subFromBadges(badges []Badge) (tier, months int) {
@@ -473,7 +475,7 @@ func (a *App) listen(ctx context.Context, bc User) {
 }
 
 // Визначає тір (Helix — точно) і місяці (бейдж з повідомлення чату, що приходить разом з redeem-ом).
-func (a *App) lookupSub(bcID, userID, rewardID string) (tier, months int, source string) {
+func (a *App) lookupSub(bcID, userID, rewardID string) (tier, months int, source, color string, badges []ChatBadge) {
 	var chat *subInfo
 	for i := 0; i < 8; i++ {
 		a.badgeMu.Lock()
@@ -514,5 +516,8 @@ func (a *App) lookupSub(bcID, userID, rewardID string) (tier, months int, source
 		}
 	}
 	source = "API: " + apiStr + "; бейдж: " + badgeStr
+	if chat != nil {
+		color, badges = chat.color, chat.badges
+	}
 	return
 }

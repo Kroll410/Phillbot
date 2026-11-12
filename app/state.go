@@ -52,6 +52,9 @@ type Entry struct {
 	Manual   bool   `json:"manual"`
 	// діагностика: що сказали API і бейдж
 	Source string `json:"source,omitempty"`
+	// як нік виглядає в чаті Twitch (з повідомлення, що прийшло разом із замовленням)
+	Color  string      `json:"color,omitempty"`
+	Badges []ChatBadge `json:"badges,omitempty"`
 }
 
 type SeenReward struct {

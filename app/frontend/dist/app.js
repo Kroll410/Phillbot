@@ -345,15 +345,15 @@ function renderTable(){
     const max = Math.max(1,...rows.map(r=>r.points)), total = rows.reduce((a,r)=>a+r.points,0)||1;
     if(!rows.length){ wrap.innerHTML = `<div class="empty">${D().entries.length?"Нічого не знайдено":"Замовлень поки немає. Виберіть нагороду і натисніть «Почати збір»."}</div>`; return; }
     const counted = countedSet();
-    wrap.innerHTML = `<table class="dnd summary"><thead><tr><th class="gripcol"></th><th style="width:44px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:220px">Частка</th>${th("Людей","count","num")}<th style="width:44px"></th></tr></thead><tbody>${
+    wrap.innerHTML = `<table class="dnd summary"><thead><tr><th class="gripcol"></th><th style="width:44px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:220px">Частка</th>${th("Людей","count","num")}<th style="width:1%"></th><th style="width:44px"></th></tr></thead><tbody>${
       rows.map((g,i)=>{
         const open = openGroups.has(g.key);
         const main = `<tr class="grow${open?" open":""}" data-key="${esc(g.key)}" data-name="${esc(g.name)}"><td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
         <td class="num pts">${g.points}</td><td><div class="share"><div class="track"><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div></div><span>${(g.points/total*100).toFixed(0)}%</span></div></td>
-        <td class="num">${g.count}</td><td class="chev" title="${open?"Згорнути":"Показати замовлення"}"><span></span></td></tr>`;
+        <td class="num">${g.count}</td><td class="wincell">${canPickWinner() && g.points>0 ? `<button class="small winbtn" data-win="${esc(g.name)}" title="Вибрати переможцем і перейти до гри">Переможець</button>` : ""}</td><td class="chev" title="${open?"Згорнути":"Показати замовлення"}"><span></span></td></tr>`;
         if(!open) return main;
         const list = D().entries.filter(e=>counted.has(e.id) && norm(e.text)===g.key).sort((a,b)=>pointsOf(b)-pointsOf(a) || a.ts-b.ts);
-        return main + `<tr class="gdetail"><td colspan="7"><table class="subtable"><thead><tr><th>Час</th><th>Чатерс</th><th>Тір сабки</th><th class="num">Має сабку</th><th class="num">Бали</th><th>Замовлення</th></tr></thead><tbody>${
+        return main + `<tr class="gdetail"><td colspan="8"><table class="subtable"><thead><tr><th>Час</th><th>Чатерс</th><th>Тір сабки</th><th class="num">Має сабку</th><th class="num">Бали</th><th>Замовлення</th></tr></thead><tbody>${
           list.map(e=>`<tr><td class="muted">${fmtClock(e.ts)}</td><td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
             <td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td>
             <td class="num">${e.tier?`<span class="subcell">${subBadgeFor(e)}${e.months} міс.</span>`:'<span class="muted">—</span>'}</td>
@@ -484,7 +484,7 @@ $("openCsv").onclick = () => call("OpenFolder", "exports");
 $("subdaySettingsBtn").onclick = () => {
   const st = S.settings; pendingReward = null;
   $("m1").value = st.mult["1"]; $("m2").value = st.mult["2"]; $("m3").value = st.mult["3"];
-  $("nonSub").value = st.nonSubPoints; $("dupMode").value = st.dupMode;
+  $("nonSub").value = st.nonSubPoints; $("dupMode").value = st.dupMode; $("gameMin").value = st.gameMin || 40;
   renderRewardGrid(); openModal("subdayModal");
   if(!(S.rewards||[]).length) call("RefreshRewards").then(renderRewardGrid);
 };
@@ -496,7 +496,7 @@ $("subdaySave").onclick = async () => {
     if(r && r.is_user_input_required === false) toast("Увага: ця нагорода не вимагає тексту — замовлення без тексту ігноруються", 4500);
   }
   await saveSettings({ mult: {"1": Math.max(0,n("m1",1)), "2": Math.max(0,n("m2",2)), "3": Math.max(0,n("m3",3))},
-    nonSubPoints: Math.max(0, n("nonSub",0)), dupMode: $("dupMode").value });
+    nonSubPoints: Math.max(0, n("nonSub",0)), dupMode: $("dupMode").value, gameMin: Math.min(600, Math.max(1, Math.round(n("gameMin",40)))) });
   pendingReward = null; closeModal("subdayModal"); toast("Налаштування СабДею збережено");
 };
 
@@ -531,6 +531,60 @@ $("newStreamBtn").onclick = async () => {
   pastStream = null; view = null;
   setState(await call("NewStream")); loadStreams(); toast("Почато новий стрім");
 };
+/* ---------- етапи СабДею: 1 збір → 2 гра переможця ---------- */
+const canPickWinner = () => D().live && S.exported && S.phase !== "play";
+async function pickWinner(name){
+  const min = S.settings.gameMin || 40;
+  if(!(await confirmBox(`Переможець: «${name}».\n\nПерейти до гри? Таймер на ${min} хв стартує одразу.`, "Почати гру", "Скасувати"))) return;
+  setState(await call("SetWinner", name));
+}
+function gameRemaining(){ const g = S.game || {}; return g.status==="running" ? g.endsAt - Date.now() : (g.remainingMs || 0); }
+let shownStep = 0;
+function renderSteps(){
+  const play = S.phase === "play";
+  $("stepper").classList.toggle("hidden", !(play || S.exported));
+  $("stepper").querySelectorAll(".step").forEach(el => {
+    const n = Number(el.dataset.step);
+    el.classList.toggle("active", (play ? 2 : 1) === n);
+    el.classList.toggle("done", play && n === 1);
+  });
+  $("stepper").classList.toggle("at2", play);
+  const step = play ? 2 : 1;
+  if(step !== shownStep){
+    $("stepTrack").classList.toggle("at2", play);
+    if(shownStep) toast(play ? "Етап 2: гра переможця" : "Гру завершено — етап 1");
+    shownStep = step;
+  }
+  if(!play) return;
+  $("gLabel").textContent = `Гра · Збір ${S.collN || ""}`;
+  $("gName").textContent = S.winner || "—";
+  // хто замовляв переможне замовлення
+  const g = aggregate(LIVE()).find(x => x.name === S.winner || x.key === norm(S.winner||""));
+  $("gUsers").innerHTML = g ? g.users.map(u => `${userTag(u)} <span class="muted">(${u.p})</span>`).join(" ") : "";
+  const o = S.obs || {};
+  $("gObs").innerHTML = o.running ? `<div class="obsrow"><span><b>Віджет гри для OBS</b> <span class="muted">600×260</span><code>${esc(o.url)}/overlay/game</code></span>
+    <button class="small" data-copy="${esc(o.url)}/overlay/game">Копіювати</button><button class="small" data-open="/overlay/game">↗</button></div>` : "";
+  renderGameTimer();
+}
+function renderGameTimer(){
+  if(!S || S.phase !== "play") return;
+  const g = S.game || {}, r = gameRemaining();
+  $("gTimer").textContent = fmtTime(r);
+  $("gTimer").className = "gtimer " + (g.status||"") + (g.status==="running" && r <= 60000 ? " low" : "");
+  $("gStatus").textContent = g.status==="paused" ? "Пауза" : "Гра йде — після завершення таймера повернемось до збору замовлень";
+  $("gPause").textContent = g.status==="paused" ? "Продовжити" : "Пауза";
+}
+setInterval(renderGameTimer, 250);
+$("gPause").onclick = async () => setState(await call(S.game.status==="paused" ? "GameResume" : "GamePause"));
+$("gPlus").onclick = async () => setState(await call("GameAddTime", 60000));
+$("gMinus").onclick = async () => setState(await call("GameAddTime", -60000));
+$("gFinish").onclick = async () => { if(await confirmBox("Завершити гру й повернутися до збору замовлень?", "Завершити", "Скасувати")) setState(await call("FinishGame")); };
+$("gObs").addEventListener("click", async e => {
+  const c = e.target.closest("[data-copy]"), o = e.target.closest("[data-open]");
+  if(c){ const ok = await call("CopyText", c.dataset.copy); toast(ok ? "URL скопійовано" : "Не вдалося скопіювати"); }
+  if(o) call("OpenOverlay", o.dataset.open);
+});
+
 function renderAll(){
   if(!inited){ initInputs(); inited = true; }
   renderAuth();
@@ -540,7 +594,7 @@ function renderAll(){
     const ck = (S.past||[]).length + ":" + S.collN + ":" + S.session.status;
     if(ck !== lastCollKey){ lastCollKey = ck; if(streams.length) loadStreams(); }
     renderStreamBar();
-    renderStats(); renderTable(); renderRewardCurrent(); renderObs(); renderChat();
+    renderStats(); renderTable(); renderRewardCurrent(); renderObs(); renderChat(); renderSteps();
     if($("subdayModal").classList.contains("show")) renderRewardGrid();
     if(!chatLoaded){ chatLoaded = true; api().GetChat().then(m => { chatPending = (m||[]).concat(chatPending); }); }
   }
@@ -579,6 +633,8 @@ $("search").oninput = renderTable;
 $("tableWrap").addEventListener("click", async e => {
   const h = e.target.closest("th[data-sort]");
   if(h){ const k=h.dataset.sort, cur=sortKey[tab]; sortKey[tab] = [k, cur[0]===k ? -cur[1] : (k==="name"||k==="user"||k==="text"?1:-1)]; renderTable(); return; }
+  const wb = e.target.closest("button[data-win]");
+  if(wb){ e.stopPropagation(); pickWinner(wb.dataset.win); return; }
   const gr = e.target.closest("tr.grow");
   if(gr && !e.target.closest(".grip")){ const k = gr.dataset.key; openGroups.has(k) ? openGroups.delete(k) : openGroups.add(k); renderTable(); return; }
   const btn = e.target.closest("button[data-act]"); if(!btn) return;
@@ -633,6 +689,7 @@ async function exportMarbles(){
     await sleep(2500);
   }
   mBusy = false; renderExportBtn();
+  if(S.exported && S.phase !== "play" && tab === "summary") toast("Тепер виберіть переможця в «Підсумку»", 3500);
 }
 $("exportMarbles").onclick = exportMarbles;
 setInterval(renderExportBtn, 500); // таймер може завершитися сам

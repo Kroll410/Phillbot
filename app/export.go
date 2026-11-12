@@ -100,6 +100,13 @@ func (a *App) ExportMarbles(launch bool) (MarblesResult, error) {
 		_ = os.WriteFile(filepath.Join(hist, "subday_marbles_"+time.Now().Format("2006-01-02_15-04-05")+".csv"), data, 0644)
 	}
 	res := MarblesResult{Path: p, Dir: dir, Lines: len(clean), Copied: setClipboard(dir)}
+	a.mu.Lock()
+	if !a.st.Exported { // після першого експорту можна вибрати переможця
+		a.st.Exported = true
+		a.saveLocked()
+		a.emitLocked()
+	}
+	a.mu.Unlock()
 	if launch {
 		if marblesRunning() {
 			res.AlreadyRunning = true

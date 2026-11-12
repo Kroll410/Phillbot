@@ -59,6 +59,10 @@ type OverlayState struct {
 	Totals      OverlayTotals `json:"totals"`
 	Top         []Group       `json:"top"`
 	Last        *LastOrder    `json:"last"`
+	Phase       string        `json:"phase"`  // collect | play
+	Game        Timer         `json:"game"`   // таймер гри переможця
+	Winner      string        `json:"winner"` // переможне замовлення
+	CollN       int           `json:"collN"`
 }
 
 // ---------- SSE ----------
@@ -326,7 +330,7 @@ func (a *App) overlayState() OverlayState {
 		top = top[:50]
 	}
 	out := OverlayState{Session: st.Session, ServerNow: time.Now().UnixMilli(), RewardTitle: st.Settings.RewardTitle,
-		Channel: a.bc.DisplayName, Top: append([]Group(nil), top...),
+		Channel: a.bc.DisplayName, Top: append([]Group(nil), top...), Phase: st.Phase, Game: st.Game, Winner: st.Winner, CollN: st.CollN,
 		Totals: OverlayTotals{Entries: n, Users: len(users), Orders: len(counts), Points: total, Marbles: sumInts(counts)}}
 	for i := range out.Top {
 		if len(out.Top[i].Users) > 10 {

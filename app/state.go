@@ -22,6 +22,7 @@ type Settings struct {
 	DupMode      string         `json:"dupMode"` // last | first | all
 	ObsPort      int            `json:"obsPort"` // локальний сервер для OBS (127.0.0.1)
 	Chat         ChatSettings   `json:"chat"`
+	GameMin      int            `json:"gameMin"` // хвилин на гру переможця (етап 2)
 }
 
 // Налаштування вкладки «Чат» (вигляд чату в програмі та в окремому вікні).
@@ -76,11 +77,16 @@ type State struct {
 	Stream StreamInfo   `json:"stream"`
 	Past   []Collection `json:"past"`
 	CollN  int          `json:"collN"`
+	// етапи: collect (збір) → play (гра переможця, окремий таймер)
+	Phase    string `json:"phase"`
+	Game     Timer  `json:"game"`
+	Winner   string `json:"winner"`
+	Exported bool   `json:"exported"` // поточний збір уже експортовано в Marbles — можна вибрати переможця
 }
 
 func defaultSettings() Settings {
 	return Settings{DurationMin: 10, NonSubPoints: 0, Mult: map[string]int{"1": 1, "2": 2, "3": 3},
-		DupMode: "last", ObsPort: defaultObsPort}
+		DupMode: "last", ObsPort: defaultObsPort, GameMin: 40}
 }
 
 func defaultState() State {
@@ -114,6 +120,9 @@ func (s *Settings) normalize() {
 	if s.Chat.FontSize < 11 || s.Chat.FontSize > 28 {
 		s.Chat.FontSize = 14
 	}
+	if s.GameMin < 1 || s.GameMin > 600 {
+		s.GameMin = 40
+	}
 	if s.ObsPort < 1024 || s.ObsPort > 65000 {
 		s.ObsPort = defaultObsPort
 	}
@@ -131,6 +140,9 @@ func loadState(file string) State {
 	}
 	if st.SeenRewards == nil {
 		st.SeenRewards = map[string]SeenReward{}
+	}
+	if st.Phase != phasePlay {
+		st.Phase = phaseCollect
 	}
 	if st.SeenRedeems == nil {
 		st.SeenRedeems = []string{}

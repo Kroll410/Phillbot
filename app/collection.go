@@ -36,6 +36,7 @@ type Collection struct {
 	FinishedAt int64    `json:"finishedAt"`
 	Settings   Settings `json:"settings"` // правила балів на момент збору
 	Entries    []Entry  `json:"entries"`
+	Winner     string   `json:"winner,omitempty"`
 }
 
 type StreamFile struct {
@@ -81,7 +82,7 @@ func (a *App) lastActivityLocked() int64 {
 // поточний збір як Collection (для збереження)
 func (a *App) currentCollectionLocked() Collection {
 	return Collection{N: a.st.CollN, StartedAt: a.st.Session.StartedAt, FinishedAt: a.st.Session.FinishedAt,
-		Settings: a.st.Settings, Entries: append([]Entry(nil), a.st.Entries...)}
+		Settings: a.st.Settings, Entries: append([]Entry(nil), a.st.Entries...), Winner: a.st.Winner}
 }
 
 func csvCell(v string) string {
@@ -233,8 +234,10 @@ func (a *App) NewStream() Snapshot {
 		}
 		a.archiveLocked()
 		a.writeStreamLocked()
+		a.finishGameLocked()
 		st.Entries = []Entry{}
 		st.SeenRedeems = []string{}
+		st.Winner, st.Exported, st.Phase = "", false, phaseCollect
 		a.lastOrd = nil
 		a.beginStreamLocked(time.Now())
 		st.Session = Timer{Status: "idle", RemainingMs: int64(st.Settings.DurationMin) * 60000}

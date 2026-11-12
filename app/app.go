@@ -256,6 +256,13 @@ func (a *App) ticker(ctx context.Context) {
 			return
 		case <-t.C:
 			a.mu.Lock()
+			if a.tickGameLocked(time.Now().UnixMilli()) {
+				a.saveLocked()
+				a.emitLocked()
+				a.mu.Unlock()
+				a.logf("Час гри вийшов — назад до збору замовлень")
+				continue
+			}
 			s := &a.st.Session
 			if s.Status == "running" && s.EndsAt <= time.Now().UnixMilli() {
 				s.Status, s.RemainingMs, s.FinishedAt = "finished", 0, time.Now().UnixMilli()
@@ -460,6 +467,8 @@ func (a *App) StartTimer() Snapshot {
 			a.archiveLocked()
 			a.ensureStreamLocked(time.UnixMilli(now)) // довга перерва — новий стрім
 			st.CollN = len(st.Past) + 1
+			st.Winner, st.Exported, st.Phase = "", false, phaseCollect
+			st.Game = Timer{Status: "idle"}
 			st.Entries = []Entry{}
 			st.SeenRedeems = []string{}
 			a.lastOrd = nil

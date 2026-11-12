@@ -282,3 +282,47 @@ func TestHidingLatestOrderCountsNothing(t *testing.T) {
 		t.Fatal(eff)
 	}
 }
+
+func TestGamePhase(t *testing.T) {
+	a := newTestApp(t)
+	a.StartTimer()
+	a.AddManual("Phill", 3, 46, "Dark Souls")
+	if _, err := a.SetWinner("Dark Souls"); err == nil {
+		t.Fatal("winner allowed before export")
+	}
+	a.FinishTimer()
+	if _, err := a.ExportMarbles(false); err != nil {
+		t.Fatal(err)
+	}
+	if !a.st.Exported {
+		t.Fatal("export flag")
+	}
+	s, err := a.SetWinner("Dark Souls")
+	if err != nil || s.Phase != "play" || s.Game.Status != "running" || s.Game.EndsAt-time.Now().UnixMilli() < 39*60000 {
+		t.Fatalf("play: %v %+v", err, s.Game)
+	}
+	s = a.GamePause()
+	if s.Game.Status != "paused" {
+		t.Fatal("pause")
+	}
+	s = a.GameAddTime(60000)
+	if s.Game.RemainingMs < 40*60000 {
+		t.Fatal("+1")
+	}
+	a.GameResume()
+	// час гри вийшов — автоматично назад до етапу 1
+	a.mu.Lock()
+	a.st.Game.EndsAt = time.Now().UnixMilli() - 1
+	ended := a.tickGameLocked(time.Now().UnixMilli())
+	a.mu.Unlock()
+	if !ended || a.st.Phase != "collect" || a.st.Game.Status != "finished" {
+		t.Fatal("auto return to collect", a.st.Phase)
+	}
+	if f, _ := a.GetStream(a.st.Stream.ID); len(f.Collections) != 1 || f.Collections[0].Winner != "Dark Souls" {
+		t.Fatal("winner not saved in stream")
+	}
+	s = a.StartTimer() // новий збір — переможець і прапорець експорту скидаються
+	if s.Winner != "" || s.Exported || s.Phase != "collect" || s.CollN != 2 {
+		t.Fatalf("%+v", s.Phase)
+	}
+}

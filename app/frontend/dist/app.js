@@ -1278,7 +1278,9 @@ function animateSpin(sp){
   const tok = ++spinToken; let endRes; spinEndP = new Promise(r => endRes = r);
   const secs = sp.ids.map((id, i) => ({id, w: sp.weights[i]}));
   const TAU = Math.PI * 2, tgt = -sp.pos * TAU; // точка pos на колі — під стрілкою зверху
-  const from = wRot, delta = ((tgt - from) % TAU + TAU) % TAU + TAU * 6, dur = 7000, t0 = performance.now();
+  // «перчинка» — довший оберт, що наприкінці ледь повзе до межі сектора
+  const spicy = !!sp.spicy, from = wRot, delta = ((tgt - from) % TAU + TAU) % TAU + TAU * (spicy ? 7 : 6), dur = spicy ? 10500 : 7000, t0 = performance.now();
+  const ease = spicy ? (t => 1 - Math.pow(1 - t, 6)) : easeSpin;
   wAnim = {secs, sp}; wFade = null; $("wResult").className = "wresult"; renderSpinBtn();
   let finished = false;
   const done = () => {
@@ -1302,7 +1304,7 @@ function animateSpin(sp){
   const step = now => {
     if(finished) return;
     if(tok !== spinToken){ finished = true; endRes(); return; }
-    const t = Math.min(1, (now - t0) / dur); wRot = from + delta * easeSpin(t); wheelDraw(secs);
+    const t = Math.min(1, (now - t0) / dur); wRot = from + delta * ease(t); wheelDraw(secs);
     if(t < 1) requestAnimationFrame(step); else done();
   };
   requestAnimationFrame(step);

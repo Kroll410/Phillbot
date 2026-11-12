@@ -92,6 +92,7 @@ type Spin struct {
 	Pos     float64   `json:"pos"`     // точка на колі 0..1 (від random.org)
 	Source  string    `json:"source"`  // random.org | локально
 	Final   bool      `json:"final"`   // після цього оберту відомий переможець
+	Spicy   bool      `json:"spicy"`   // «перчинка»: стрілка зупиняється впритул до межі сектора
 }
 
 type AuctionState struct {
@@ -102,7 +103,8 @@ type AuctionState struct {
 	Winner  string          `json:"winner"` // id лота-переможця
 	Spin    *Spin           `json:"spin,omitempty"`
 	SeenIDs []string        `json:"seenIds"`
-	Merges  []MergeRec      `json:"merges"` // історія об'єднань — для «Скасувати об'єднання»
+	Merges  []MergeRec      `json:"merges"`  // історія об'єднань — для «Скасувати об'єднання»
+	SpiceAt int             `json:"spiceAt"` // «на вибування»: при скількох лотах на колесі буде оберт «на тоненького» (0 — ще не вибрано)
 }
 
 // MergeRec — одне об'єднання лотів: що повернути, якщо стрімер натисне «Скасувати об'єднання».
@@ -686,21 +688,35 @@ func (a *App) AuctionSpin() (Snapshot, error) {
 		return a.GetState(), errors.New("на колесі ще немає лотів")
 	}
 	pos, src := 0.0, "—"
-	pick := ids[0]
+	pick, pickIdx := ids[0], 0
 	if len(ids) > 1 {
 		pos, src = randomUnit()
 		r := pos * total
 		for k, x := range w {
-			pick = ids[k]
+			pick, pickIdx = ids[k], k
 			if r < x {
 				break
 			}
 			r -= x
 		}
 	}
+	// «перчинка»: коли на колесі ≤5 лотів, один випадковий оберт зупиняється впритул до межі сектора.
+	// Хто вибуває — і далі вирішує random.org; змінюється лише точка всередині того самого сектора.
+	spicy := false
+	a.mu.Lock()
+	if mode == "elim" && len(ids) >= 2 && len(ids) <= 5 {
+		if a.st.Auction.SpiceAt == 0 {
+			a.st.Auction.SpiceAt = 2 + localIntn(len(ids)-1) // один з обертів, що лишились (при n…2 лотах)
+		}
+		spicy = a.st.Auction.SpiceAt == len(ids)
+	}
+	a.mu.Unlock()
+	if spicy {
+		pos = nearEdge(w, total, pickIdx)
+	}
 	snap := a.mutate(func(st *State) {
 		au := &st.Auction
-		sp := &Spin{At: time.Now().UnixMilli(), Mode: mode, IDs: ids, Weights: w, Pick: pick, Pos: pos, Source: src}
+		sp := &Spin{At: time.Now().UnixMilli(), Mode: mode, IDs: ids, Weights: w, Pick: pick, Pos: pos, Source: src, Spicy: spicy}
 		if mode == "instant" || len(ids) <= 1 {
 			au.Winner, sp.Final = pick, true
 		} else {
@@ -737,7 +753,7 @@ func (a *App) AuctionResetSpins() Snapshot {
 		for i := range au.Lots {
 			au.Lots[i].Out = 0
 		}
-		au.Winner, au.Spin = "", nil
+		au.Winner, au.Spin, au.SpiceAt = "", nil, 0
 	})
 }
 
@@ -778,4 +794,32 @@ func (a *App) tickAuctionLocked(now int64) bool {
 		return true
 	}
 	return false
+}
+
+// nearEdge — точка всередині сектора k, зовсім близько до однієї з його меж (1–3.5% ширини сектора).
+func nearEdge(w []float64, total float64, k int) float64 {
+	start := 0.0
+	for i := 0; i < k; i++ {
+		start += w[i]
+	}
+	start /= total
+	width := w[k] / total
+	off := width * (0.01 + 0.025*localUnit())
+	if localUnit() < 0.5 {
+		return start + off
+	}
+	return start + width - off
+}
+
+func localUnit() float64 {
+	var b [8]byte
+	_, _ = crand.Read(b[:])
+	return float64(binary.BigEndian.Uint64(b[:])>>11) / float64(1<<53)
+}
+
+func localIntn(n int) int {
+	if n <= 1 {
+		return 0
+	}
+	return int(localUnit() * float64(n))
 }

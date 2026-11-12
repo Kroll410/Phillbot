@@ -198,3 +198,56 @@ func TestAuctionEditAndWinnerLock(t *testing.T) {
 		t.Fatal("merge allowed after winner")
 	}
 }
+
+func TestAuctionSpice(t *testing.T) {
+	a := newTestApp(t)
+	a.AuctionSaveSettings(AuctionSettings{RewardIDs: []string{"q"}})
+	a.AuctionStart()
+	for i, name := range []string{"A", "B", "C", "D", "E", "F"} {
+		a.onRedemption(bid(name, "q", "Квиток", "u"+name, name, 1000*(i+1)), User{})
+	}
+	a.AuctionFinish()
+	au := &a.st.Auction
+	randomUnit = func() (float64, string) { return 0.5, "test" }
+	spicy := 0
+	for au.Winner == "" {
+		if _, err := a.AuctionSpin(); err != nil {
+			t.Fatal(err)
+		}
+		sp := au.Spin
+		// стрілка все одно в секторі вибраного лота
+		start, total := 0.0, 0.0
+		for _, x := range sp.Weights {
+			total += x
+		}
+		k := 0
+		for i, id := range sp.IDs {
+			if id == sp.Pick {
+				k = i
+			}
+		}
+		for i := 0; i < k; i++ {
+			start += sp.Weights[i] / total
+		}
+		end := start + sp.Weights[k]/total
+		if sp.Pos < start || sp.Pos >= end {
+			t.Fatalf("pos %.4f outside pick sector [%.4f,%.4f)", sp.Pos, start, end)
+		}
+		if sp.Spicy {
+			spicy++
+			if len(sp.IDs) > 5 {
+				t.Fatal("spice before last 5")
+			}
+			if d := sp.Pos - start; d > (end-start)*0.04 && end-sp.Pos > (end-start)*0.04 {
+				t.Fatalf("spicy pos not near the edge")
+			}
+		}
+	}
+	if spicy != 1 {
+		t.Fatalf("spicy spins = %d, want 1", spicy)
+	}
+	a.AuctionResetSpins()
+	if au.SpiceAt != 0 {
+		t.Fatal("spice not reset")
+	}
+}

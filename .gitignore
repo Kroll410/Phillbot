@@ -1,0 +1,9 @@
+# секрети й локальні дані — ніколи не комітити
+config.json
+tokens.json
+redemptions.csv
+marbles/
+*.exe
+build/bin/
+node_modules/
+frontend/dist/

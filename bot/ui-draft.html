@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>СабДей — збір замовлень</title>
+<style>
+  :root{
+    --bg:#0e0e10; --panel:#18181b; --panel2:#1f1f23; --line:#2f2f35;
+    --text:#efeff1; --muted:#adadb8; --accent:#9147ff; --accent2:#772ce8;
+    --ok:#00c853; --warn:#ffb300; --bad:#eb0400;
+    --t1:#9147ff; --t2:#00b5ad; --t3:#ff8c00;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+  header{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;letter-spacing:.3px}
+  header h1 span{color:var(--accent)}
+  .conn{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--bad);display:inline-block}
+  .dot.on{background:var(--ok)} .dot.wait{background:var(--warn)}
+  main{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px 20px;align-items:start}
+  @media (max-width:980px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:16px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0 0 10px}
+  label{display:block;color:var(--muted);font-size:12px;margin:8px 0 3px}
+  input,select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 9px;font:inherit;width:100%}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .row{display:flex;gap:8px;align-items:center}
+  .row>*{flex:1}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 12px;font:inherit;cursor:pointer;white-space:nowrap}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);font-weight:600}
+  button.primary:hover{background:var(--accent2)}
+  button.danger{border-color:#5a1a1a;color:#ff7a7a}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .small{font-size:12px;padding:4px 8px}
+  .muted{color:var(--muted)}
+  .hint{color:var(--muted);font-size:12px;margin-top:6px}
+  /* timer */
+  .timer{font-variant-numeric:tabular-nums;font-size:56px;font-weight:700;text-align:center;letter-spacing:2px;margin:6px 0 4px}
+  .timer.running{color:var(--ok)} .timer.paused{color:var(--warn)} .timer.finished{color:var(--muted)}
+  .timer.low{color:var(--bad);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.55}}
+  .status{text-align:center;color:var(--muted);margin-bottom:10px}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .btns .wide{grid-column:span 2}
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .stat b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+  .stat span{color:var(--muted);font-size:12px}
+  /* tabs + table */
+  .tabs{display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap}
+  .tab{background:transparent;border:1px solid var(--line)}
+  .tab.active{background:var(--accent);border-color:var(--accent)}
+  .tabs input{max-width:260px;margin-left:auto}
+  .tablewrap{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:calc(100vh - 260px)}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+  th{position:sticky;top:0;background:var(--panel2);color:var(--muted);font-weight:600;font-size:12px;cursor:pointer;user-select:none;z-index:1}
+  th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr.off td{opacity:.38;text-decoration:line-through}
+  tr.replaced td{opacity:.45}
+  tr.fresh{animation:fresh 2.5s ease-out}
+  @keyframes fresh{from{background:rgba(145,71,255,.35)}to{background:transparent}}
+  td input.edit{background:transparent;border:1px solid transparent;padding:3px 5px}
+  td input.edit:hover{border-color:var(--line)} td input.edit:focus{border-color:var(--accent);background:var(--panel2)}
+  td select{width:auto;padding:3px 5px}
+  td input.mo{width:62px;padding:3px 5px;text-align:right}
+  .tier{display:inline-block;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700}
+  .tier1{background:rgba(145,71,255,.2);color:#c9a6ff}.tier2{background:rgba(0,181,173,.2);color:#5fe3dc}.tier3{background:rgba(255,140,0,.2);color:#ffb866}
+  .pts{font-weight:700;font-size:15px}
+  .bar{height:6px;background:var(--accent);border-radius:3px;min-width:2px}
+  .users{color:var(--muted);font-size:12px;max-width:380px}
+  .empty{padding:40px;text-align:center;color:var(--muted)}
+  .reward{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;margin-top:6px;font-size:12px}
+  .reward code{color:var(--muted);font-size:11px;word-break:break-all}
+  .reward.bound{border-color:var(--ok)}
+  details summary{cursor:pointer;color:var(--muted);font-size:12px;margin-top:8px}
+  .chk{display:flex;gap:8px;align-items:center;color:var(--text);font-size:13px;margin-top:8px}
+  .chk input{width:auto}
+  /* modal + toast */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:20}
+  .modal.show{display:flex}
+  .modal .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:420px;width:92%}
+  .modal .box p{margin:0 0 16px}
+  .modal .row{justify-content:flex-end}.modal .row>*{flex:0}
+  #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--accent);padding:10px 16px;border-radius:8px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
+  #toast.show{opacity:1}
+  .mode-switch{display:flex;gap:4px}
+  .mode-switch button{font-size:12px}
+  .mode-switch button.active{background:var(--accent);border-color:var(--accent)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Саб<span>Дей</span></h1>
+  <div class="mode-switch">
+    <button class="active" title="Поточний івент">СабДей</button>
+    <button disabled title="Опишіть механіку — додамо">Переглядовий (скоро)</button>
+  </div>
+  <div class="conn">
+    <span class="dot" id="connDot"></span>
+    <span id="connText" class="muted">Не підключено</span>
+    <input id="channel" placeholder="назва каналу" style="width:170px">
+    <button id="connectBtn" class="primary">Підключити</button>
+  </div>
+</header>
+
+<main>
+  <aside>
+    <div class="card">
+      <h2>Збір замовлень</h2>
+      <div class="timer finished" id="timer">10:00</div>
+      <div class="status" id="statusText">Очікування старту</div>
+      <div class="btns">
+        <button class="primary wide" id="startBtn">▶ Почати збір</button>
+        <button id="pauseBtn" disabled>⏸ Пауза</button>
+        <button id="stopBtn" disabled>⏹ Завершити</button>
+        <button id="plusBtn">+1 хв</button>
+        <button id="minusBtn">−1 хв</button>
+      </div>
+      <label>Тривалість збору (хв)</label>
+      <input type="number" id="duration" min="1" step="1" value="10">
+    </div>
+
+    <div class="card">
+      <h2>Нагорода за бали каналу</h2>
+      <div id="rewardBound" class="hint">Нагороду ще не вибрано.</div>
+      <div class="hint">Після підключення погасіть нагороду «сабдей замовлення» самі (або попросіть чатерса) — вона з'явиться нижче, натисніть «Вибрати».</div>
+      <div id="seenRewards"></div>
+      <details>
+        <summary>Ввести ID вручну</summary>
+        <div class="row" style="margin-top:6px">
+          <input id="rewardIdInput" placeholder="custom-reward-id">
+          <button id="rewardIdSave" style="flex:0">OK</button>
+        </div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>Правила балів</h2>
+      <div class="row">
+        <div><label>Тір 1 ×</label><input type="number" id="m1" min="0" step="1"></div>
+        <div><label>Тір 2 ×</label><input type="number" id="m2" min="0" step="1"></div>
+        <div><label>Тір 3 ×</label><input type="number" id="m3" min="0" step="1"></div>
+      </div>
+      <label>Бали для не-підписника</label>
+      <input type="number" id="nonSub" min="0" step="1">
+      <label>Кілька замовлень від однієї людини</label>
+      <select id="dupMode">
+        <option value="last">Рахується лише останнє</option>
+        <option value="first">Рахується лише перше</option>
+        <option value="all">Рахуються всі</option>
+      </select>
+      <div class="hint">Бали = множник тіра × місяці підписки. Тір і місяці зчитуються з бейджа в чаті; їх можна виправити прямо в таблиці.</div>
+    </div>
+
+    <div class="card">
+      <h2>Експорт у Marbles on Stream</h2>
+      <div class="row">
+        <div><label>Макс. куль</label><input type="number" id="cap" min="1" max="1000" step="1"></div>
+        <div><label>Макс. довжина назви</label><input type="number" id="nameMax" min="5" max="100" step="1"></div>
+      </div>
+      <label>Назва кулі</label>
+      <select id="nameFormat">
+        <option value="order">Назва замовлення</option>
+        <option value="orderPts">Назва замовлення + бали</option>
+      </select>
+      <div class="hint" id="marblePreview">—</div>
+      <div class="btns" style="margin-top:10px">
+        <button class="primary wide" id="exportMarbles">⬇ Файл для Marbles (.csv)</button>
+        <button id="copyMarbles" class="wide">Копіювати список куль</button>
+      </div>
+      <details>
+        <summary>Як завантажити в гру</summary>
+        <div class="hint">Race → Simulate → ⚙ Settings (праворуч унизу) → Simulation Settings → увімкнути <b>Use Custom Names</b> → <b>Add Names</b> → <b>Open</b> → вибрати цей .csv. Потім запустити Bots-гонку з кількістю куль, що дорівнює кількості рядків. Кожен бал = одна куля з назвою замовлення, тож у замовлення з більшою кількістю балів більше шансів.</div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>Дані</h2>
+      <div class="btns">
+        <button id="exportCsv">⬇ Таблиця (.csv)</button>
+        <button id="exportJson">⬇ JSON</button>
+        <button id="newSession" class="danger wide">Новий збір (очистити)</button>
+      </div>
+      <details>
+        <summary>Додати замовлення вручну</summary>
+        <label>Нік</label><input id="mUser">
+        <div class="row">
+          <div><label>Тір</label><select id="mTier"><option value="0">не саб</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+          <div><label>Місяці</label><input id="mMonths" type="number" min="1" value="1"></div>
+        </div>
+        <label>Замовлення</label><input id="mText">
+        <button id="mAdd" style="margin-top:8px;width:100%">Додати</button>
+      </details>
+    </div>
+  </aside>
+
+  <section>
+    <div class="stats">
+      <div class="stat"><b id="sEntries">0</b><span>замовлень</span></div>
+      <div class="stat"><b id="sUsers">0</b><span>чатерсів</span></div>
+      <div class="stat"><b id="sUnique">0</b><span>унікальних варіантів</span></div>
+      <div class="stat"><b id="sPoints">0</b><span>балів усього</span></div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-tab="summary">Підсумок за замовленнями</button>
+      <button class="tab" data-tab="entries">Усі замовлення</button>
+      <input id="search" placeholder="Пошук…">
+    </div>
+    <div class="tablewrap" id="tableWrap"></div>
+    <div class="hint" style="margin-top:8px">Однакові замовлення (без урахування регістру, зайвих пробілів і розділових знаків у кінці) об'єднуються. Щоб злити варіанти з помилками, виправте текст в «Усі замовлення».</div>
+  </section>
+</main>
+
+<div class="modal" id="modal"><div class="box"><p id="modalText"></p><div class="row"><button id="modalNo">Скасувати</button><button id="modalYes" class="primary">Так</button></div></div></div>
+<div id="toast"></div>
+
+<script>
+(() => {
+"use strict";
+const LS_KEY = "subday-tool-v1";
+
+/* ---------- state ---------- */
+const defaults = () => ({
+  settings: { channel:"", rewardId:"", durationMin:10, nonSubPoints:0, mult:{1:1,2:2,3:3},
+              dupMode:"last", cap:1000, nameMax:30, nameFormat:"order" },
+  session: { status:"idle", endsAt:0, remainingMs:10*60000, startedAt:0, finishedAt:0 },
+  entries: [],
+  seenRewards: {},
+  seenMsgIds: []
+});
+let S = load();
+let tab = "summary", sortKey = { summary:["points",-1], entries:["ts",-1] }, freshIds = new Set();
+
+function load(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){ const d = JSON.parse(raw), base = defaults();
+      return { ...base, ...d, settings:{...base.settings, ...(d.settings||{})}, session:{...base.session, ...(d.session||{})} }; }
+  }catch(e){}
+  return defaults();
+}
+let saveT = null;
+function save(){ clearTimeout(saveT); saveT = setTimeout(()=>{ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} }, 200); }
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtTime = ms => { ms = Math.max(0, ms); const t = Math.ceil(ms/1000), m = Math.floor(t/60), s = t%60; return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`; };
+const fmtClock = ts => new Date(ts).toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+const norm = t => String(t).toLowerCase().replace(/\s+/g," ").trim().replace(/[.!?,;:…]+$/,"").trim();
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2200); }
+function confirmBox(text){ return new Promise(res=>{ $("modalText").textContent=text; $("modal").classList.add("show");
+  const done=v=>{ $("modal").classList.remove("show"); $("modalYes").onclick=$("modalNo").onclick=null; res(v); };
+  $("modalYes").onclick=()=>done(true); $("modalNo").onclick=()=>done(false); }); }
+
+function pointsOf(e){
+  if(!e.tier) return Number(S.settings.nonSubPoints)||0;
+  return (Number(S.settings.mult[e.tier])||0) * Math.max(1, Number(e.months)||1);
+}
+
+/* which entries count (duplicate policy) */
+function countedSet(){
+  const active = S.entries.filter(e=>!e.excluded);
+  const mode = S.settings.dupMode;
+  if(mode==="all") return new Set(active.map(e=>e.id));
+  const byUser = new Map();
+  const sorted = [...active].sort((a,b)=>a.ts-b.ts);
+  for(const e of sorted){
+    const k = e.login.toLowerCase();
+    if(mode==="first"){ if(!byUser.has(k)) byUser.set(k,e.id); }
+    else byUser.set(k,e.id);
+  }
+  return new Set(byUser.values());
+}
+
+function aggregate(){
+  const counted = countedSet(), groups = new Map();
+  for(const e of S.entries){
+    if(!counted.has(e.id)) continue;
+    const k = norm(e.text); if(!k) continue;
+    if(!groups.has(k)) groups.set(k,{key:k, variants:new Map(), points:0, count:0, users:[]});
+    const g = groups.get(k), p = pointsOf(e);
+    g.points += p; g.count++; g.users.push({name:e.user, p});
+    g.variants.set(e.text.trim(), (g.variants.get(e.text.trim())||0)+1);
+  }
+  return [...groups.values()].map(g=>{
+    const name = [...g.variants.entries()].sort((a,b)=>b[1]-a[1])[0][0];
+    g.users.sort((a,b)=>b.p-a.p);
+    return {...g, name};
+  });
+}
+
+/* ---------- Twitch IRC (anonymous, read-only) ---------- */
+let ws = null, wantConn = false, reconnectT = null;
+function unescTag(v){ return v.replace(/\\(.)/g,(m,c)=>({s:" ",":":";","\\":"\\",r:"\r",n:"\n"}[c] ?? c)); }
+function parseIRC(line){
+  const msg = {tags:{}, prefix:null, command:"", params:[], trailing:null};
+  let rest = line;
+  if(rest[0]==="@"){ const sp = rest.indexOf(" ");
+    for(const kv of rest.slice(1,sp).split(";")){ const i=kv.indexOf("="); msg.tags[i<0?kv:kv.slice(0,i)] = i<0?"":unescTag(kv.slice(i+1)); }
+    rest = rest.slice(sp+1); }
+  if(rest[0]===":"){ const sp = rest.indexOf(" "); msg.prefix = rest.slice(1,sp); rest = rest.slice(sp+1); }
+  const ti = rest.indexOf(" :");
+  if(ti>=0){ msg.trailing = rest.slice(ti+2); rest = rest.slice(0,ti); }
+  const parts = rest.split(" ").filter(Boolean); msg.command = parts[0]||""; msg.params = parts.slice(1);
+  return msg;
+}
+function parseBadges(s){ const o={}; if(!s) return o; for(const b of s.split(",")){ const i=b.indexOf("/"); if(i>0) o[b.slice(0,i)]=b.slice(i+1); } return o; }
+function subInfo(tags){
+  const badges = parseBadges(tags["badges"]), info = parseBadges(tags["badge-info"]);
+  const b = badges.subscriber ?? badges.founder;
+  if(b===undefined) return {tier:0, months:0};
+  const v = parseInt(b,10)||0;
+  const tier = v>=3000 ? 3 : v>=2000 ? 2 : 1;
+  const months = parseInt(info.subscriber ?? info.founder, 10) || 1;
+  return {tier, months};
+}
+
+function setConn(state, text){ $("connDot").className = "dot " + (state==="on"?"on":state==="wait"?"wait":""); $("connText").textContent = text; $("connectBtn").textContent = wantConn ? "Відключити" : "Підключити"; }
+
+function connect(){
+  const ch = $("channel").value.trim().toLowerCase().replace(/^#/,"").replace(/.*twitch\.tv\//,"").replace(/\/.*/,"");
+  if(!ch){ toast("Вкажіть назву каналу"); return; }
+  $("channel").value = ch; S.settings.channel = ch; save();
+  wantConn = true; openSocket(ch);
+}
+function openSocket(ch){
+  clearTimeout(reconnectT);
+  try{ ws && ws.close(); }catch(e){}
+  setConn("wait","Підключення…");
+  ws = new WebSocket("wss://irc-ws.chat.twitch.tv:443");
+  ws.onopen = () => {
+    ws.send("CAP REQ :twitch.tv/tags twitch.tv/commands");
+    ws.send("PASS SCHMOOPIIE");
+    ws.send("NICK justinfan" + Math.floor(10000 + Math.random()*80000));
+    ws.send("JOIN #" + ch);
+  };
+  ws.onmessage = ev => { for(const line of String(ev.data).split("\r\n")) if(line) handleLine(line, ch); };
+  ws.onclose = () => { if(wantConn){ setConn("wait","Перепідключення…"); reconnectT = setTimeout(()=>openSocket(ch), 3000); } else setConn("off","Не підключено"); };
+  ws.onerror = () => {};
+}
+function disconnect(){ wantConn=false; clearTimeout(reconnectT); try{ ws && ws.close(); }catch(e){} setConn("off","Не підключено"); }
+
+function handleLine(line, ch){
+  if(line.startsWith("PING")){ ws.send("PONG :tmi.twitch.tv"); return; }
+  const m = parseIRC(line);
+  if(m.command==="JOIN" && m.prefix && m.prefix.startsWith("justinfan")) { setConn("on", "Підключено до #" + ch); return; }
+  if(m.command==="ROOMSTATE"){ setConn("on", "Підключено до #" + ch); return; }
+  if(m.command==="NOTICE" && /msg_channel_suspended|no such channel/i.test(m.tags["msg-id"]+" "+m.trailing)){ setConn("off","Канал не знайдено"); disconnect(); return; }
+  if(m.command!=="PRIVMSG") return;
+  const rid = m.tags["custom-reward-id"];
+  if(!rid) return;
+  onRedemption(m, rid);
+}
+
+function onRedemption(m, rid){
+  const login = (m.prefix||"").split("!")[0];
+  const user = m.tags["display-name"] || login;
+  let text = (m.trailing||"").replace(/^\x01ACTION |\x01$/g,"").trim();
+
+  // remember all rewards seen, for binding
+  const sr = S.seenRewards[rid] || {count:0};
+  S.seenRewards[rid] = {count:sr.count+1, sample:text.slice(0,60), user, ts:Date.now()};
+
+  const bound = S.settings.rewardId;
+  if(!bound || rid!==bound){ save(); renderRewards(); return; }
+  if(S.session.status!=="running"){ save(); renderRewards(); return; }
+
+  const mid = m.tags["id"];
+  if(mid){ if(S.seenMsgIds.includes(mid)) return; S.seenMsgIds.push(mid); if(S.seenMsgIds.length>3000) S.seenMsgIds.splice(0,1000); }
+  const {tier, months} = subInfo(m.tags);
+  addEntry({user, login, userId:m.tags["user-id"]||"", tier, months, text});
+}
+
+function addEntry({user, login, userId="", tier, months, text, manual=false}){
+  if(!text) return;
+  const e = {id: Date.now().toString(36)+Math.random().toString(36).slice(2,7), ts:Date.now(), user, login:login||user.toLowerCase(), userId, tier, months, text, excluded:false, manual};
+  S.entries.push(e); freshIds.add(e.id); setTimeout(()=>freshIds.delete(e.id), 3000);
+  save(); renderAll();
+}
+
+/* ---------- timer ---------- */
+function remaining(){ const s=S.session; return s.status==="running" ? s.endsAt-Date.now() : s.remainingMs; }
+function startCollect(){
+  const s = S.session, dur = Math.max(1, Number($("duration").value)||10)*60000;
+  if(s.status==="paused"){ s.endsAt = Date.now()+s.remainingMs; }
+  else { s.endsAt = Date.now()+dur; s.startedAt = s.startedAt || Date.now(); }
+  s.status = "running"; save(); renderTimer();
+  if(!S.settings.rewardId) toast("Увага: нагороду не вибрано — замовлення не записуватимуться");
+  else if(!wantConn) toast("Увага: чат не підключено");
+}
+function pauseCollect(){ const s=S.session; if(s.status!=="running") return; s.remainingMs = Math.max(0,s.endsAt-Date.now()); s.status="paused"; save(); renderTimer(); }
+function finishCollect(){ const s=S.session; s.status="finished"; s.remainingMs=0; s.finishedAt=Date.now(); save(); renderTimer(); toast("Збір завершено"); }
+function addTime(ms){
+  const s = S.session;
+  if(s.status==="running"){ s.endsAt = Math.max(Date.now()+1000, s.endsAt+ms); }
+  else if(s.status==="paused" || s.status==="idle"){ s.remainingMs = Math.max(1000, s.remainingMs+ms); }
+  else if(s.status==="finished" && ms>0){ s.endsAt = Date.now()+ms; s.status="running"; toast("Збір продовжено"); }
+  save(); renderTimer();
+}
+setInterval(()=>{ if(S.session.status==="running" && S.session.endsAt<=Date.now()) finishCollect(); renderTimer(); }, 250);
+
+/* ---------- rendering ---------- */
+function renderTimer(){
+  const s = S.session, r = remaining(), el = $("timer");
+  el.textContent = fmtTime(s.status==="finished"?0:r);
+  el.className = "timer " + s.status + (s.status==="running" && r<=30000 ? " low" : "");
+  $("statusText").textContent = {idle:"Очікування старту", running:"Збір іде — замовлення записуються", paused:"Пауза — замовлення не записуються", finished:"Збір завершено"}[s.status];
+  $("startBtn").disabled = s.status==="running";
+  $("startBtn").textContent = s.status==="paused" ? "▶ Продовжити" : s.status==="finished" ? "▶ Почати знову" : "▶ Почати збір";
+  $("pauseBtn").disabled = s.status!=="running";
+  $("stopBtn").disabled = !(s.status==="running"||s.status==="paused");
+}
+
+function renderRewards(){
+  const bound = S.settings.rewardId, wrap = $("seenRewards");
+  $("rewardBound").innerHTML = bound ? `Вибрано: <code>${esc(bound)}</code>` : "Нагороду ще не вибрано.";
+  const ids = Object.keys(S.seenRewards).sort((a,b)=>S.seenRewards[b].ts-S.seenRewards[a].ts);
+  wrap.innerHTML = ids.map(id=>{ const r=S.seenRewards[id];
+    return `<div class="reward ${id===bound?"bound":""}"><div><div>«${esc(r.sample||"(без тексту)")}» — ${esc(r.user)} <span class="muted">(${r.count}×)</span></div><code>${esc(id)}</code></div>
+      ${id===bound?'<span style="color:var(--ok)">✓</span>':`<button class="small" data-bind="${esc(id)}">Вибрати</button>`}</div>`; }).join("");
+}
+
+function renderStats(){
+  const counted = countedSet(), groups = aggregate();
+  const cEntries = S.entries.filter(e=>counted.has(e.id));
+  $("sEntries").textContent = cEntries.length;
+  $("sUsers").textContent = new Set(cEntries.map(e=>e.login.toLowerCase())).size;
+  $("sUnique").textContent = groups.length;
+  $("sPoints").textContent = groups.reduce((a,g)=>a+g.points,0);
+  const lines = marbleLines();
+  $("marblePreview").textContent = lines.total
+    ? `${lines.list.length} куль із ${lines.groups} замовлень` + (lines.scaled ? ` (зменшено пропорційно з ${lines.total} балів до ліміту)` : "")
+    : "Немає замовлень із балами > 0";
+}
+
+function sortRows(rows, [k,dir]){ return rows.sort((a,b)=>{ const x=a[k], y=b[k]; return (typeof x==="string" ? x.localeCompare(y,"uk") : (x-y))*dir; }); }
+function th(label, key, cls=""){ const [k,d]=sortKey[tab]; return `<th class="${cls}" data-sort="${key}">${label}${k===key?(d>0?" ▲":" ▼"):""}</th>`; }
+
+function renderTable(){
+  const q = $("search").value.trim().toLowerCase(), wrap = $("tableWrap");
+  if(tab==="summary"){
+    let rows = aggregate().filter(g=>!q || g.name.toLowerCase().includes(q) || g.users.some(u=>u.name.toLowerCase().includes(q)));
+    rows = sortRows(rows, sortKey.summary);
+    const max = Math.max(1,...rows.map(r=>r.points)), total = rows.reduce((a,r)=>a+r.points,0)||1;
+    if(!rows.length){ wrap.innerHTML = `<div class="empty">${S.entries.length?"Нічого не знайдено":"Замовлень поки немає. Підключіть чат, виберіть нагороду і натисніть «Почати збір»."}</div>`; return; }
+    wrap.innerHTML = `<table><thead><tr><th style="width:40px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:140px">Частка</th>${th("Людей","count","num")}<th>Хто замовив</th></tr></thead><tbody>${
+      rows.map((g,i)=>`<tr><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
+        <td class="num pts">${g.points}</td><td><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div><span class="muted" style="font-size:11px">${(g.points/total*100).toFixed(1)}%</span></td>
+        <td class="num">${g.count}</td><td class="users">${g.users.map(u=>`${esc(u.name)} <span class="muted">(${u.p})</span>`).join(", ")}</td></tr>`).join("")
+    }</tbody></table>`;
+  } else {
+    const counted = countedSet();
+    let rows = S.entries.map(e=>({...e, points:pointsOf(e), counted:counted.has(e.id)}))
+      .filter(e=>!q || e.text.toLowerCase().includes(q) || e.user.toLowerCase().includes(q));
+    rows = sortRows(rows, sortKey.entries);
+    if(!rows.length){ wrap.innerHTML = `<div class="empty">${S.entries.length?"Нічого не знайдено":"Замовлень поки немає."}</div>`; return; }
+    wrap.innerHTML = `<table><thead><tr>${th("Час","ts")}${th("Чатерс","user")}${th("Тір","tier")}${th("Місяці","months","num")}${th("Бали","points","num")}${th("Замовлення","text")}<th></th></tr></thead><tbody>${
+      rows.map(e=>`<tr data-id="${e.id}" class="${e.excluded?"off":!e.counted?"replaced":""} ${freshIds.has(e.id)?"fresh":""}" title="${!e.excluded&&!e.counted?"Не рахується: від цього чатерса враховано інше замовлення":""}">
+        <td class="muted">${fmtClock(e.ts)}</td>
+        <td>${esc(e.user)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
+        <td><select data-f="tier"><option value="0" ${!e.tier?"selected":""}>—</option>${[1,2,3].map(t=>`<option value="${t}" ${e.tier===t?"selected":""}>T${t}</option>`).join("")}</select></td>
+        <td class="num"><input class="mo" type="number" min="1" data-f="months" value="${e.months||""}" ${!e.tier?"disabled":""}></td>
+        <td class="num pts">${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span> `:""}${e.points}</td>
+        <td><input class="edit" data-f="text" value="${esc(e.text)}"></td>
+        <td style="white-space:nowrap"><button class="small" data-act="toggle">${e.excluded?"Повернути":"Виключити"}</button> <button class="small danger" data-act="del" title="Видалити">✕</button></td></tr>`).join("")
+    }</tbody></table>`;
+  }
+}
+
+function renderAll(){ renderStats(); renderTable(); renderRewards(); renderTimer(); }
+
+/* ---------- export ---------- */
+function cleanName(s, max){ return String(s).replace(/[,;"\r\n\t]/g," ").replace(/\s+/g," ").trim().slice(0,max).trim(); }
+function marbleLines(){
+  const st = S.settings, cap = Math.min(1000, Math.max(1, Number(st.cap)||1000)), max = Math.max(5, Number(st.nameMax)||30);
+  const groups = aggregate().filter(g=>g.points>0).sort((a,b)=>b.points-a.points);
+  const total = groups.reduce((a,g)=>a+g.points,0);
+  let counts = groups.map(g=>g.points), scaled = false;
+  if(total>cap){
+    scaled = true;
+    counts = groups.map(g=>Math.max(1, Math.round(g.points*cap/total)));
+    let sum = counts.reduce((a,b)=>a+b,0), i = 0;
+    while(sum>cap && i<counts.length*50){ const j = counts.indexOf(Math.max(...counts)); if(counts[j]<=1) break; counts[j]--; sum--; i++; }
+    if(sum>cap){ counts = counts.slice(0,cap); }
+  }
+  const list = [];
+  groups.forEach((g,i)=>{ const c = counts[i]||0; if(!c) return;
+    let name = cleanName(g.name, max);
+    if(st.nameFormat==="orderPts") name = cleanName(g.name, Math.max(3,max-(String(g.points).length+3))) + ` (${g.points})`;
+    if(!name) return;
+    for(let k=0;k<c;k++) list.push(name);
+  });
+  for(let i=list.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [list[i],list[j]]=[list[j],list[i]]; }
+  return {list, total, scaled, groups:groups.length};
+}
+function download(name, text, mime, bom=false){
+  const blob = new Blob([(bom?"\uFEFF":"")+text], {type:mime+";charset=utf-8"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+const stamp = () => { const d=new Date(), p=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`; };
+const csvCell = v => { const s = String(v ?? ""); return /[",\n;]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
+
+/* ---------- events ---------- */
+$("connectBtn").onclick = () => wantConn ? disconnect() : connect();
+$("channel").addEventListener("keydown", e=>{ if(e.key==="Enter") connect(); });
+$("startBtn").onclick = startCollect;
+$("pauseBtn").onclick = pauseCollect;
+$("stopBtn").onclick = finishCollect;
+$("plusBtn").onclick = () => addTime(60000);
+$("minusBtn").onclick = () => addTime(-60000);
+$("duration").onchange = () => { const v = Math.max(1, Number($("duration").value)||10); S.settings.durationMin = v;
+  if(S.session.status==="idle") S.session.remainingMs = v*60000; save(); renderTimer(); };
+
+$("seenRewards").onclick = e => { const id = e.target.dataset.bind; if(!id) return; S.settings.rewardId = id; save(); renderRewards(); toast("Нагороду вибрано"); };
+$("rewardIdSave").onclick = () => { S.settings.rewardId = $("rewardIdInput").value.trim(); save(); renderRewards(); toast(S.settings.rewardId?"ID збережено":"ID очищено"); };
+
+const bindNum = (id, set) => { $(id).onchange = () => { set(Number($(id).value)); save(); renderAll(); }; };
+bindNum("m1", v=>S.settings.mult[1]=Math.max(0,v||0));
+bindNum("m2", v=>S.settings.mult[2]=Math.max(0,v||0));
+bindNum("m3", v=>S.settings.mult[3]=Math.max(0,v||0));
+bindNum("nonSub", v=>S.settings.nonSubPoints=Math.max(0,v||0));
+bindNum("cap", v=>S.settings.cap=Math.min(1000,Math.max(1,v||1000)));
+bindNum("nameMax", v=>S.settings.nameMax=Math.min(100,Math.max(5,v||30)));
+$("dupMode").onchange = () => { S.settings.dupMode = $("dupMode").value; save(); renderAll(); };
+$("nameFormat").onchange = () => { S.settings.nameFormat = $("nameFormat").value; save(); renderStats(); };
+
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.tab; document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b)); renderTable(); });
+$("search").oninput = renderTable;
+
+$("tableWrap").addEventListener("click", async e => {
+  const h = e.target.closest("th[data-sort]");
+  if(h){ const k=h.dataset.sort, cur=sortKey[tab]; sortKey[tab] = [k, cur[0]===k ? -cur[1] : (k==="name"||k==="user"||k==="text"?1:-1)]; renderTable(); return; }
+  const btn = e.target.closest("button[data-act]"); if(!btn) return;
+  const id = btn.closest("tr").dataset.id, ent = S.entries.find(x=>x.id===id); if(!ent) return;
+  if(btn.dataset.act==="toggle"){ ent.excluded = !ent.excluded; }
+  if(btn.dataset.act==="del"){ if(!(await confirmBox(`Видалити замовлення «${ent.text}» від ${ent.user}?`))) return; S.entries = S.entries.filter(x=>x.id!==id); }
+  save(); renderAll();
+});
+$("tableWrap").addEventListener("change", e => {
+  const f = e.target.dataset.f; if(!f) return;
+  const id = e.target.closest("tr").dataset.id, ent = S.entries.find(x=>x.id===id); if(!ent) return;
+  if(f==="tier"){ ent.tier = Number(e.target.value); if(ent.tier && !ent.months) ent.months = 1; }
+  if(f==="months") ent.months = Math.max(1, Number(e.target.value)||1);
+  if(f==="text"){ const v = e.target.value.trim(); if(v) ent.text = v; }
+  save(); renderAll();
+});
+
+$("exportMarbles").onclick = () => { const {list} = marbleLines(); if(!list.length) return toast("Немає що експортувати");
+  download(`marbles_subday_${stamp()}.csv`, list.join("\r\n")+"\r\n", "text/csv"); };
+$("copyMarbles").onclick = async () => { const {list} = marbleLines(); if(!list.length) return toast("Немає що копіювати");
+  try{ await navigator.clipboard.writeText(list.join("\n")); toast(`Скопійовано ${list.length} рядків`); }catch(e){ toast("Не вдалося скопіювати"); } };
+$("exportCsv").onclick = () => {
+  const counted = countedSet();
+  const head = ["Час","Чатерс","Логін","Тір","Місяці","Бали","Замовлення","Рахується"];
+  const rows = S.entries.map(e=>[new Date(e.ts).toLocaleString("uk-UA"), e.user, e.login, e.tier||"—", e.tier?e.months:"", pointsOf(e), e.text, e.excluded?"виключено":counted.has(e.id)?"так":"ні (дубль)"]);
+  const sum = aggregate().sort((a,b)=>b.points-a.points).map(g=>[g.name, g.points, g.count, g.users.map(u=>u.name).join(" ")]);
+  const csv = [head, ...rows].map(r=>r.map(csvCell).join(",")).join("\r\n")
+    + "\r\n\r\nПідсумок\r\n" + [["Замовлення","Бали","Людей","Хто"], ...sum].map(r=>r.map(csvCell).join(",")).join("\r\n");
+  download(`subday_${stamp()}.csv`, csv, "text/csv", true);
+};
+$("exportJson").onclick = () => download(`subday_${stamp()}.json`, JSON.stringify({exportedAt:new Date().toISOString(), settings:S.settings, entries:S.entries.map(e=>({...e, points:pointsOf(e)})), summary:aggregate().map(({variants,...g})=>g)}, null, 2), "application/json");
+$("newSession").onclick = async () => {
+  if(S.entries.length && !(await confirmBox("Почати новий збір? Усі поточні замовлення буде видалено (спершу можна зберегти CSV/JSON)."))) return;
+  S.entries = []; S.seenMsgIds = []; S.session = {...defaults().session, remainingMs:(Number(S.settings.durationMin)||10)*60000};
+  save(); renderAll();
+};
+$("mAdd").onclick = () => {
+  const user = $("mUser").value.trim(), text = $("mText").value.trim();
+  if(!user || !text) return toast("Вкажіть нік і замовлення");
+  const tier = Number($("mTier").value);
+  addEntry({user, login:user.toLowerCase(), tier, months: tier ? Math.max(1, Number($("mMonths").value)||1) : 0, text, manual:true});
+  $("mText").value = ""; toast("Додано");
+};
+
+/* ---------- init ---------- */
+function initInputs(){
+  const st = S.settings;
+  $("channel").value = st.channel; $("duration").value = st.durationMin;
+  $("m1").value = st.mult[1]; $("m2").value = st.mult[2]; $("m3").value = st.mult[3];
+  $("nonSub").value = st.nonSubPoints; $("dupMode").value = st.dupMode;
+  $("cap").value = st.cap; $("nameMax").value = st.nameMax; $("nameFormat").value = st.nameFormat;
+  $("rewardIdInput").value = st.rewardId;
+}
+initInputs(); renderAll();
+if(S.settings.channel){ wantConn = true; openSocket(S.settings.channel); }
+
+// exposed for testing
+window.__subday = { parseIRC, subInfo, aggregate, marbleLines, pointsOf, handleLine, S:()=>S };
+})();
+</script>
+</body>
+</html>

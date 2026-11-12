@@ -909,3 +909,4 @@ tr[draggable="true"] input{cursor:text}
 
 /* «Новий аукціон» у верхній смузі — затисканням */
 .winbtn.newaubtn{min-width:0;height:32px;padding:0 14px;border-radius:8px;font-size:13px}
+.changecid{margin-top:22px}

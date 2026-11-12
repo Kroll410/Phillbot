@@ -94,7 +94,7 @@ function renderTimer(){
   el.className = "timer " + s.status + (s.status==="running" && r<=30000 ? " low" : "");
   $("statusText").textContent = {idle:"Очікування старту", running:"Збір іде — замовлення записуються", paused:"Пауза — замовлення не записуються", finished:"Збір завершено"}[s.status] || "";
   $("startBtn").disabled = s.status==="running";
-  $("startBtn").textContent = s.status==="paused" ? "Продовжити" : s.status==="finished" ? "Продовжити збір" : "Почати збір";
+  $("startBtn").textContent = s.status==="paused" ? "Продовжити" : s.status==="finished" ? "Старт" : "Почати збір";
   $("pauseBtn").disabled = s.status!=="running";
   $("stopBtn").disabled = !(s.status==="running"||s.status==="paused");
   $("minusBtn").disabled = s.status==="finished";

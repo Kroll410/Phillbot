@@ -936,3 +936,7 @@ button.cidnext{flex:0 0 auto;min-width:110px;height:44px;padding:0 22px;font-wei
 /* падіння карток зборів (новий стрім): без смуги прокрутки і без обрізання */
 .cchips.dropping{overflow:visible}
 #toast{display:none!important}
+/* мінімізовані лоти: колір лота — квадратик перед назвою (як у великій таблиці), без кольорового краю */
+.autop-i,.autop-i.wglow{border-left:0}
+.autop-i .ldot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px;vertical-align:middle;position:relative;top:-1px}
+.autop-i.wglow .nm .ldot{-webkit-text-fill-color:initial}

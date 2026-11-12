@@ -199,7 +199,7 @@ function renderAuth(){
   $("connDot").className = "dot " + (c.status==="on"?"on":c.status==="wait"?"wait":"");
   $("connDot").title = c.text;
   // «Вийти» — затисканням з червоною «фарбою»; перемальовуємо лише при зміні акаунта (щоб не перервати затискання)
-  $("modes").classList.toggle("hidden", !ok); $("generalBtn").classList.toggle("hidden", !ok); // перемикач вкладок і налаштування — лише після входу
+  $("modes").classList.toggle("hidden", !ok); $("generalBtn").classList.toggle("hidden", !ok); if(!ok) $("donPill").classList.add("hidden"); // перемикач вкладок і налаштування — лише після входу
   const ub = ok && a.user ? `<b class="uname">${esc(a.user.display_name)}</b><button class="winbtn holdend logoutbtn" id="logoutBtn" data-hold="logout" title="Затисніть і тримайте, щоб вийти з акаунта Twitch">${LIQUID_RED}<span class="wl">Вийти</span></button>` : "";
   if($("userBox")._k !== ub){ $("userBox")._k = ub; $("userBox").innerHTML = ub; }
   if(ok && a.user && lastAuthStatus !== "ok") showWelcome(a.user.display_name);
@@ -592,6 +592,7 @@ $("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round
 // Donatello: перевірка токена і статус підключення
 function renderDon(){
   const d = S.don || {state: "off"}, pill = $("donPill");
+  if(!(S.auth && S.auth.status === "ok")){ pill.classList.add("hidden"); return; } // без входу в Twitch індикатора немає
   pill.classList.toggle("hidden", d.state === "off");
   pill.className = "donpill " + (d.state === "on" ? "on" : d.state === "error" ? "err" : "") + (d.state === "off" ? " hidden" : "");
   if($("generalModal").classList.contains("show") && !$("donStatus").dataset.lock)

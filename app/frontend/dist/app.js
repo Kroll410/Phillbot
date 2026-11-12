@@ -632,12 +632,19 @@ async function holdDone(){
   const {btn, name} = holding; holding.mode = "done";
   setLevel(btn, 1); btn.classList.remove("pressed","near"); btn.classList.add("full");
   await new Promise(r => setTimeout(r, 380)); // «вистрибнула» і спалахнула
+  const action = btn.dataset.hold;
+  if(action === "finishgame"){ // завершити гру — без блискіток
+    holding = null;
+    try{ setState(await call("FinishGame")); } finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); }, 500); }
+    return;
+  }
   await sparkles(1500);
   holding = null;
   try{ setState(await call("SetWinner", name)); } catch(e){ renderTable(); }
 }
-$("tableWrap").addEventListener("pointerdown", e => {
-  const b = e.target.closest("button[data-win]"); if(!b || e.button !== 0) return;
+// затискання: «Переможець» у підсумку і «Завершити гру» на етапі 2
+document.addEventListener("pointerdown", e => {
+  const b = e.target.closest("button[data-win], button[data-hold]"); if(!b || e.button !== 0 || b.disabled) return;
   e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(_){}
   holdStart(b);
 });
@@ -739,10 +746,10 @@ function renderGameTimer(){
   if(sec === "gTie") $("tieInfo").textContent = `Голоси розділились порівну: 1 — ${v.yes||0}, 2 — ${v.no||0}. Вирішіть самі.`;
 }
 setInterval(renderGameTimer, 250);
+$("gFinish").insertAdjacentHTML("afterbegin", LIQUID);
 $("gPause").onclick = async () => setState(await call(S.game.status==="paused" ? "GameResume" : "GamePause"));
 $("gPlus").onclick = async () => setState(await call("GameAddTime", 60000));
 $("gMinus").onclick = async () => setState(await call("GameAddTime", -60000));
-$("gFinish").onclick = async () => { if(await confirmBox("Завершити гру зараз? Далі — голосування або наступний збір.", "Завершити", "Скасувати")) setState(await call("FinishGame")); };
 $("vStart").onclick = async () => setState(await call("StartVote"));
 $("vPlus").onclick = async () => setState(await call("VoteAddTime", 60000));
 $("vFinish").onclick = async () => setState(await call("FinishVote"));

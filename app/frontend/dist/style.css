@@ -619,3 +619,5 @@ button.primary:not(:disabled):hover{background:var(--grad) border-box no-repeat;
 .gamecard #gPlay .gstatus{margin-bottom:0}
 .gplayctl{justify-content:center}
 .gplayctl button{min-width:180px;height:44px}
+/* «Завершити гру» — затискання, як «Переможець» (розмір — як у сусідньої «Пауза») */
+.gplayctl .winbtn{height:44px;min-width:180px;border-radius:10px}

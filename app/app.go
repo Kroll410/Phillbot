@@ -30,16 +30,17 @@ type ConnInfo struct {
 // Snapshot — усе, що потрібно інтерфейсу.
 type Snapshot struct {
 	State
-	Auth       AuthInfo    `json:"auth"`
-	Conn       ConnInfo    `json:"conn"`
-	Rewards    []Reward    `json:"rewards"`
-	RewardsErr string      `json:"rewardsErr"`
-	BaseDir    string      `json:"baseDir"`
-	ClientID   string      `json:"clientId"`
-	Now        int64       `json:"now"`
-	Log        []LogLine   `json:"log"`
-	Obs        OverlayInfo `json:"obs"`
-	ChatWindow bool        `json:"chatWindow"` // чат відкрито в окремому вікні — вкладка заблокована
+	Auth       AuthInfo          `json:"auth"`
+	Conn       ConnInfo          `json:"conn"`
+	Rewards    []Reward          `json:"rewards"`
+	RewardsErr string            `json:"rewardsErr"`
+	BaseDir    string            `json:"baseDir"`
+	ClientID   string            `json:"clientId"`
+	Now        int64             `json:"now"`
+	Log        []LogLine         `json:"log"`
+	Obs        OverlayInfo       `json:"obs"`
+	ChatWindow bool              `json:"chatWindow"`
+	SubBadges  map[string]string `json:"subBadges"` // значки підписки каналу: версія ("0", "3", "2012", "3036"…) → картинка // чат відкрито в окремому вікні — вкладка заблокована
 }
 
 type App struct {
@@ -144,7 +145,7 @@ func (a *App) snapshotLocked() Snapshot {
 	}
 	return Snapshot{State: st, Auth: auth, Conn: a.conn, Rewards: append([]Reward(nil), a.rewards...), RewardsErr: a.rewErr,
 		BaseDir: a.baseDir, ClientID: a.clientID, Now: time.Now().UnixMilli(), Log: append([]LogLine(nil), a.logLines...), Obs: obs,
-		ChatWindow: a.chatWinClients > 0 || a.chatWinPending}
+		ChatWindow: a.chatWinClients > 0 || a.chatWinPending, SubBadges: a.subBadges()}
 }
 
 // подія для головного вікна і для оверлеїв OBS

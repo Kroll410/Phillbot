@@ -30,17 +30,19 @@ function pointsOf(e){
   if(!e.tier) return Number(S.settings.nonSubPoints)||0;
   return (Number(S.settings.mult[String(e.tier)])||0) * Math.max(1, Number(e.months)||1);
 }
-function countedSet(){
-  const active = S.entries.filter(e=>!e.excluded);
+// «діюче» замовлення кожного чатерса (останнє / перше / усі), включно з прихованими — лише вони є в таблиці
+function effectiveSet(){
   const mode = S.settings.dupMode;
-  if(mode==="all") return new Set(active.map(e=>e.id));
+  if(mode==="all") return new Set(S.entries.map(e=>e.id));
   const byUser = new Map();
-  for(const e of [...active].sort((a,b)=>a.ts-b.ts)){
+  for(const e of [...S.entries].sort((a,b)=>a.ts-b.ts)){
     const k = (e.userId || e.login || e.user).toLowerCase();
     if(mode==="first"){ if(!byUser.has(k)) byUser.set(k,e.id); } else byUser.set(k,e.id);
   }
   return new Set(byUser.values());
 }
+// рахується «діюче» замовлення, якщо воно не приховане
+function countedSet(){ const eff = effectiveSet(); return new Set(S.entries.filter(e=>eff.has(e.id) && !e.excluded).map(e=>e.id)); }
 function aggregate(){
   const counted = countedSet(), groups = new Map();
   for(const e of S.entries){
@@ -186,6 +188,21 @@ function userTag(u){
   const name = u.name || u.user || u.login || "";
   return `<span class="utag">${badges}<span class="cname" style="color:${esc(ChatRender.nameColor(u.login||name, u.color))}">${esc(name)}</span></span>`;
 }
+// значок підписки каналу для стажу: найбільша версія ≤ місяців для цього тіру (T1: 0…999, T2: 2000+, T3: 3000+)
+function subBadgeFor(e){
+  if(!e.tier) return "";
+  const m = S.subBadges || {}, months = Math.max(1, Number(e.months)||1);
+  const pick = base => { let best = -1, url = "";
+    for(const [k,u] of Object.entries(m)){
+      const v = Number(k); if(!Number.isFinite(v)) continue;
+      if(base ? (v < base || v >= base+1000) : v >= 1000) continue;
+      const mo = v - base; if(mo <= months && mo > best){ best = mo; url = u; }
+    }
+    return url; };
+  let url = pick(e.tier > 1 ? e.tier*1000 : 0) || pick(0);
+  if(!url){ const b = (e.badges||[]).find(b=>b.setId==="subscriber"||b.setId==="founder"); url = b ? b.url : ""; }
+  return /^https:\/\//.test(url) ? `<img class="subicon" src="${esc(url)}" alt="" title="Підписка ${months} міс. (T${e.tier})">` : "";
+}
 let editMode = false; // режим редагування у вкладці «Замовлення»
 
 function sortRows(rows, [k,dir]){ return rows.sort((a,b)=>{ const x=a[k], y=b[k]; return (typeof x==="string" ? x.localeCompare(y,"uk") : (x-y))*dir; }); }
@@ -267,7 +284,8 @@ function renderTable(){
     }</tbody></table>`;
   } else {
     const counted = countedSet();
-    let rows = S.entries.map(e=>({...e, points:pointsOf(e), counted:counted.has(e.id)}))
+    const eff = effectiveSet();
+    let rows = S.entries.filter(e=>eff.has(e.id)).map(e=>({...e, points:pointsOf(e), counted:counted.has(e.id)}))
       .filter(e=>!q || e.text.toLowerCase().includes(q) || e.user.toLowerCase().includes(q));
     rows = sortRows(rows, sortKey.entries);
     if(!rows.length){ wrap.innerHTML = `<div class="empty">${S.entries.length?"Нічого не знайдено":"Замовлень поки немає."}</div>`; return; }
@@ -276,8 +294,8 @@ function renderTable(){
         <td class="gripcol">${GRIP}</td><td class="muted">${fmtClock(e.ts)}</td>
         <td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
         ${editMode ? `<td><select data-f="tier"><option value="0" ${!e.tier?"selected":""}>—</option>${[1,2,3].map(t=>`<option value="${t}" ${e.tier===t?"selected":""}>T${t}</option>`).join("")}</select></td>
-        <td class="num"><input class="mo" type="number" min="1" data-f="months" value="${e.months||""}" ${!e.tier?"disabled":""}></td>`
-        : `<td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td><td class="num">${e.tier?`${e.months} міс.`:'<span class="muted">—</span>'}</td>`}
+        <td class="num"><span class="subcell">${subBadgeFor(e)}<input class="mo" type="number" min="1" data-f="months" value="${e.months||""}" ${!e.tier?"disabled":""}></span></td>`
+        : `<td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td><td class="num">${e.tier?`<span class="subcell">${subBadgeFor(e)}${e.months} міс.</span>`:'<span class="muted">—</span>'}</td>`}
         <td class="num pts">${e.points}</td>
         <td>${editMode ? `<input class="edit" data-f="text" value="${esc(e.text)}">` : `<span class="otext">${esc(e.text)}</span>`}</td>
         <td class="acts"><button class="icon${e.excluded?" on":""}" data-act="toggle" title="${e.excluded?"Показати — знову рахувати":"Приховати — не рахувати (можна повернути)"}">${e.excluded?ICON_EYE_OFF:ICON_EYE}</button>${editMode?`<button class="icon danger" data-act="del" title="Видалити назавжди">${ICON_TRASH}</button>`:""}</td></tr>`).join("")

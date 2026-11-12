@@ -51,23 +51,20 @@ func userKey(e Entry) string {
 }
 
 // Які замовлення враховуються з урахуванням правила дублікатів (last | first | all).
-func countedIDs(s Settings, entries []Entry) map[string]bool {
+// Яке замовлення кожного чатерса «діє» (last — останнє, first — перше, all — усі), враховуючи й приховані.
+// Старіші замовлення того ж чатерса не показуються в таблиці й не рахуються.
+func effectiveIDs(s Settings, entries []Entry) map[string]bool {
 	out := map[string]bool{}
-	var active []Entry
-	for _, e := range entries {
-		if !e.Excluded {
-			active = append(active, e)
-		}
-	}
 	if s.DupMode == "all" {
-		for _, e := range active {
+		for _, e := range entries {
 			out[e.ID] = true
 		}
 		return out
 	}
-	sort.SliceStable(active, func(i, j int) bool { return active[i].Ts < active[j].Ts })
+	sorted := append([]Entry(nil), entries...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Ts < sorted[j].Ts })
 	byUser := map[string]string{}
-	for _, e := range active {
+	for _, e := range sorted {
 		k := userKey(e)
 		if _, ok := byUser[k]; ok && s.DupMode == "first" {
 			continue
@@ -76,6 +73,19 @@ func countedIDs(s Settings, entries []Entry) map[string]bool {
 	}
 	for _, id := range byUser {
 		out[id] = true
+	}
+	return out
+}
+
+// Які замовлення рахуються: «діюче» замовлення чатерса, якщо воно не приховане.
+// Якщо приховати останнє замовлення — від цього чатерса не рахується нічого.
+func countedIDs(s Settings, entries []Entry) map[string]bool {
+	eff := effectiveIDs(s, entries)
+	out := map[string]bool{}
+	for _, e := range entries {
+		if eff[e.ID] && !e.Excluded {
+			out[e.ID] = true
+		}
 	}
 	return out
 }

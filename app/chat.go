@@ -198,6 +198,22 @@ func (a *App) loadBadges(bcID string) {
 	a.badgeMu.Lock()
 	a.badgeImgs = imgs
 	a.badgeMu.Unlock()
+	a.mu.Lock()
+	a.emitLocked() // оновити значки в таблиці
+	a.mu.Unlock()
+}
+
+// subscriber-бейджі каналу для показу стажу підписки в таблиці
+func (a *App) subBadges() map[string]string {
+	a.badgeMu.Lock()
+	defer a.badgeMu.Unlock()
+	out := map[string]string{}
+	for k, v := range a.badgeImgs {
+		if strings.HasPrefix(k, "subscriber/") {
+			out[strings.TrimPrefix(k, "subscriber/")] = v.url
+		}
+	}
+	return out
 }
 
 func (a *App) GetChat() []ChatMsg {

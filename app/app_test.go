@@ -229,3 +229,17 @@ func TestEachStartIsNewCollection(t *testing.T) {
 		t.Fatal("empty collection produced csv", files)
 	}
 }
+
+func TestHidingLatestOrderCountsNothing(t *testing.T) {
+	s := defaultSettings()
+	es := []Entry{
+		{ID: "1", Ts: 1, UserID: "u", User: "x", Tier: 1, Months: 5, Text: "Elden Ring"},
+		{ID: "2", Ts: 2, UserID: "u", User: "x", Tier: 1, Months: 5, Text: "Hades", Excluded: true},
+	}
+	if g := aggregate(s, es); len(g) != 0 {
+		t.Fatalf("older order revived: %+v", g)
+	}
+	if eff := effectiveIDs(s, es); len(eff) != 1 || !eff["2"] {
+		t.Fatal(eff)
+	}
+}

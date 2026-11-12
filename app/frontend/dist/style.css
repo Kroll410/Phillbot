@@ -839,3 +839,4 @@ tr[draggable="true"] input{cursor:text}
 #auListHint{display:none}
 #auListWin .austats{margin-left:4px}
 #auListWin .auundo{margin-left:auto}
+.auswap:disabled{opacity:.35;cursor:default}

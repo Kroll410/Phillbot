@@ -1177,7 +1177,10 @@ function renderSpinBtn(){
   if(!S) return;
   const au = AU(), t = au.timer.status, btn = $("auSpin"), act = au.lots.filter(l => !l.out && !l.hidden && l.amount > 0).length;
   if(holding && (holding.btn === btn || holding.btn === $("auReset"))) return;
-  const why = wAnim ? "Колесо крутиться…" : (t === "running" || t === "paused") ? "Спершу завершіть прийом ставок" : au.winner ? "Переможця визначено" : !act ? "На колесі немає лотів" : "";
+  const why = wAnim ? "Колесо крутиться…" : (t === "running" || t === "paused") ? "Спершу завершіть прийом ставок" : au.winner ? "Переможця визначено" : !act ? "На колесі немає лотів"
+    : !auSwapped ? "Розгорніть колесо у велике вікно, щоб крутити" : "";
+  // поки колесо крутиться — вікна не міняються місцями
+  document.querySelectorAll("[data-swap]").forEach(s => { s.disabled = !!wAnim; s.title = wAnim ? "Колесо крутиться — дочекайтеся результату" : "Поміняти вікна місцями"; });
   btn.disabled = !!why; btn.title = why || "Затисніть і тримайте, щоб крутити колесо";
   btn.querySelector(".wl").textContent = au.cfg.spinMode === "instant" || act <= 2 ? "Крутити" : "Крутити на вибування";
   $("auReset").disabled = !!wAnim || (!au.lots.some(l => l.out) && !au.winner);
@@ -1195,9 +1198,10 @@ function placeWins(){
   wrap.classList.toggle("swapped", auSwapped);
 }
 document.querySelectorAll("[data-swap]").forEach(b => b.onclick = () => {
+  if(wAnim) return; // під час оберту колесо не мінімізується
   const wins = [$("auListWin"), $("auWheelWin")], before = wins.map(w => w.getBoundingClientRect());
   auSwapped = !auSwapped; try{ localStorage.setItem("phillbot-auswap", auSwapped ? "1" : "0"); }catch(e){}
-  placeWins(); renderAuList(); wheelDraw();
+  placeWins(); renderAuList(); wheelDraw(); renderSpinBtn();
   wins.forEach((w, i) => {
     const a = before[i], z = w.getBoundingClientRect();
     w.animate([{transform: `translate(${a.left - z.left}px,${a.top - z.top}px) scale(${a.width / z.width},${a.height / z.height})`, transformOrigin: "0 0"},

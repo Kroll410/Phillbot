@@ -244,7 +244,7 @@ $("rewardRefresh").onclick = async () => {
 function renderObs(){
   const o = S.obs || {}, box = $("obsWidget"); if(!box) return;
   box.innerHTML = o.running
-    ? `<div class="obsrow"><span><b>Віджет PhillBot</b> <span class="muted">640×360 · таймер збору, гри й голосування</span><code>${esc(o.url)}/overlay/widget</code></span>
+    ? `<div class="obsrow"><span><b>Віджет PhillBot</b> <span class="muted">640×200 · таймер збору, гри й голосування</span><code>${esc(o.url)}/overlay/widget</code></span>
        <button class="small" data-copy="${esc(o.url)}/overlay/widget">Копіювати</button><button class="small" data-open="/overlay/widget" title="Відкрити в браузері">↗</button></div>`
     : `<div class="hint err">${esc(o.error || "Сервер для OBS не запущено.")}</div>`;
 }

@@ -1046,7 +1046,8 @@ auListEl.addEventListener("drop", async ev => {
 function renderAuUndo(){
   const m = AU().merges || [], last = m[m.length - 1], b = $("auUndo");
   b.disabled = !last;
-  b.title = last ? `Повернути «${last.src.name}» окремим лотом` : "Немає об'єднань";
+  const to = last && lotById(last.to);
+  b.title = last ? `Скасувати лише останнє: «${last.src.name}» → «${to ? to.name : "?"}». «${last.src.name}» знову стане окремим лотом` + (m.length > 1 ? ` (ще ${m.length - 1} об'єднань можна скасувати далі)` : "") : "Немає об'єднань";
 }
 $("auUndo").onclick = async () => {
   const m = AU().merges || [], last = m[m.length - 1]; if(!last) return;

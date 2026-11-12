@@ -601,3 +601,10 @@ button,.winbtn,.cchip,.mbtn:disabled{border-width:2px}
 button.primary:not(:disabled):hover{border-color:transparent;background:var(--grad) border-box no-repeat;filter:brightness(1.08);box-shadow:0 4px 14px rgba(145,71,255,.35)}
 /* градієнтна заливка рахується від зовнішнього краю (з рамкою) і не повторюється — без «чужих» смуг по боках */
 button.primary:not(:disabled):hover{background:var(--grad) border-box no-repeat;background-origin:border-box}
+
+/* заборонений перехід на «Переглядовий»: підкладка вібрує й повертається, таймер блимає градієнтом */
+.seg-ind.deny{animation:denyshake .5s cubic-bezier(.36,.07,.19,.97)}
+@keyframes denyshake{10%,90%{translate:-1px 0}20%,80%{translate:3px 0}30%,50%,70%{translate:-5px 0}40%,60%{translate:5px 0}}
+.mode-tab.denied{color:#ff9a95!important}
+.gblink,.timer.gblink,.gtimer.gblink,.vtimer.gblink{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:gblink .42s ease-in-out 4}
+@keyframes gblink{0%,100%{filter:brightness(1);opacity:1}50%{filter:brightness(1.6) drop-shadow(0 0 12px rgba(145,71,255,.7));opacity:.55}}

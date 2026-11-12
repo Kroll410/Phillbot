@@ -184,7 +184,7 @@ function renderTimer(){
   if(!S) return;
   const s = S.session, r = remaining(), el = $("timer");
   el.textContent = fmtTime(s.status==="finished"?0:r);
-  el.className = "timer " + s.status + (s.status==="running" && r<=30000 ? " low" : "");
+  el.className = "timer " + s.status + (s.status==="running" && r<=30000 ? " low" : "") + (Date.now() < blinkUntil ? " gblink" : "");
   $("statusText").textContent = {idle:"Очікування старту", running:"Збір іде", paused:"Пауза", finished:"Збір завершено"}[s.status] || "";
   $("statusText").className = "spill " + (s.status || "idle");
   $("statusText").title = {running:"Замовлення записуються", paused:"Замовлення не записуються, поки пауза"}[s.status] || "";
@@ -352,7 +352,6 @@ wrapEl.addEventListener("drop", async ev => {
 function renderTable(){
   const wrap = $("tableWrap");
   $("search").classList.toggle("hidden", tab==="log");
-  $("tableHint").classList.toggle("hidden", tab!=="summary" && tab!=="entries");
   // не перемальовувати, поки користувач редагує клітинку
   if(drag || holding || (wrap.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName))){ tableDirty = true; return; }
   tableDirty = false;
@@ -489,7 +488,37 @@ function showMode(m){
   const pane = {chat:$("modeChat"), viewing:$("modeViewing")}[mode] || $("modeSubday"); // вміст вкладки теж «прослизає»
   pane.classList.remove("slidein"); void pane.offsetWidth; pane.classList.add("slidein");
 }
-document.querySelectorAll(".mode-tab[data-mode]").forEach(b => b.onclick = () => showMode(b.dataset.mode));
+// СабДей активний (збір іде / пауза / гра й голосування) — на «Переглядовий» не переходимо
+function subdayBusy(){
+  if(!S) return false;
+  const st = S.session && S.session.status;
+  return st === "running" || st === "paused" || S.phase === "play";
+}
+let denyBusy = false, blinkUntil = 0;
+function denyMode(btn){
+  if(denyBusy) return; denyBusy = true;
+  const box = $("modes"), ind = box.querySelector(":scope > .seg-ind"), cur = box.querySelector(":scope > .active");
+  if(ind && cur){
+    // 1) підкладка рушає до «Переглядового», але зупиняється на півдорозі
+    const x = cur.offsetLeft + (btn.offsetLeft - cur.offsetLeft) * 0.3; // лише третина шляху
+    const w = cur.offsetWidth + (btn.offsetWidth - cur.offsetWidth) * 0.3;
+    ind.style.transform = `translateX(${x}px)`; ind.style.width = w + "px";
+    // 2) вібрує — «не можна»; 3) повертається під «СабДей»
+    setTimeout(() => { ind.classList.add("deny"); btn.classList.add("denied"); }, 260);
+    setTimeout(() => { ind.classList.remove("deny"); btn.classList.remove("denied"); slideSeg(box); denyBusy = false; }, 820);
+  } else denyBusy = false;
+  // таймер, що зараз іде, блимає градієнтом
+  if(mode !== "subday") showMode("subday");
+  const t = S.phase === "play" ? (S.vote && S.vote.status === "running" ? $("vTimer") : $("gTimer")) : $("timer");
+  blinkUntil = Date.now() + 1700; // таймери перемальовуються щочверть секунди — блимання переживає це
+  t.classList.remove("gblink"); void t.offsetWidth; t.classList.add("gblink");
+  setTimeout(() => t.classList.remove("gblink"), 1700);
+  toast(S.phase === "play" ? "Спершу завершіть гру в СабДеї" : "Спершу завершіть збір у СабДеї");
+}
+document.querySelectorAll(".mode-tab[data-mode]").forEach(b => b.onclick = () => {
+  if(b.dataset.mode === "viewing" && subdayBusy()) return denyMode(b);
+  showMode(b.dataset.mode);
+});
 showMode(mode);
 
 /* ---------- налаштування: окремо для кожної вкладки ---------- */
@@ -699,7 +728,7 @@ function renderGameTimer(){
   if(sec === "gPlay"){
     const r = remainOf(g);
     $("gTimer").textContent = fmtTime(r);
-    $("gTimer").className = "gtimer " + (g.status||"") + (g.status==="running" && r <= 60000 ? " low" : "");
+    $("gTimer").className = "gtimer " + (g.status||"") + (g.status==="running" && r <= 60000 ? " low" : "") + (Date.now() < blinkUntil ? " gblink" : "");
     $("gStatus").textContent = g.status==="paused" ? "Пауза" : "Гра йде. Коли час вийде — запустіть голосування за продовження.";
     $("gPause").textContent = g.status==="paused" ? "Продовжити" : "Пауза";
   }

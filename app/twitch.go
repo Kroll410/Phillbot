@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-var scopes = []string{"channel:read:redemptions", "channel:read:subscriptions", "user:read:chat"}
+var scopes = []string{"channel:read:redemptions", "channel:read:subscriptions", "user:read:chat", "moderator:read:followers"}
 
 const eventsubURL = "wss://eventsub.wss.twitch.tv/ws"
 

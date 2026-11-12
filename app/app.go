@@ -69,6 +69,10 @@ type App struct {
 	chatWinPending bool        // вікно запускається, ще не підключилось
 	chatWinProc    *os.Process // процес Edge --app
 
+	chattersMu sync.Mutex
+	chatters   map[string]*Chatter
+	chattersCh chan struct{}
+
 	chatMu sync.Mutex
 	chat   []ChatMsg
 
@@ -80,7 +84,9 @@ type App struct {
 }
 
 func NewApp() *App {
-	a := &App{badgeCache: map[string]subInfo{}, badgeImgs: map[string]badgeImg{}}
+	a := &App{badgeCache: map[string]subInfo{}, badgeImgs: map[string]badgeImg{},
+		chatters: map[string]*Chatter{}, chattersCh: make(chan struct{}, 1)}
+	go a.chattersLoop()
 	if exe, err := os.Executable(); err == nil {
 		a.baseDir = filepath.Dir(exe)
 	} else {

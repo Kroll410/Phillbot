@@ -67,6 +67,15 @@ function marbleInfo(){
 }
 
 /* ---------- auth / header ---------- */
+let lastAuthStatus = "";
+// вітання стрімера після входу в акаунт
+function showWelcome(name){
+  const w = $("welcome"); $("wName").textContent = name;
+  w.classList.remove("hidden","out","play"); void w.offsetWidth; w.classList.add("play");
+  clearTimeout(w._t1); clearTimeout(w._t2);
+  const hide = () => { w.classList.add("out"); w._t2 = setTimeout(() => w.classList.add("hidden"), 450); };
+  w._t1 = setTimeout(hide, 2600); w.onclick = hide;
+}
 function renderAuth(){
   const a = S.auth || {status:"checking"};
   const ok = a.status === "ok";
@@ -84,7 +93,9 @@ function renderAuth(){
   const c = S.conn || {status:"off", text:"Не підключено"};
   $("connDot").className = "dot " + (c.status==="on"?"on":c.status==="wait"?"wait":"");
   $("connDot").title = c.text;
-  $("userBox").innerHTML = ok && a.user ? `<b>${esc(a.user.display_name)}</b> <button class="small" id="logoutBtn">Вийти</button>` : "";
+  $("userBox").innerHTML = ok && a.user ? `<b class="uname">${esc(a.user.display_name)}</b><button class="small" id="logoutBtn">Вийти</button>` : "";
+  if(ok && a.user && lastAuthStatus !== "ok") showWelcome(a.user.display_name);
+  lastAuthStatus = a.status;
 }
 
 /* ---------- таймер ---------- */
@@ -207,7 +218,8 @@ function subBadgeFor(e){
   if(!url){ const b = (e.badges||[]).find(b=>b.setId==="subscriber"||b.setId==="founder"); url = b ? b.url : ""; }
   return /^https:\/\//.test(url) ? `<img class="subicon" src="${esc(url)}" alt="" title="Підписка ${months} міс. (T${e.tier})">` : "";
 }
-let editMode = false; // режим редагування у вкладці «Замовлення»
+let editMode = false;
+const openGroups = new Set(); // розгорнуті рядки «Підсумку» // режим редагування у вкладці «Замовлення»
 
 function sortRows(rows, [k,dir]){ return rows.sort((a,b)=>{ const x=a[k], y=b[k]; return (typeof x==="string" ? x.localeCompare(y,"uk") : (x-y))*dir; }); }
 function th(label, key, cls=""){ const [k,d]=sortKey[tab]; return `<th class="${cls}" data-sort="${key}">${label}${k===key?(d>0?" ▲":" ▼"):""}</th>`; }
@@ -281,10 +293,22 @@ function renderTable(){
     rows = sortRows(rows, sortKey.summary);
     const max = Math.max(1,...rows.map(r=>r.points)), total = rows.reduce((a,r)=>a+r.points,0)||1;
     if(!rows.length){ wrap.innerHTML = `<div class="empty">${S.entries.length?"Нічого не знайдено":"Замовлень поки немає. Виберіть нагороду і натисніть «Почати збір»."}</div>`; return; }
-    wrap.innerHTML = `<table class="dnd"><thead><tr><th class="gripcol"></th><th style="width:40px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:180px">Частка</th>${th("Людей","count","num")}<th>Хто замовив</th></tr></thead><tbody>${
-      rows.map((g,i)=>`<tr data-key="${esc(g.key)}" data-name="${esc(g.name)}"><td class="gripcol">${GRIP}</td><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
+    const counted = countedSet();
+    wrap.innerHTML = `<table class="dnd summary"><thead><tr><th class="gripcol"></th><th style="width:44px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:220px">Частка</th>${th("Людей","count","num")}<th style="width:44px"></th></tr></thead><tbody>${
+      rows.map((g,i)=>{
+        const open = openGroups.has(g.key);
+        const main = `<tr class="grow${open?" open":""}" data-key="${esc(g.key)}" data-name="${esc(g.name)}"><td class="gripcol">${GRIP}</td><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
         <td class="num pts">${g.points}</td><td><div class="share"><div class="track"><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div></div><span>${(g.points/total*100).toFixed(0)}%</span></div></td>
-        <td class="num">${g.count}</td><td class="users">${g.users.map(u=>`${userTag(u)} <span class="muted">(${u.p})</span>`).join(" ")}</td></tr>`).join("")
+        <td class="num">${g.count}</td><td class="chev" title="${open?"Згорнути":"Показати замовлення"}"><span></span></td></tr>`;
+        if(!open) return main;
+        const list = S.entries.filter(e=>counted.has(e.id) && norm(e.text)===g.key).sort((a,b)=>pointsOf(b)-pointsOf(a) || a.ts-b.ts);
+        return main + `<tr class="gdetail"><td colspan="7"><table class="subtable"><thead><tr><th>Час</th><th>Чатерс</th><th>Тір сабки</th><th class="num">Має сабку</th><th class="num">Бали</th><th>Замовлення</th></tr></thead><tbody>${
+          list.map(e=>`<tr><td class="muted">${fmtClock(e.ts)}</td><td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
+            <td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td>
+            <td class="num">${e.tier?`<span class="subcell">${subBadgeFor(e)}${e.months} міс.</span>`:'<span class="muted">—</span>'}</td>
+            <td class="num pts">${pointsOf(e)}</td><td>${esc(e.text)}</td></tr>`).join("")
+        }</tbody></table></td></tr>`;
+      }).join("")
     }</tbody></table>`;
   } else {
     const counted = countedSet();
@@ -345,6 +369,20 @@ function renderChat(){
   $("chatTitle").textContent = "Чат " + (S.auth && S.auth.user ? S.auth.user.display_name : "");
 }
 $("chatWindowBtn").onclick = () => call("OpenChatWindow");
+
+/* список активних глядачів зліва: найсвіжіші зверху в кожній групі */
+const CHAT_GROUPS = [["mod","Модератори"],["vip","VIP"],["follower","Підписники на канал"],["sub","Саби"],["viewer","Глядачі"]];
+let chatters = [];
+function renderChatters(){
+  const box = $("chatUsers"); if(!box) return;
+  if(!chatters.length){ box.innerHTML = `<div class="cuempty">Тут з'являться глядачі, які пишуть у чат.</div>`; return; }
+  box.innerHTML = CHAT_GROUPS.map(([g, title]) => {
+    const list = chatters.filter(c => c.group === g);
+    if(!list.length) return "";
+    return `<div class="cugroup"><div class="cuhead">${title}<span>${list.length}</span></div>${
+      list.map(c => `<div class="curow" title="${esc(c.count)} повідом. · останнє о ${fmtClock(c.lastTs)}">${userTag(c)}</div>`).join("")}</div>`;
+  }).join("");
+}
 $("chatReturn").onclick = () => call("CloseChatWindow");
 
 /* ---------- вкладки-режими: Чат / СабДей / Переглядовий ---------- */
@@ -367,6 +405,17 @@ const n = (id, d) => { const v = Number($(id).value); return Number.isFinite(v) 
 async function saveSettings(patch){ setState(await call("SaveSettings", {...S.settings, ...patch})); }
 const openModal = id => $(id).classList.add("show"), closeModal = id => $(id).classList.remove("show");
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { closeModal(b.dataset.close); pendingReward = null; });
+// будь-яке вікно закривається через Esc або клік поза ним (підтвердження = «Скасувати»)
+function dismissModal(m){
+  if(m.id === "modal"){ $("modalNo").click(); return; }
+  closeModal(m.id); pendingReward = null;
+}
+document.addEventListener("keydown", e => {
+  if(e.key !== "Escape") return;
+  const open = [...document.querySelectorAll(".modal.show")]; if(!open.length) return;
+  e.preventDefault(); dismissModal(open[open.length-1]);
+});
+document.querySelectorAll(".modal").forEach(m => m.addEventListener("mousedown", e => { if(e.target === m) dismissModal(m); }));
 
 // Загальні: акаунт, порт OBS
 $("generalBtn").onclick = () => {
@@ -465,6 +514,8 @@ $("search").oninput = renderTable;
 $("tableWrap").addEventListener("click", async e => {
   const h = e.target.closest("th[data-sort]");
   if(h){ const k=h.dataset.sort, cur=sortKey[tab]; sortKey[tab] = [k, cur[0]===k ? -cur[1] : (k==="name"||k==="user"||k==="text"?1:-1)]; renderTable(); return; }
+  const gr = e.target.closest("tr.grow");
+  if(gr && !e.target.closest(".grip")){ const k = gr.dataset.key; openGroups.has(k) ? openGroups.delete(k) : openGroups.add(k); renderTable(); return; }
   const btn = e.target.closest("button[data-act]"); if(!btn) return;
   if(btn.dataset.act==="editmode"){ editMode = !editMode; renderTable(); return; }
   const id = btn.closest("tr").dataset.id, ent = S.entries.find(x=>x.id===id); if(!ent) return;
@@ -527,6 +578,8 @@ function boot(){
   window.runtime.EventsOn("redeem", d => { const id = d && d.id; if(!id) return; freshIds.add(id); setTimeout(()=>freshIds.delete(id), 3000); });
   window.runtime.EventsOn("chat", m => chatPending.push(m));
   window.runtime.EventsOn("chatdel", chatDelete);
+  window.runtime.EventsOn("chatters", list => { chatters = list || []; renderChatters(); });
+  api().GetChatters().then(list => { chatters = list || []; renderChatters(); });
   api().GetState().then(setState);
 }
 boot();

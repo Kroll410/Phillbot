@@ -312,3 +312,51 @@ header > #generalBtn{width:38px;height:38px;border-radius:10px;background:var(--
 aside{min-width:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;padding-right:4px}
 details.fold{min-width:0;overflow:hidden}
 .obsrow,.obsrow>span{min-width:0}
+
+/* «Підсумок»: розгортання замовлення */
+tr.grow{cursor:pointer}
+td.chev{text-align:center;padding-left:0;padding-right:12px}
+td.chev span{display:inline-block;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translateY(-3px);transition:transform .15s}
+tr.grow.open td.chev span{transform:rotate(-135deg) translateY(-1px);border-color:var(--text)}
+tr.grow:hover td.chev span{border-color:var(--text)}
+tr.grow.open td{background:#202026;border-bottom-color:transparent}
+tr.gdetail>td{padding:0 14px 14px 52px;background:#202026}
+tr.gdetail:hover{background:transparent}
+.subtable{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;border-collapse:separate;border-spacing:0}
+.subtable th{position:static;background:#1c1c20;cursor:default;padding:8px 12px;font-size:10.5px}
+.subtable td{padding:8px 12px;font-size:13.5px}
+.subtable tbody tr:hover{background:#232329}
+.subtable .pts{font-size:15px}
+
+/* шапка: відступ між ніком і «Вийти» */
+#userBox{display:inline-flex;align-items:center;gap:14px}
+#userBox .uname{font-weight:700}
+/* вітання після входу */
+.welcome{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(14,14,16,.72);backdrop-filter:blur(6px);cursor:pointer;opacity:0;transition:opacity .45s}
+.welcome.play{opacity:1}
+.welcome.out{opacity:0}
+.wbox{text-align:center;transform:scale(.92);transition:transform .6s cubic-bezier(.2,1.4,.4,1)}
+.welcome.play .wbox{transform:scale(1)}
+.whi{font:600 22px/1.2 var(--font-display);color:var(--muted);opacity:0;animation:wfade .5s .1s forwards}
+.wname{font:800 68px/1.1 var(--font-display);letter-spacing:.5px;margin:6px 0 10px;
+  background:linear-gradient(90deg,#bf94ff,#9147ff 30%,#ffffff 50%,#9147ff 70%,#bf94ff);background-size:250% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  opacity:0;animation:wpop .7s .2s cubic-bezier(.2,1.5,.4,1) forwards,wshine 2.2s .5s ease-in-out}
+.wsub{font-size:14px;color:var(--muted);opacity:0;animation:wfade .5s .55s forwards}
+@keyframes wpop{0%{opacity:0;transform:translateY(16px) scale(.8)}100%{opacity:1;transform:none}}
+@keyframes wfade{to{opacity:1}}
+@keyframes wshine{0%{background-position:100% 0}100%{background-position:0 0}}
+
+/* вкладка «Чат»: зліва глядачі, справа чат */
+#modeChat{display:flex;flex-direction:column}
+.chatgrid{flex:1;min-height:0;display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px}
+.chatmain{display:flex;flex-direction:column;min-height:0;min-width:0}
+.chatmain .chatwrap,.chatmain .locked{flex:1;min-height:0}
+.cusers{background:var(--panel);border:1px solid var(--line);border-radius:var(--r,12px);overflow-y:auto;padding:8px 0;scrollbar-gutter:stable}
+.cugroup+.cugroup{margin-top:6px}
+.cuhead{display:flex;justify-content:space-between;align-items:center;padding:8px 16px 4px;font:600 11px/1.3 var(--font-ui);text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.cuhead span{font-variant-numeric:tabular-nums;background:var(--panel2);border-radius:10px;padding:1px 8px;letter-spacing:0}
+.curow{padding:4px 16px;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.curow:hover{background:var(--panel2)}
+.curow .utag .cbadge{height:16px}
+.cuempty{padding:16px;color:var(--muted);font-size:13px}

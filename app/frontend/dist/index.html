@@ -133,12 +133,17 @@
     <button id="chatWindowBtn">⧉ Відкрити в окремому вікні</button>
     <button id="chatSettingsBtn">Налаштування чату</button>
   </div>
+  <div class="chatgrid">
+  <aside class="cusers" id="chatUsers"></aside>
+  <div class="chatmain">
   <div class="tablewrap chatwrap" id="chatWrap"><div id="chatList"></div><button id="chatMore" class="hidden">↓ Нові повідомлення</button></div>
   <div class="locked hidden" id="chatLocked">
     <div class="lockicon">⧉</div>
     <h3>Чат відкрито в окремому вікні</h3>
     <p class="muted">Поки окреме вікно відкрите, ця вкладка заблокована. Закрийте вікно або поверніть чат сюди.</p>
     <button id="chatReturn" class="primary">↩ Повернути чат у вкладку</button>
+  </div>
+  </div>
   </div>
 </section>
 
@@ -193,6 +198,7 @@
 </main>
 
 <div class="modal" id="modal"><div class="box"><p id="modalText"></p><div class="row actions"><button id="modalNo">Скасувати</button><button id="modalYes" class="primary">Так</button></div></div></div>
+<div id="welcome" class="welcome hidden"><div class="wbox"><div class="whi">Вітаю,</div><div class="wname" id="wName"></div><div class="wsub">PhillBot готовий до стріму</div></div></div>
 <div id="toast"></div>
 
 <script src="chatrender.js"></script>

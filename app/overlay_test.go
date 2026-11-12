@@ -147,3 +147,39 @@ func TestBackfillLookFromChat(t *testing.T) {
 		t.Fatalf("%+v", e)
 	}
 }
+
+func TestChattersGroups(t *testing.T) {
+	a := newTestApp(t)
+	msg := func(id, login string, badges string) {
+		a.handleChatNotification("channel.chat.message", json.RawMessage(`{"chatter_user_id":"`+id+`","chatter_user_login":"`+login+`","chatter_user_name":"`+login+`","message_id":"m`+id+`","color":"",
+			"badges":[`+badges+`],"message_type":"text","message":{"text":"hi","fragments":[{"type":"text","text":"hi"}]}}`))
+		time.Sleep(5 * time.Millisecond)
+	}
+	msg("1", "modguy", `{"set_id":"moderator","id":"1","info":""},{"set_id":"subscriber","id":"0","info":"3"}`)
+	msg("2", "vipgal", `{"set_id":"vip","id":"1","info":""}`)
+	msg("3", "subber", `{"set_id":"subscriber","id":"3000","info":"5"}`)
+	msg("4", "lurker", ``)
+	deadline := time.Now().Add(2 * time.Second)
+	var list []Chatter
+	for time.Now().Before(deadline) {
+		list = a.GetChatters()
+		if len(list) == 4 && list[0].Group != "" {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	got := map[string]string{}
+	for _, c := range list {
+		got[c.Login] = c.Group
+	}
+	if got["modguy"] != "mod" || got["vipgal"] != "vip" || got["subber"] != "sub" || got["lurker"] != "viewer" {
+		t.Fatal(got)
+	}
+	if list[0].Login != "lurker" { // найсвіжіший зверху
+		t.Fatal("order", list[0].Login)
+	}
+	a.handleChatNotification("channel.chat.clear_user_messages", json.RawMessage(`{"target_user_id":"4"}`))
+	if len(a.GetChatters()) != 3 {
+		t.Fatal("banned chatter not removed")
+	}
+}

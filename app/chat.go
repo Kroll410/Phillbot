@@ -119,6 +119,7 @@ func (a *App) onChatMessage(raw json.RawMessage) {
 	a.chatMu.Unlock()
 	a.emitEvent("chat", msg)
 	a.backfillLook(msg.UserID, msg.Color, msg.Badges)
+	a.trackChatter(ev, msg)
 }
 
 // видалення: ids — конкретні повідомлення; userID — усі повідомлення людини; all — очищення чату
@@ -157,6 +158,7 @@ func (a *App) handleChatNotification(subType string, raw json.RawMessage) bool {
 		}
 		if json.Unmarshal(raw, &ev) == nil && ev.TargetUserID != "" {
 			a.onChatDelete(nil, ev.TargetUserID, false)
+			a.removeChatter(ev.TargetUserID) // бан / таймаут — прибрати зі списку
 		}
 	case "channel.chat.clear":
 		a.onChatDelete(nil, "", true)

@@ -163,6 +163,15 @@ func TestExport(t *testing.T) {
 	if err != nil || r.Lines != 2 {
 		t.Fatal(r, err)
 	}
+	if _, err := a.ExportMarbles(false); err != nil { // повторний експорт — у теці last усе одно один файл
+		t.Fatal(err)
+	}
+	if fs, _ := os.ReadDir(r.Dir); len(fs) != 1 || filepath.Base(r.Dir) != "last" {
+		t.Fatal("last folder must hold exactly one file", fs)
+	}
+	if hs, _ := os.ReadDir(filepath.Join(a.baseDir, "marbles", "history")); len(hs) < 1 {
+		t.Fatal("history copies missing")
+	}
 	b, _ := os.ReadFile(r.Path)
 	if b[0] != 0xEF || b[1] != 0xBB || b[2] != 0xBF || string(b[3:]) != "Ой так\r\nОй так\r\n" {
 		t.Fatalf("%q", b)

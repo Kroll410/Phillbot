@@ -18,6 +18,7 @@ const marblesAppID = "1170970"
 
 type MarblesResult struct {
 	Path           string `json:"path"`
+	Dir            string `json:"dir"`
 	Lines          int    `json:"lines"`
 	Copied         bool   `json:"copied"`
 	AlreadyRunning bool   `json:"alreadyRunning"`
@@ -76,17 +77,29 @@ func (a *App) ExportMarbles(launch bool) (MarblesResult, error) {
 	if len(clean) == 0 {
 		return MarblesResult{}, errors.New("немає замовлень з балами > 0")
 	}
-	dir := filepath.Join(a.baseDir, "marbles")
+	// marbles/last — тека, де лежить ЛИШЕ файл останнього збору; її шлях копіюється в буфер.
+	// Копії всіх експортів з датою — у marbles/history.
+	dir := filepath.Join(a.baseDir, "marbles", "last")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return MarblesResult{}, err
+	}
+	if old, err := os.ReadDir(dir); err == nil {
+		for _, f := range old {
+			if f.Name() != "subday_marbles.csv" {
+				_ = os.RemoveAll(filepath.Join(dir, f.Name()))
+			}
+		}
 	}
 	data := encodeLines(clean)
 	p := filepath.Join(dir, "subday_marbles.csv")
 	if err := os.WriteFile(p, data, 0644); err != nil {
 		return MarblesResult{}, errors.New("не вдалося записати файл (" + err.Error() + ") — можливо, він відкритий в іншій програмі")
 	}
-	_ = os.WriteFile(filepath.Join(dir, "subday_marbles_"+time.Now().Format("2006-01-02_15-04-05")+".csv"), data, 0644)
-	res := MarblesResult{Path: p, Lines: len(clean), Copied: setClipboard(p)}
+	hist := filepath.Join(a.baseDir, "marbles", "history")
+	if os.MkdirAll(hist, 0755) == nil {
+		_ = os.WriteFile(filepath.Join(hist, "subday_marbles_"+time.Now().Format("2006-01-02_15-04-05")+".csv"), data, 0644)
+	}
+	res := MarblesResult{Path: p, Dir: dir, Lines: len(clean), Copied: setClipboard(dir)}
 	if launch {
 		if marblesRunning() {
 			res.AlreadyRunning = true

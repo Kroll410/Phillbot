@@ -251,3 +251,68 @@ func TestAuctionSpice(t *testing.T) {
 		t.Fatal("spice not reset")
 	}
 }
+
+// Точна перевірка правила вибування: повний перебір усіх сценаріїв (без випадковості) —
+// шанс перемогти кожного лота має дорівнювати сума/загальна сума.
+func winProbs(a []float64) []float64 {
+	n := len(a)
+	memo := map[int][]float64{}
+	var rec func(mask int) []float64
+	rec = func(mask int) []float64 {
+		if r, ok := memo[mask]; ok {
+			return r
+		}
+		var idx []int
+		var am []float64
+		for i := 0; i < n; i++ {
+			if mask&(1<<i) != 0 {
+				idx, am = append(idx, i), append(am, a[i])
+			}
+		}
+		res := make([]float64, n)
+		if len(idx) == 1 {
+			res[idx[0]] = 1
+		} else {
+			w := elimWeights(am)
+			tot := 0.0
+			for _, x := range w {
+				tot += x
+			}
+			for k, j := range idx {
+				sub := rec(mask &^ (1 << j))
+				for i := range res {
+					res[i] += w[k] / tot * sub[i]
+				}
+			}
+		}
+		memo[mask] = res
+		return res
+	}
+	return rec(1<<n - 1)
+}
+
+func TestElimWeightsExact(t *testing.T) {
+	cases := [][]float64{{1000, 1000, 2000}, {1000, 5000, 10000, 26000, 15000}, {1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 10000}, {1000, 10000}, {7}}
+	seed := uint64(42)
+	for c := 0; c < 30; c++ { // ще 30 випадкових наборів по 2..9 лотів
+		n := 2 + c%8
+		am := make([]float64, n)
+		for i := range am {
+			seed = seed*6364136223846793005 + 1442695040888963407
+			am[i] = float64(1000 * (1 + (seed>>33)%30))
+		}
+		cases = append(cases, am)
+	}
+	for _, am := range cases {
+		s := 0.0
+		for _, x := range am {
+			s += x
+		}
+		p := winProbs(am)
+		for i := range am {
+			if d := p[i] - am[i]/s; d > 1e-9 || d < -1e-9 {
+				t.Fatalf("%v: lot %d wins %.6f, want %.6f", am, i, p[i], am[i]/s)
+			}
+		}
+	}
+}

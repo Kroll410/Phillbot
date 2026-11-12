@@ -515,7 +515,7 @@ function slideSeg(box){
 function slideAll(){ slideSeg($("modes")); slideSeg(document.querySelector(".tabs .seg")); }
 addEventListener("resize", slideAll);
 function showMode(m){
-  mode = ["chat","viewing"].includes(m) ? m : "subday";
+  mode = m === "viewing" ? m : "subday"; // вкладку «Чат» прибрано з перемикача
   try{ localStorage.setItem("phillbot-mode", mode); }catch(e){}
   document.querySelectorAll(".mode-tab[data-mode]").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
   $("modeChat").classList.toggle("hidden", mode !== "chat");
@@ -636,6 +636,8 @@ function countTo0(el, fmt = v => String(v), ms = 650){
     requestAnimationFrame(step); setTimeout(fin, ms + 300);
   });
 }
+// кінець анімації — з запасним таймером: у прихованому чи згорнутому вікні анімації можуть стояти
+function animDone(anim, ms){ return Promise.race([anim.finished.catch(() => {}), new Promise(r => setTimeout(r, ms))]); }
 function animOut(els, frames, {dur = 420, stagger = 30, max = 14} = {}){
   return Promise.all([...els].map((el, i) => new Promise(res => {
     const delay = Math.min(i, max) * stagger, kf = typeof frames === "function" ? frames(el, i) : frames;
@@ -665,7 +667,7 @@ async function resetAnimAuction(){
   await Promise.all([
     animOut($("auList").querySelectorAll("tbody > tr, .autop-i"), ROW_OUT, {dur: 560, stagger: 55, max: 16}),
     animOut($("auFeed").querySelectorAll(".fbid"), [{transform: "none", opacity: 1}, {transform: "translateX(48px)", opacity: 0}], {dur: 560, stagger: 55, max: 16}),
-    $("wheel").animate([{opacity: 1}, {opacity: .15}], {duration: 800, fill: "forwards"}).finished.catch(() => {}),
+    animDone($("wheel").animate([{opacity: 1}, {opacity: .15}], {duration: 800, fill: "forwards"}), 1000),
     countTo0($("auLots"), undefined, 1100), countTo0($("auBids"), undefined, 1100), countTo0($("auSum"), fmtN, 1100),
   ]);
   await sleep(250);
@@ -1039,10 +1041,12 @@ function renderAuTimer(){
 }
 setInterval(renderAuTimer, 250);
 
-// частки на колесі: «одразу результат» — пропорційно сумі; «на вибування» — 1/сума (дешевші вибувають частіше)
+// частки на колесі: «одразу результат» — пропорційно сумі; «на вибування» — шанс вибути ∝ сумі решти лотів
+// (лише так шанс перемогти точно дорівнює сума/загальна сума — див. elimWeights у auction.go)
 function wheelSectors(){
   const au = AU(), elim = au.cfg.spinMode !== "instant";
-  return au.lots.filter(l => !l.out && !l.hidden && l.amount > 0).map(l => ({id: l.id, w: elim ? 1 / l.amount : l.amount}));
+  const act = au.lots.filter(l => !l.out && !l.hidden && l.amount > 0), S = act.reduce((s, l) => s + l.amount, 0);
+  return act.map(l => ({id: l.id, w: elim ? (act.length > 1 ? S - l.amount : 1) : l.amount}));
 }
 function chanceOf(lot){
   // шанс перемогти — від сум усіх лотів на колесі до обертів (вибування його не обнуляє)
@@ -1075,9 +1079,9 @@ function renderAuList(){
       if(leaving.length){ // вибулий лот виїжджає вправо, рядок згортається — потім перемальовуємо
         auLeaving = true;
         Promise.all(leaving.map(el => { const h = el.offsetHeight + "px";
-          return el.animate([{transform: "none", opacity: 1, height: h}, {transform: "translateX(70px)", opacity: 0, height: h, offset: .55},
+          const an = el.animate([{transform: "none", opacity: 1, height: h}, {transform: "translateX(70px)", opacity: 0, height: h, offset: .55},
             {transform: "translateX(70px)", opacity: 0, height: "0px", paddingTop: "0px", paddingBottom: "0px", marginTop: "-8px"}],
-            {duration: 700, easing: "ease-in", fill: "forwards"}).finished.catch(() => {}); }))
+            {duration: 700, easing: "ease-in", fill: "forwards"}); return animDone(an, 900); }))
           .then(() => { auLeaving = false; renderAuList(); });
         return;
       }
@@ -1571,6 +1575,7 @@ function renderAuction(){
 let auFlashT = 0;
 function onAuctionBid(id){
   auFresh.add(id); setTimeout(() => auFresh.delete(id), 3000);
+  renderAuFeed(); // стан із цією ставкою вже намальовано (подія приходить після нього) — перемалювати з підсвіткою
   if(mode !== "viewing") return;
   const f = document.querySelector(".aufeedcard"); loadOn(f); clearTimeout(auFlashT); auFlashT = setTimeout(() => loadOff(f), 1300);
 }

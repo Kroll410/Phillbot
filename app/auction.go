@@ -87,7 +87,7 @@ type Spin struct {
 	At      int64     `json:"at"`
 	Mode    string    `json:"mode"`
 	IDs     []string  `json:"ids"`     // сектори по колу, по порядку
-	Weights []float64 `json:"weights"` // розмір секторів (elim — 1/сума: дешевші вибувають частіше)
+	Weights []float64 `json:"weights"` // розмір секторів (elim — сума решти лотів, див. elimWeights)
 	Pick    string    `json:"pick"`    // на кого вказала стрілка
 	Pos     float64   `json:"pos"`     // точка на колі 0..1 (від random.org)
 	Source  string    `json:"source"`  // random.org | локально
@@ -661,7 +661,7 @@ var randomUnit = func() (float64, string) {
 // AuctionSpin — один оберт. Бекенд вибирає результат (random.org), інтерфейс лише анімує колесо до нього.
 //
 //	instant — частка сектора = сума лота; на кого вказала стрілка, той і переміг.
-//	elim    — частка сектора ∝ 1/сума (дешевші вибувають частіше); вибраний лот вибуває, останній — переможець.
+//	elim    — частка сектора = шанс вибути (elimWeights); вибраний лот вибуває, останній — переможець.
 func (a *App) AuctionSpin() (Snapshot, error) {
 	a.mu.Lock()
 	au := &a.st.Auction
@@ -672,16 +672,18 @@ func (a *App) AuctionSpin() (Snapshot, error) {
 	mode := au.Cfg.SpinMode
 	var ids []string
 	var w []float64
-	total := 0.0
 	for _, l := range au.Lots {
 		if l.Out > 0 || l.Hidden || l.Amount <= 0 {
 			continue
 		}
-		x := float64(l.Amount)
-		if mode == "elim" {
-			x = 1 / x
-		}
-		ids, w, total = append(ids, l.ID), append(w, x), total+x
+		ids, w = append(ids, l.ID), append(w, float64(l.Amount))
+	}
+	if mode == "elim" {
+		w = elimWeights(w)
+	}
+	total := 0.0
+	for _, x := range w {
+		total += x
 	}
 	a.mu.Unlock()
 	if len(ids) == 0 {
@@ -822,4 +824,26 @@ func localIntn(n int) int {
 		return 0
 	}
 	return int(localUnit() * float64(n))
+}
+
+// elimWeights — сектори колеса «на вибування»: шанс лота j вибути в цьому оберті ∝ (S − aⱼ),
+// де S — сума всіх лотів на колесі. Лише за такого правила шанс кожного лота ПЕРЕМОГТИ дорівнює aᵢ/S
+// (доведення індукцією за кількістю лотів n: потрібно Σ_{j≠i} qⱼ·aᵢ/(S−aⱼ) = aᵢ/S для всіх i,
+//
+//	звідки qⱼ/(S−aⱼ) однакові для всіх j, тобто qⱼ = (S−aⱼ)/((n−1)·S)).
+//
+// Попереднє правило «1/сума» давало дорогим лотам фору (напр. 10000 проти дев'яти по 1000 — 76% замість 52.6%).
+func elimWeights(amounts []float64) []float64 {
+	s := 0.0
+	for _, x := range amounts {
+		s += x
+	}
+	out := make([]float64, len(amounts))
+	for i, x := range amounts {
+		out[i] = s - x
+	}
+	if len(amounts) == 1 {
+		out[0] = 1
+	}
+	return out
 }

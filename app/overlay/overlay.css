@@ -1,11 +1,17 @@
 /* Спільні стилі оверлеїв OBS. Фон прозорий (OBS Browser Source). Параметри URL: ?scale=1.5&theme=shadow|box|plain&align=left|center|right */
-:root{ --scale:1; --accent:#9147ff; --ok:#00e676; --warn:#ffb300; --bad:#ff3b30; --text:#fff; --muted:#d6d6dc; }
+:root{
+  /* ті самі шрифти, що й у програмі (див. frontend/README.md) */
+  --font-ui:"Segoe UI Variable Text","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+  --font-display:"Segoe UI Variable Display","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+  --font-mono:"Cascadia Mono","Cascadia Code",Consolas,monospace;
+  --scale:1; --accent:#9147ff; --ok:#00e676; --warn:#ffb300; --bad:#ff3b30; --text:#fff; --muted:#d6d6dc; }
 *{box-sizing:border-box}
 html,body{margin:0;background:transparent;color:var(--text);overflow:hidden;
-  font:700 calc(20px * var(--scale))/1.25 "Segoe UI Variable Display","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+  font:700 calc(20px * var(--scale))/1.25 var(--font-display);
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
 body.theme-shadow{text-shadow:0 2px 3px rgba(0,0,0,.85),0 0 8px rgba(0,0,0,.6)}
 body.theme-box .box{background:rgba(14,14,16,.78);border:2px solid rgba(145,71,255,.65);border-radius:calc(14px * var(--scale));padding:calc(10px * var(--scale)) calc(16px * var(--scale))}
 body.align-center{text-align:center} body.align-right{text-align:right}
 .hidden{display:none!important}
 .fade{transition:opacity .5s} .fade.out{opacity:0}
+button,input,select{font-family:inherit} code{font-family:var(--font-mono)}

@@ -23,6 +23,15 @@ async function call(fn, ...args){
   try{ return await api()[fn](...args); }
   catch(e){ toast("Помилка: " + (e && e.message || e), 4000); throw e; }
 }
+/* Індикатор завантаження — єдиний підхід для будь-якого завантаження:
+   рамка елемента (вікна, картки) стає анімованим градієнтом зелений → фіолетовий.
+   withLoading(елемент або [елементи], async () => {...}) — клас .is-loading знімається сам, навіть при помилці. */
+async function withLoading(els, work){
+  const list = (Array.isArray(els) ? els : [els]).filter(Boolean);
+  list.forEach(el => el.classList.add("is-loading"));
+  try{ return await work(); }
+  finally{ list.forEach(el => el.classList.remove("is-loading")); }
+}
 function setState(snap){ if(snap && snap.settings) { S = snap; renderAll(); } }
 
 /* ---------- дані: поточний збір або збір, вибраний для перегляду ---------- */
@@ -87,9 +96,11 @@ function ordersOf(c){ return countedSet({entries: c.entries || [], settings: c.s
 async function loadStreams(){ try{ streams = await api().ListStreams() || []; }catch(e){ streams = []; } renderStreamBar(); }
 function renderStreamBar(){
   if(!S || !S.stream) return;
-  const sel = $("streamSel"), curId = pastStream ? pastStream.id : S.stream.id;
-  const list = streams.length ? streams : [{id:S.stream.id, startedAt:S.stream.startedAt, collections:(S.past||[]).length + (S.entries.length?1:0), current:true}];
-  if(document.activeElement !== sel) sel.innerHTML = list.map(m => `<option value="${esc(m.id)}" ${m.id===curId?"selected":""}>${esc(fmtStream(m))}</option>`).join("");
+  const curId = pastStream ? pastStream.id : S.stream.id;
+  const meta = streams.find(m => m.id === curId) || {id:curId, startedAt: pastStream ? pastStream.startedAt : S.stream.startedAt, collections: streamColls().length + (!pastStream && S.entries.length ? 1 : 0), current: !pastStream};
+  $("streamCur").innerHTML = `<b>${esc(fmtStream(meta).replace(" (поточний)",""))}</b>${pastStream ? ' <span class="muted">· минулий</span>' : ' <span class="live-dot"></span>'}`;
+  $("streamLabel").textContent = pastStream ? fmtStream(meta) : "";
+  $("streamLabel").classList.toggle("hidden", !pastStream);
   const chips = streamColls().map(c => `<button class="cchip${view&&view.n===c.n?" active":""}" data-n="${c.n}"><b>Збір ${c.n}</b><span>${fmtHM(c.startedAt)} · ${ordersOf(c)} замовл.</span></button>`);
   if(!pastStream){
     const st = S.session.status, n = S.collN || (S.past||[]).length + 1;
@@ -105,16 +116,27 @@ $("collChips").addEventListener("click", e => {
   view = b.dataset.n === "live" ? null : {n: Number(b.dataset.n)};
   editMode = false; openGroups.clear(); renderAll();
 });
-$("streamSel").addEventListener("change", async () => {
-  const id = $("streamSel").value;
+async function openStream(id){
   if(!id || id === S.stream.id){ pastStream = null; view = null; }
   else {
     try{ pastStream = await api().GetStream(id); }catch(e){ toast("Не вдалося відкрити стрім"); return; }
     const cs = pastStream.collections || []; view = cs.length ? {n: cs[cs.length-1].n} : null;
   }
   editMode = false; openGroups.clear(); renderAll();
-});
-$("streamSel").addEventListener("focus", loadStreams);
+}
+function renderStreamList(){
+  const curId = pastStream ? pastStream.id : S.stream.id;
+  $("streamList").innerHTML = streams.length ? streams.map(m => `<button class="srow${m.id===curId?" active":""}" data-sid="${esc(m.id)}">
+      <span class="sdate">${esc(fmtStream(m).split(" · ")[0])}</span>
+      <span class="smeta">${esc(fmtStream(m).replace(" (поточний)","").split(" · ").slice(1).join(" · "))} · ${m.orders} замовл.</span>
+      ${m.current ? '<span class="sbadge">поточний</span>' : ""}</button>`).join("")
+    : `<div class="hint">Стрімів ще немає.</div>`;
+}
+$("openJournal").onclick = async () => {
+  renderStreamList(); openModal("streamsModal");
+  await withLoading($("streamsModal").querySelector(".box"), loadStreams); renderStreamList();
+};
+$("streamList").addEventListener("click", async e => { const b = e.target.closest("[data-sid]"); if(!b) return; closeModal("streamsModal"); await openStream(b.dataset.sid); });
 document.addEventListener("click", e => { if(e.target.id==="backLive"){ e.preventDefault(); pastStream = null; view = null; renderAll(); } });
 
 /* ---------- auth / header ---------- */
@@ -192,22 +214,31 @@ function renderRewardCurrent(){
 }
 document.addEventListener("click", e => { if(e.target.id==="pickReward"){ e.preventDefault(); $("subdaySettingsBtn").click(); } });
 let pendingReward = null; // вибір у вікні налаштувань до «Зберегти»
-function renderRewardGrid(){
+let showAllRewards = false;
+function renderRewardGrid(animate){
   const sel = pendingReward ?? S.settings.rewardId;
-  const list = [...(S.rewards||[])].sort((a,b)=>a.cost-b.cost);
-  if(sel && !list.some(r=>r.id===sel)){ const r = rewardById(sel); if(r) list.unshift(r); }
-  $("rewardGrid").innerHTML = list.length ? list.map(r=>rewardTile(r,{button:true, sel:r.id===sel})).join("")
-    : `<div class="hint">Список нагород порожній. Натисніть «Оновити» або виберіть з отриманих погашень нижче.</div>`;
+  const all = [...(S.rewards||[])].sort((a,b)=>a.cost-b.cost);
+  if(sel && !all.some(r=>r.id===sel)){ const r = rewardById(sel); if(r) all.unshift(r); }
+  let html;
+  if(showAllRewards){
+    html = all.map((r,i)=>rewardTile(r,{button:true, sel:r.id===sel}).replace('class="rtile', `style="animation-delay:${animate? i*45 : 0}ms" class="rtile${animate?" appear":""}`)).join("");
+    if(!all.length) html = `<div class="hint">Список нагород порожній. Натисніть «Оновити».</div>`;
+  } else {
+    const cur = all.find(r=>r.id===sel);
+    html = (cur ? rewardTile(cur,{button:true, sel:true}) : `<div class="rtile rnone"><div class="rimg"></div><div class="rtitle">Нагороду не вибрано</div></div>`)
+      + `<button class="rtile rmore" id="showAllRewards" title="Показати всі нагороди каналу"><div class="rimg"><span class="plus"></span></div><div class="rtitle">Показати всі<br><span class="muted">${all.length} нагород</span></div></button>`;
+  }
+  $("rewardGrid").innerHTML = html;
   $("rewardsErr").textContent = S.rewardsErr || "";
-  const seen = Object.values(S.seenRewards || {}).sort((a,b)=>b.ts-a.ts);
-  $("seenRewards").innerHTML = seen.length ? seen.map(r=>`<div class="reward ${r.id===sel?"bound":""}"><div><div><b>${esc(r.title)}</b> — «${esc(r.sample||"(без тексту)")}» ${esc(r.user)} <span class="muted">(${r.count}×)</span></div><code>${esc(r.id)}</code></div>
-      ${r.id===sel?'<span style="color:var(--ok)">✓</span>':`<button class="small" data-bind="${esc(r.id)}">Вибрати</button>`}</div>`).join("")
-    : `<div class="hint">Погашень ще не було.</div>`;
 }
-$("rewardGrid").addEventListener("click", e => { const t = e.target.closest("[data-rid]"); if(!t) return; pendingReward = t.dataset.rid; renderRewardGrid(); });
-$("seenRewards").addEventListener("click", e => { const b = e.target.closest("button[data-bind]"); if(!b) return; pendingReward = b.dataset.bind; renderRewardGrid(); });
-$("rewardIdUse").onclick = () => { const id = $("rewardIdInput").value.trim(); if(id){ pendingReward = id; renderRewardGrid(); } };
-$("rewardRefresh").onclick = async () => { await call("RefreshRewards"); renderRewardGrid(); toast("Список нагород оновлено"); };
+$("rewardGrid").addEventListener("click", e => {
+  if(e.target.closest("#showAllRewards")){ showAllRewards = true; renderRewardGrid(true); return; }
+  const t = e.target.closest("[data-rid]"); if(!t) return; pendingReward = t.dataset.rid; renderRewardGrid();
+});
+$("rewardRefresh").onclick = async () => {
+  await withLoading([$("subdayModal").querySelector(".box"), $("rewardRefresh")], () => call("RefreshRewards"));
+  renderRewardGrid(); toast("Список нагород оновлено");
+};
 
 /* ---------- OBS ---------- */
 const OVERLAYS = [
@@ -353,11 +384,11 @@ function renderTable(){
         <td class="num">${g.count}</td><td class="wincell">${canPickWinner() && g.points>0 ? `<button class="small winbtn" data-win="${esc(g.name)}" title="Вибрати переможцем і перейти до гри">Переможець</button>` : ""}</td><td class="chev" title="${open?"Згорнути":"Показати замовлення"}"><span></span></td></tr>`;
         if(!open) return main;
         const list = D().entries.filter(e=>counted.has(e.id) && norm(e.text)===g.key).sort((a,b)=>pointsOf(b)-pointsOf(a) || a.ts-b.ts);
-        return main + `<tr class="gdetail"><td colspan="8"><table class="subtable"><thead><tr><th>Час</th><th>Чатерс</th><th>Тір сабки</th><th class="num">Має сабку</th><th class="num">Бали</th><th>Замовлення</th></tr></thead><tbody>${
+        return main + `<tr class="gdetail"><td colspan="8"><table class="subtable"><thead><tr><th>Час</th><th>Чатерс</th><th>Тір сабки</th><th class="num">Має сабку</th><th class="num">Бали</th></tr></thead><tbody>${
           list.map(e=>`<tr><td class="muted">${fmtClock(e.ts)}</td><td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
             <td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td>
             <td class="num">${e.tier?`<span class="subcell">${subBadgeFor(e)}${e.months} міс.</span>`:'<span class="muted">—</span>'}</td>
-            <td class="num pts">${pointsOf(e)}</td><td>${esc(e.text)}</td></tr>`).join("")
+            <td class="num pts">${pointsOf(e)}</td></tr>`).join("")
         }</tbody></table></td></tr>`;
       }).join("")
     }</tbody></table>`;
@@ -482,21 +513,18 @@ $("openCsv").onclick = () => call("OpenFolder", "exports");
 
 // СабДей: нагорода + правила балів
 $("subdaySettingsBtn").onclick = () => {
-  const st = S.settings; pendingReward = null;
-  $("m1").value = st.mult["1"]; $("m2").value = st.mult["2"]; $("m3").value = st.mult["3"];
-  $("nonSub").value = st.nonSubPoints; $("dupMode").value = st.dupMode; $("gameMin").value = st.gameMin || 40;
+  pendingReward = null; showAllRewards = false;
+  $("gameMin").value = S.settings.gameMin || 40;
   renderRewardGrid(); openModal("subdayModal");
-  if(!(S.rewards||[]).length) call("RefreshRewards").then(renderRewardGrid);
+  if(!(S.rewards||[]).length) withLoading([$("subdayModal").querySelector(".box"), $("rewardRefresh")], () => call("RefreshRewards")).then(() => renderRewardGrid());
 };
-$("settingsReset").onclick = () => { $("m1").value = 1; $("m2").value = 2; $("m3").value = 3; $("nonSub").value = 0; $("dupMode").value = "last"; };
 $("subdaySave").onclick = async () => {
   if(pendingReward !== null && pendingReward !== S.settings.rewardId){
     const r = rewardById(pendingReward);
     setState(await call("SelectReward", pendingReward, r ? r.title : ""));
     if(r && r.is_user_input_required === false) toast("Увага: ця нагорода не вимагає тексту — замовлення без тексту ігноруються", 4500);
   }
-  await saveSettings({ mult: {"1": Math.max(0,n("m1",1)), "2": Math.max(0,n("m2",2)), "3": Math.max(0,n("m3",3))},
-    nonSubPoints: Math.max(0, n("nonSub",0)), dupMode: $("dupMode").value, gameMin: Math.min(600, Math.max(1, Math.round(n("gameMin",40)))) });
+  await saveSettings({ gameMin: Math.min(600, Math.max(1, Math.round(n("gameMin",40)))) });
   pendingReward = null; closeModal("subdayModal"); toast("Налаштування СабДею збережено");
 };
 
@@ -527,6 +555,7 @@ $("newStreamBtn").onclick = async () => {
   const st = S.session.status;
   const msg = (st==="running"||st==="paused" ? "Збір ще йде — його буде завершено.\n\n" : "") +
     "Завершити цей стрім і почати новий? Усі збори цього стріму збережено, їх можна переглянути у списку стрімів.";
+  closeModal("streamsModal");
   if(!(await confirmBox(msg, "Новий стрім", "Скасувати"))) return;
   pastStream = null; view = null;
   setState(await call("NewStream")); loadStreams(); toast("Почато новий стрім");

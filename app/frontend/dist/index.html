@@ -43,41 +43,30 @@
 <!-- налаштування СабДею -->
 <div class="modal" id="subdayModal"><div class="box settings wide">
   <h2>Налаштування СабДею</h2>
-  <h3 class="row twitchfont" style="align-items:center">Нагорода за бали каналу <button id="rewardRefresh" class="small" style="flex:0 0 auto;margin-left:auto" title="Оновити список з Twitch">Оновити</button></h3>
-  <div class="hint" style="margin:-2px 0 8px">Виберіть нагороду, через яку глядачі надсилають замовлення (з текстом).</div>
+  <h3 class="row twitchfont" style="align-items:center">Нагорода за бали каналу <button id="rewardRefresh" class="icon-btn refresh" style="margin-left:auto" title="Оновити список нагород з Twitch"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button></h3>
+  <div class="hint" style="margin:-2px 0 10px">Нагорода, через яку глядачі надсилають замовлення (з текстом).</div>
   <div id="rewardGrid" class="rgrid"></div>
   <div id="rewardsErr" class="hint err"></div>
-  <details>
-    <summary>Отримані погашення / ввести ID вручну</summary>
-    <div id="seenRewards"></div>
-    <div class="row" style="margin-top:6px">
-      <input id="rewardIdInput" placeholder="custom-reward-id">
-      <button id="rewardIdUse" style="flex:0 0 auto">Вибрати</button>
-    </div>
-  </details>
-  <h3>Правила балів</h3>
-  <div class="row">
-    <div><label>Тір 1 ×</label><input type="number" id="m1" min="0" step="1"></div>
-    <div><label>Тір 2 ×</label><input type="number" id="m2" min="0" step="1"></div>
-    <div><label>Тір 3 ×</label><input type="number" id="m3" min="0" step="1"></div>
-    <div><label>Не-підписник</label><input type="number" id="nonSub" min="0" step="1"></div>
-  </div>
-  <label>Час на гру переможця (хв)</label>
-  <input type="number" id="gameMin" min="1" max="600" step="1">
-  <label>Кілька замовлень від однієї людини</label>
-  <select id="dupMode">
-    <option value="last">Рахується лише останнє</option>
-    <option value="first">Рахується лише перше</option>
-    <option value="all">Рахуються всі</option>
-  </select>
-  <div class="hint">Бали = множник тіра × місяці підписки. Тір — з Twitch API, місяці — з бейджа в чаті.</div>
+  <h3>Гра переможця</h3>
+  <label>Час на гру (хв)</label>
+  <input type="number" id="gameMin" min="1" max="600" step="1" style="max-width:160px">
   <h3>Дані</h3>
   <div class="row" style="align-items:center"><button id="openCsv" style="flex:0 0 auto">Відкрити теку з .csv</button>
     <span class="hint" style="margin:0">Після кожного збору таблиця зберігається сюди автоматично.</span></div>
-  <div class="row actions" style="margin-top:16px">
-    <button id="settingsReset" style="margin-right:auto">Скинути правила</button>
+  <div class="row actions" style="margin-top:18px">
     <button data-close="subdayModal">Скасувати</button>
     <button id="subdaySave" class="primary">Зберегти</button>
+  </div>
+</div></div>
+
+<!-- журнал стрімів -->
+<div class="modal" id="streamsModal"><div class="box settings wide">
+  <h2>Журнал стрімів</h2>
+  <div class="hint" style="margin:0 0 12px">Кожен стрім — це всі збори замовлень за один СабДей. Виберіть стрім, щоб переглянути його збори.</div>
+  <div id="streamList" class="slist"></div>
+  <div class="row actions" style="margin-top:18px">
+    <button id="newStreamBtn" style="margin-right:auto" title="Завершити цей стрім і почати новий">Почати новий стрім</button>
+    <button data-close="streamsModal">Закрити</button>
   </div>
 </div></div>
 
@@ -183,13 +172,17 @@
       <div id="obsList"></div>
     </details>
 
+    <div class="card scard">
+      <h2>Стрім</h2>
+      <div class="scur" id="streamCur">—</div>
+      <button id="openJournal" class="wide-btn">Відкрити журнал стрімів</button>
+    </div>
   </aside>
 
   <section>
     <div class="streambar">
-      <select id="streamSel" title="Стрім"></select>
+      <span class="slabel" id="streamLabel"></span>
       <div class="cchips" id="collChips"></div>
-      <button id="newStreamBtn" class="small" title="Завершити цей стрім і почати новий">Новий стрім</button>
     </div>
     <div id="viewNote" class="viewnote hidden"></div>
     <div class="stats">

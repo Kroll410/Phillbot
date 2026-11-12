@@ -100,6 +100,8 @@ func (s *Settings) normalize() {
 	if s.DurationMin < 1 {
 		s.DurationMin = d.DurationMin
 	}
+	// правила балів фіксовані: T1×1, T2×2, T3×3, не-підписник 0, від чатерса — останнє замовлення
+	s.Mult, s.NonSubPoints, s.DupMode = map[string]int{"1": 1, "2": 2, "3": 3}, 0, "last"
 	if s.Mult == nil {
 		s.Mult = d.Mult
 	}

@@ -21,6 +21,9 @@
 - від одного чатерса рахується останнє замовлення; однакові замовлення зливаються
 - Marbles: кожен бал = одна куля, ліміт гри 1000 (пропорційне зменшення)
 
+## Інтерфейс
+Правила оформлення (шрифти, кольори, індикатор завантаження, вікна) — [app/frontend/README.md](app/frontend/README.md).
+
 ## Збірка програми (Windows)
 Потрібні Go і Wails CLI (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`); Node.js не потрібен —
 фронтенд — чистий HTML/JS у `app/frontend/dist`.

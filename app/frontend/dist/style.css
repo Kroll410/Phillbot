@@ -581,3 +581,6 @@ button.icon:not(:disabled):hover{color:var(--text)}
 /* кнопки керування таймером: фіксовані колонки — зміна «Старт» ↔ «Продовжити» не рухає сусідів */
 .tctl{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr)}
 .tctl button{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:8px;padding-right:8px}
+/* товстіша рамка в усіх кнопках (2px); вкладки лишаються без рамки */
+button,.winbtn,.cchip,.mbtn:disabled{border-width:2px}
+.tab,.mode-tab,.mbtn:not(:disabled){border-width:0}

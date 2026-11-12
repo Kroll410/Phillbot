@@ -11,15 +11,15 @@
 <header>
   <h1>Phill<span>Bot</span></h1>
   <nav class="modes" id="modes">
-    <button class="mode-tab" data-mode="chat">💬 Чат<span class="lock hidden" id="chatLockIcon" title="Чат відкрито в окремому вікні">⧉</span></button>
-    <button class="mode-tab active" data-mode="subday">🎱 СабДей</button>
-    <button class="mode-tab" disabled title="Механіку ще не описано — додамо пізніше">👀 Переглядовий <small>скоро</small></button>
+    <button class="mode-tab" data-mode="chat">Чат<span class="lock hidden" id="chatLockIcon" title="Чат відкрито в окремому вікні">⧉</span></button>
+    <button class="mode-tab active" data-mode="subday">СабДей</button>
+    <button class="mode-tab" disabled title="Механіку ще не описано — додамо пізніше">Переглядовий <small>скоро</small></button>
   </nav>
   <div class="conn">
     <span class="dot" id="connDot"></span>
     <span id="connText" class="muted">Не підключено</span>
     <span id="userBox"></span>
-    <button id="generalBtn" class="icon-btn" title="Загальні налаштування">⚙</button>
+    <button id="generalBtn" class="icon-btn" title="Загальні налаштування"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </div>
 </header>
 
@@ -44,7 +44,7 @@
 <!-- налаштування СабДею -->
 <div class="modal" id="subdayModal"><div class="box settings wide">
   <h2>Налаштування СабДею</h2>
-  <h3 class="row" style="align-items:center">Нагорода за бали каналу <button id="rewardRefresh" class="small" style="flex:0 0 auto;margin-left:auto" title="Оновити список з Twitch">⟳ Оновити</button></h3>
+  <h3 class="row" style="align-items:center">Нагорода за бали каналу <button id="rewardRefresh" class="small" style="flex:0 0 auto;margin-left:auto" title="Оновити список з Twitch">Оновити</button></h3>
   <div class="hint" style="margin:-2px 0 8px">Виберіть нагороду, через яку глядачі надсилають замовлення (з текстом).</div>
   <div id="rewardGrid" class="rgrid"></div>
   <div id="rewardsErr" class="hint err"></div>
@@ -129,7 +129,7 @@
   <div class="modebar">
     <h2 id="chatTitle">Чат</h2>
     <button id="chatWindowBtn">⧉ Відкрити в окремому вікні</button>
-    <button id="chatSettingsBtn">⚙ Налаштування чату</button>
+    <button id="chatSettingsBtn">Налаштування чату</button>
   </div>
   <div class="tablewrap chatwrap" id="chatWrap"><div id="chatList"></div><button id="chatMore" class="hidden">↓ Нові повідомлення</button></div>
   <div class="locked hidden" id="chatLocked">
@@ -147,23 +147,20 @@
       <div class="timer idle" id="timer">10:00</div>
       <div class="status" id="statusText">Очікування старту</div>
       <div class="btns">
-        <button class="primary wide" id="startBtn">▶ Почати збір</button>
-        <button id="pauseBtn" disabled>⏸ Пауза</button>
-        <button id="stopBtn" disabled>⏹ Завершити</button>
+        <button class="primary wide" id="startBtn">Почати збір</button>
+        <button id="pauseBtn" disabled>Пауза</button>
+        <button id="stopBtn" disabled>Завершити</button>
         <button id="plusBtn">+1 хв</button>
         <button id="minusBtn">−1 хв</button>
       </div>
       <div class="mexport">
-        <button id="exportMarbles" class="mbtn"><span class="mfill"></span><span class="mlabel" id="mLabel">🎱 Експорт у Marbles</span><span class="mcount" id="mCount"></span></button>
-        <button id="finishExport" class="linkbtn hidden">⏹ Завершити збір достроково й експортувати</button>
+        <button id="exportMarbles" class="mbtn"><span class="mfill"></span><span class="mlabel" id="mLabel">Експорт у Marbles</span><span class="mcount" id="mCount"></span></button>
       </div>
-      <label>Тривалість збору (хв)</label>
-      <input type="number" id="duration" min="1" step="1" value="10">
       <div class="hint">Замовлення записуються лише поки йде таймер.</div>
     </div>
 
     <div class="card">
-      <h2 class="row" style="align-items:center">Нагорода<button id="subdaySettingsBtn" class="small" style="flex:0 0 auto;margin-left:auto">⚙ Налаштування СабДею</button></h2>
+      <h2 class="row" style="align-items:center">Нагорода<button id="subdaySettingsBtn" class="small" style="flex:0 0 auto;margin-left:auto">Налаштування СабДею</button></h2>
       <div id="rewardCurrent"></div>
     </div>
 
@@ -180,8 +177,8 @@
     <div class="card">
       <h2>Дані</h2>
       <div class="btns">
-        <button id="exportCsv">⬇ Excel (.csv)</button>
-        <button id="exportJson">⬇ JSON</button>
+        <button id="exportCsv">Excel (.csv)</button>
+        <button id="exportJson">JSON</button>
         <button id="openExports">Папка експорту</button>
         <button id="openHistory">Історія зборів</button>
         <button id="newSession" class="danger wide">Новий збір (архівувати й очистити)</button>
@@ -207,7 +204,7 @@
       <div class="stat"><b id="sPoints">0</b><span>балів усього</span></div>
     </div>
     <div class="tabs">
-      <button class="tab active" data-tab="summary">Підсумок за замовленнями</button>
+      <button class="tab active" data-tab="summary">Підсумок</button>
       <button class="tab" data-tab="entries">Замовлення</button>
       <button class="tab" data-tab="log">Журнал</button>
       <input id="search" placeholder="Пошук…">

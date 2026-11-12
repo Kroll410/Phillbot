@@ -94,7 +94,7 @@ function renderTimer(){
   el.className = "timer " + s.status + (s.status==="running" && r<=30000 ? " low" : "");
   $("statusText").textContent = {idle:"Очікування старту", running:"Збір іде — замовлення записуються", paused:"Пауза — замовлення не записуються", finished:"Збір завершено"}[s.status] || "";
   $("startBtn").disabled = s.status==="running";
-  $("startBtn").textContent = s.status==="paused" ? "▶ Продовжити" : s.status==="finished" ? "▶ Продовжити збір" : "▶ Почати збір";
+  $("startBtn").textContent = s.status==="paused" ? "Продовжити" : s.status==="finished" ? "Продовжити збір" : "Почати збір";
   $("pauseBtn").disabled = s.status!=="running";
   $("stopBtn").disabled = !(s.status==="running"||s.status==="paused");
   $("minusBtn").disabled = s.status==="finished";
@@ -123,7 +123,7 @@ function renderRewardCurrent(){
   const r = rewardById(S.settings.rewardId);
   $("rewardCurrent").innerHTML = r
     ? `<div class="rcurrent">${rewardTile(r)}<div class="hint" style="margin:0">Замовлення приймаються через цю нагороду, поки йде таймер.</div></div>`
-    : `<div class="rempty">Нагороду не вибрано — замовлення не записуватимуться. Відкрийте ⚙ Налаштування СабДею.</div>`;
+    : `<div class="rempty">Нагороду не вибрано — замовлення не записуватимуться. Відкрийте «Налаштування СабДею».</div>`;
 }
 let pendingReward = null; // вибір у вікні налаштувань до «Зберегти»
 function renderRewardGrid(){
@@ -131,7 +131,7 @@ function renderRewardGrid(){
   const list = [...(S.rewards||[])].sort((a,b)=>a.cost-b.cost);
   if(sel && !list.some(r=>r.id===sel)){ const r = rewardById(sel); if(r) list.unshift(r); }
   $("rewardGrid").innerHTML = list.length ? list.map(r=>rewardTile(r,{button:true, sel:r.id===sel})).join("")
-    : `<div class="hint">Список нагород порожній. Натисніть «⟳ Оновити» або виберіть з отриманих погашень нижче.</div>`;
+    : `<div class="hint">Список нагород порожній. Натисніть «Оновити» або виберіть з отриманих погашень нижче.</div>`;
   $("rewardsErr").textContent = S.rewardsErr || "";
   const seen = Object.values(S.seenRewards || {}).sort((a,b)=>b.ts-a.ts);
   $("seenRewards").innerHTML = seen.length ? seen.map(r=>`<div class="reward ${r.id===sel?"bound":""}"><div><div><b>${esc(r.title)}</b> — «${esc(r.sample||"(без тексту)")}» ${esc(r.user)} <span class="muted">(${r.count}×)</span></div><code>${esc(r.id)}</code></div>
@@ -156,7 +156,7 @@ function renderObs(){
   const key = JSON.stringify(o);
   if(key === obsKey) return; obsKey = key;
   if(!o.running){
-    $("obsStatus").innerHTML = `<span class="err">${esc(o.error || "Сервер для OBS не запущено.")}</span> Змініть порт у ⚙ Налаштуваннях.`;
+    $("obsStatus").innerHTML = `<span class="err">${esc(o.error || "Сервер для OBS не запущено.")}</span> Змініть порт у загальних налаштуваннях.`;
     $("obsList").innerHTML = ""; return;
   }
   $("obsStatus").textContent = "Браузерні джерела для OBS (розмір — підказка):";
@@ -328,7 +328,7 @@ document.querySelectorAll(".mode-tab[data-mode]").forEach(b => b.onclick = () =>
 showMode(mode);
 
 /* ---------- налаштування: окремо для кожної вкладки ---------- */
-function initInputs(){ $("duration").value = S.settings.durationMin; }
+function initInputs(){}
 const n = (id, d) => { const v = Number($(id).value); return Number.isFinite(v) && $(id).value !== "" ? v : d; };
 async function saveSettings(patch){ setState(await call("SaveSettings", {...S.settings, ...patch})); }
 const openModal = id => $(id).classList.add("show"), closeModal = id => $(id).classList.remove("show");
@@ -387,7 +387,6 @@ $("chatSave").onclick = async () => {
   closeModal("chatModal"); toast("Налаштування чату збережено");
 };
 
-$("duration").addEventListener("change", async () => { await saveSettings({durationMin: Math.max(1, Math.round(n("duration",10)))}); initInputs(); });
 function renderAll(){
   if(!inited){ initInputs(); inited = true; }
   renderAuth();
@@ -457,23 +456,24 @@ function renderExportBtn(){
   const btn = $("exportMarbles");
   btn.disabled = collecting || !m.total;
   btn.className = "mbtn" + (m.count > 1000 ? " warn" : "");
-  $("mLabel").textContent = "🎱 Експорт у Marbles";
+  $("mLabel").textContent = "Експорт у Marbles";
   $("mCount").textContent = m.total ? `${m.count} ${m.count%10===1&&m.count%100!==11?"куля":[2,3,4].includes(m.count%10)&&![12,13,14].includes(m.count%100)?"кулі":"куль"}` : "";
   btn.title = collecting ? "Йде збір — завершіть таймер, щоб експортувати" : !m.total ? "Немає замовлень з балами" : m.count > 1000 ? "Більше 1000 куль — гра може не прийняти весь список" : "Створити файл, скопіювати шлях і запустити гру";
-  $("finishExport").classList.toggle("hidden", !(collecting && m.total));
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function exportMarbles(){
   if(mBusy || !marbleInfo().total) return;
   const btn = $("exportMarbles"), label = $("mLabel");
-  mBusy = true; btn.disabled = true; $("finishExport").classList.add("hidden");
+  mBusy = true; btn.disabled = true;
   btn.className = "mbtn busy"; label.textContent = "Створюю файл…"; $("mCount").textContent = "";
   try{
-    const r = await api().ExportMarbles(true);
+    const r = await api().ExportMarbles(false);
     await sleep(350);
     btn.className = "mbtn ok"; label.textContent = r.copied ? "✓ Шлях скопійовано" : "✓ Файл створено";
     await sleep(1300);
-    btn.className = "mbtn ok go"; label.textContent = r.alreadyRunning ? "🎮 Гра вже запущена — Ctrl+V" : "🚀 Запускаю гру…";
+    btn.className = "mbtn ok go"; label.textContent = "Запускаю гру…";
+    const launched = await api().LaunchMarbles(); // запуск саме зараз
+    if(!launched) label.textContent = "Гра вже запущена — Ctrl+V";
     await sleep(1800);
   }catch(e){
     btn.className = "mbtn fail"; label.textContent = "✕ " + (e && e.message || e);
@@ -482,7 +482,6 @@ async function exportMarbles(){
   mBusy = false; renderExportBtn();
 }
 $("exportMarbles").onclick = exportMarbles;
-$("finishExport").onclick = async () => { setState(await call("FinishTimer")); exportMarbles(); };
 setInterval(renderExportBtn, 500); // таймер може завершитися сам
 $("openExports").onclick = () => call("OpenFolder", "exports");
 $("openHistory").onclick = () => call("OpenFolder", "history");

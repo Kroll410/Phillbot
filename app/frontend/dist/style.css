@@ -206,5 +206,5 @@ input[type=range]{padding:0;accent-color:var(--accent);background:transparent;bo
 @keyframes mpop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
 @keyframes mrise{0%,70%{transform:none;opacity:1}100%{transform:translateY(-14px);opacity:0}}
 .mbtn.fail:disabled{background:#5a1a1a;color:#ffb3b3}
-.linkbtn{display:block;width:100%;margin-top:6px;background:transparent;border:0;color:var(--warn);font-size:12px;padding:4px;text-decoration:underline;text-underline-offset:3px}
-.linkbtn:not(:disabled):hover{background:transparent!important;color:#ffd35a}
+
+.icon-btn svg{display:block}

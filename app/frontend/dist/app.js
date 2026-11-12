@@ -65,6 +65,7 @@ function D(){ const c = viewColl(); return c ? {entries: c.entries || [], settin
 
 /* ---------- бали ---------- */
 function pointsOf(e, st = D().settings){
+  if(e.donation) return Number(e.donPoints) || 0; // донат Donatello: бали вже з гривень
   if(!e.tier) return Number(st.nonSubPoints)||0;
   return (Number(st.mult[String(e.tier)])||0) * Math.max(1, Number(e.months)||1);
 }
@@ -435,7 +436,7 @@ function renderTable(){
       rows.map(e=>`<tr data-id="${e.id}"${DRAG()} class="${e.excluded?"off":!e.counted?"replaced":""} ${freshIds.has(e.id)?"fresh":""}" title="${esc(e.excluded?"Приховано — не рахується":!e.counted?"Не рахується: від цього чатерса враховано інше замовлення":(e.source||""))}">
         <td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${fmtClock(e.ts)}</td>
         <td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
-        ${editMode ? `<td><select data-f="tier"><option value="0" ${!e.tier?"selected":""}>—</option>${[1,2,3].map(t=>`<option value="${t}" ${e.tier===t?"selected":""}>T${t}</option>`).join("")}</select></td>
+        ${e.donation ? `<td><span class="donchip">₴${fmtUAH(e.uah)}</span></td><td class="num"><span class="muted">Donatello</span></td>` : editMode ? `<td><select data-f="tier"><option value="0" ${!e.tier?"selected":""}>—</option>${[1,2,3].map(t=>`<option value="${t}" ${e.tier===t?"selected":""}>T${t}</option>`).join("")}</select></td>
         <td class="num"><span class="subcell">${subBadgeFor(e)}<input class="mo" type="number" min="1" data-f="months" value="${e.months||""}" ${!e.tier?"disabled":""}></span></td>`
         : `<td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td><td class="num">${e.tier?`<span class="subcell">${subBadgeFor(e)}${e.months} міс.</span>`:'<span class="muted">—</span>'}</td>`}
         <td class="num pts">${e.points}</td>
@@ -582,11 +583,29 @@ document.querySelectorAll(".modal").forEach(m => m.addEventListener("mousedown",
 
 // Загальні: акаунт, порт OBS
 $("generalBtn").onclick = () => {
+  $("donToken").value = S.settings.donToken || ""; delete $("donStatus").dataset.lock;
   const u = S.auth && S.auth.user;
   $("accountInfo").innerHTML = u ? `Канал: <b>${esc(u.display_name)}</b> <span class="muted">(${esc(u.login)})</span>` : "Не увійшли";
-  $("obsPort").value = S.settings.obsPort; renderObs(); openModal("generalModal");
+  $("obsPort").value = S.settings.obsPort; renderObs(); openModal("generalModal"); renderDon();
 };
-$("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round(n("obsPort",17841))}); closeModal("generalModal"); toast("Збережено"); };
+$("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round(n("obsPort",17841)), donToken: $("donToken").value.trim()}); closeModal("generalModal"); toast("Збережено"); };
+// Donatello: перевірка токена і статус підключення
+function renderDon(){
+  const d = S.don || {state: "off"}, pill = $("donPill");
+  pill.classList.toggle("hidden", d.state === "off");
+  pill.className = "donpill " + (d.state === "on" ? "on" : d.state === "error" ? "err" : "") + (d.state === "off" ? " hidden" : "");
+  if($("generalModal").classList.contains("show") && !$("donStatus").dataset.lock)
+    $("donStatus").innerHTML = d.state === "on" ? `<span class="ok">Підключено: <b>${esc(d.nickname || "")}</b>. Нові донати перевіряються кожні 5 с.</span>`
+      : d.state === "error" ? `<span class="err">${esc(d.error || "Помилка Donatello")}</span>` : "Не підключено.";
+}
+$("donTest").onclick = async () => {
+  const st = $("donStatus"); st.dataset.lock = "1";
+  try{
+    const nick = await withLoading($("donTest"), () => api().TestDonatello($("donToken").value.trim()));
+    st.innerHTML = `<span class="ok">Токен правильний: <b>${esc(nick)}</b>. Натисніть «Зберегти», щоб підключити.</span>`;
+  }catch(e){ st.innerHTML = `<span class="err">${esc(e && e.message || e)}</span>`; }
+};
+const fmtUAH = v => { const x = Number(v) || 0; return x % 1 ? x.toFixed(2).replace(".", ",") : String(x); };
 $("logoutBtn2").onclick = async () => { if(await confirmBox("Вийти з акаунта Twitch?")){ closeModal("generalModal"); call("Logout"); } };
 $("changeClient2").onclick = async () => { if(await confirmBox("Змінити Client ID? Потрібно буде увійти знову.")){ closeModal("generalModal"); call("ChangeClientID"); } };
 $("openBase").onclick = () => call("OpenFolder", "");
@@ -595,7 +614,7 @@ $("openCsv").onclick = () => call("OpenFolder", "exports");
 // СабДей: нагорода + правила балів
 $("subdaySettingsBtn").onclick = () => {
   pendingReward = null; showAllRewards = false;
-  $("gameMin").value = S.settings.gameMin || 40; $("voteMin").value = S.settings.voteMin || 3;
+  $("gameMin").value = S.settings.gameMin || 40; $("voteMin").value = S.settings.voteMin || 3; $("donPerPoint").value = S.settings.donUahPerPoint || 30;
   renderRewardGrid(); openModal("subdayModal");
   if(!(S.rewards||[]).length) withLoading([$("subdayModal").querySelector(".box"), $("rewardRefresh")], () => call("RefreshRewards")).then(() => renderRewardGrid());
 };
@@ -605,7 +624,8 @@ $("subdaySave").onclick = async () => {
     setState(await call("SelectReward", pendingReward, r ? r.title : ""));
     if(r && r.is_user_input_required === false) toast("Увага: ця нагорода не вимагає тексту — замовлення без тексту ігноруються", 4500);
   }
-  await saveSettings({ gameMin: Math.min(600, Math.max(1, Math.round(n("gameMin",40)))), voteMin: Math.min(60, Math.max(1, Math.round(n("voteMin",3)))) });
+  await saveSettings({ gameMin: Math.min(600, Math.max(1, Math.round(n("gameMin",40)))), voteMin: Math.min(60, Math.max(1, Math.round(n("voteMin",3)))),
+    donUahPerPoint: Math.min(100000, Math.max(1, Math.round(n("donPerPoint",30)))) });
   pendingReward = null; closeModal("subdayModal"); toast("Налаштування СабДею збережено");
 };
 
@@ -910,7 +930,7 @@ function renderAll(){
     if(ck !== lastCollKey){ lastCollKey = ck; if(streams.length) loadStreams(); }
     if(!resetting){ renderStreamBar(); renderStats(); renderTable(); renderRewardCurrent(); renderSteps(); }
     renderObs(); renderChat(); slideAll();
-    renderAuction();
+    renderAuction(); renderDon();
     if($("subdayModal").classList.contains("show")) renderRewardGrid();
     if(!chatLoaded){ chatLoaded = true; api().GetChat().then(m => { chatPending = (m||[]).concat(chatPending); }); }
   }
@@ -1202,7 +1222,7 @@ function renderAuFeed(){
     else if(b.status === "added") st = `<div class="fst">до лота <b>«${esc(lot ? lot.name : b.text)}»</b></div>`;
     else st = `<div class="fst">${b.status === "rejected" ? "окремий лот" : "новий лот"}</div>`;
     return `<div class="fbid ${b.status}${auFresh.has(b.id) ? " fresh" : ""}" style="--c:${lotColor(b.lotId || b.suggestId)}">
-      <div class="frow">${userTag(b)}<span class="famt">${POINTS_ICON}${fmtN(b.amount)}</span><span class="ftime">${fmtHM(b.ts)}</span></div>
+      <div class="frow">${userTag(b)}${b.donation ? `<span class="donchip">₴${fmtUAH(b.uah)}</span>` : ""}<span class="famt">${POINTS_ICON}${fmtN(b.amount)}</span><span class="ftime">${fmtHM(b.ts)}</span></div>
       <div class="ftext">${esc(b.text)}</div>${st}</div>`;
   }).join("");
 }
@@ -1523,7 +1543,7 @@ function auModeSeg(){
 document.querySelectorAll("#auModeSeg .tab").forEach(b => b.onclick = () => { auModePending = b.dataset.mode; auModeSeg(); });
 $("auSettingsBtn").onclick = () => {
   auPending = null; auShowAll = false; auModePending = null; auCenterPending = null;
-  $("auMin").value = AU().cfg.durationMin || 10; $("auGap").value = AU().cfg.spinGapSec || 5;
+  $("auMin").value = AU().cfg.durationMin || 10; $("auGap").value = AU().cfg.spinGapSec || 5; $("auDonPer1000").value = AU().cfg.donUahPer1000 || 10;
   auRewardGrid(); openModal("auctionModal"); requestAnimationFrame(() => { auModeSeg(); auCenterUI(); });
   if(((AU().cfg || {}).center || {}).kind === "emote") loadEmotes();
   if(!(S.rewards || []).length) withLoading([$("auctionModal").querySelector(".box"), $("auRewardRefresh")], () => call("RefreshRewards")).then(() => auRewardGrid());
@@ -1533,7 +1553,8 @@ $("auctionSave").onclick = async () => {
   if(center.kind === "emote" && !center.url) center = {kind: ""}; // вкладку відкрили, але емодзі не вибрали
   if(center.kind === "file" && !center.name) center = {kind: ""};
   const cfg = {...AU().cfg, center, rewardIds: auPending ?? AU().cfg.rewardIds, spinMode: auModePending || AU().cfg.spinMode,
-    durationMin: Math.min(180, Math.max(1, Math.round(n("auMin", 10)))), spinGapSec: Math.min(60, Math.max(1, Math.round(n("auGap", 5))))};
+    durationMin: Math.min(180, Math.max(1, Math.round(n("auMin", 10)))), spinGapSec: Math.min(60, Math.max(1, Math.round(n("auGap", 5)))),
+    donUahPer1000: Math.min(100000, Math.max(1, Math.round(n("auDonPer1000", 10))))};
   setState(await call("AuctionSaveSettings", cfg));
   const noText = cfg.rewardIds.map(rewardById).filter(r => r && r.is_user_input_required === false);
   closeModal("auctionModal"); auPending = null; auCenterPending = null; wheelDraw();

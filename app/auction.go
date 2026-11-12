@@ -55,16 +55,19 @@ type Bid struct {
 	LotID       string      `json:"lotId,omitempty"`
 	SuggestID   string      `json:"suggestId,omitempty"`
 	SuggestName string      `json:"suggestName,omitempty"`
+	Donation    bool        `json:"donation,omitempty"` // ставка з донату Donatello
+	UAH         float64     `json:"uah,omitempty"`
 }
 
 // Налаштування аукціону (окремо від СабДею): до 5 нагород-ставок, тривалість прийому ставок, режим колеса.
 type AuctionSettings struct {
-	RewardIDs   []string    `json:"rewardIds"`
-	RewardsSet  bool        `json:"rewardsSet"`  // стрімер сам вибрав нагороди — автовибір більше не втручається
-	DurationMin int         `json:"durationMin"` // 10 хв за замовчуванням
-	SpinMode    string      `json:"spinMode"`    // elim — на вибування (за замовчуванням) | instant — одразу результат
-	Center      WheelCenter `json:"center"`
-	SpinGapSec  int         `json:"spinGapSec"` // «на вибування»: пауза між автоматичними обертами (с), за замовчуванням 5      // емодзі каналу або власна картинка / GIF у центрі колеса
+	RewardIDs     []string    `json:"rewardIds"`
+	RewardsSet    bool        `json:"rewardsSet"`  // стрімер сам вибрав нагороди — автовибір більше не втручається
+	DurationMin   int         `json:"durationMin"` // 10 хв за замовчуванням
+	SpinMode      string      `json:"spinMode"`    // elim — на вибування (за замовчуванням) | instant — одразу результат
+	Center        WheelCenter `json:"center"`
+	DonUAHPer1000 int         `json:"donUahPer1000"` // Donatello: скільки гривень = 1000 балів ставки (за замовчуванням 10)
+	SpinGapSec    int         `json:"spinGapSec"`    // «на вибування»: пауза між автоматичними обертами (с), за замовчуванням 5      // емодзі каналу або власна картинка / GIF у центрі колеса
 }
 
 const maxAuctionRewards = 5
@@ -134,6 +137,9 @@ func (au *AuctionState) normalize() {
 	}
 	if au.Cfg.DurationMin < 1 || au.Cfg.DurationMin > 180 {
 		au.Cfg.DurationMin = 10
+	}
+	if au.Cfg.DonUAHPer1000 < 1 || au.Cfg.DonUAHPer1000 > 100000 {
+		au.Cfg.DonUAHPer1000 = 10
 	}
 	if au.Cfg.SpinGapSec < 1 || au.Cfg.SpinGapSec > 60 {
 		au.Cfg.SpinGapSec = 5

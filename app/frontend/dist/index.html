@@ -17,6 +17,7 @@
   </nav>
   <button id="generalBtn" class="icon-btn" title="Загальні налаштування"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   <div class="conn">
+    <span class="donpill hidden" id="donPill">Donatello</span>
     <span class="dot" id="connDot"></span>
     <span id="userBox"></span>
   </div>
@@ -31,6 +32,14 @@
   <label>Порт локального сервера (127.0.0.1)</label>
   <input type="number" id="obsPort" min="1024" max="65000" step="1" style="max-width:160px">
   <div class="hint">Працює лише на цьому комп'ютері. Після зміни порту оновіть URL у джерелі OBS.</div>
+  <h3>Донати Donatello</h3>
+  <label>Токен API (Donatello → Налаштування → API)</label>
+  <div class="row" style="align-items:center">
+    <input type="password" id="donToken" autocomplete="off" spellcheck="false" placeholder="вставте токен">
+    <button id="donTest" style="flex:0 0 auto">Перевірити</button>
+  </div>
+  <div class="hint" id="donStatus"></div>
+  <div class="hint">Донат під час збору СабДею стає замовленням, під час аукціону — ставкою. Текст донату — назва, сума в гривнях перераховується в бали (налаштовується у СабДеї та аукціоні).</div>
   <h3>Акаунт Twitch</h3>
   <div id="accountInfo" class="hint"></div>
   <div class="row" style="margin-top:8px"><button id="logoutBtn2">Вийти з акаунта</button><button id="changeClient2">Змінити Client ID</button></div>
@@ -54,6 +63,11 @@
     <div><label>Час на гру (хв)</label><input type="number" id="gameMin" min="1" max="600" step="1"></div>
     <div><label>Голосування (хв)</label><input type="number" id="voteMin" min="1" max="60" step="1"></div>
   </div>
+  <h3>Донати Donatello</h3>
+  <div class="row" style="max-width:360px">
+    <div><label>Гривень за 1 бал</label><input type="number" id="donPerPoint" min="1" max="100000" step="1"></div>
+  </div>
+  <div class="hint" id="donPerPointHint">Округлення вниз: 120 грн / 30 = 4 бали, 59 грн = 1 бал.</div>
   <h3>Дані</h3>
   <div class="row" style="align-items:center"><button id="openCsv" style="flex:0 0 auto">Відкрити теку з .csv</button>
     <span class="hint" style="margin:0">Після кожного збору таблиця зберігається сюди автоматично.</span></div>
@@ -79,6 +93,11 @@
   <div class="row" style="max-width:300px;margin-top:6px">
     <div><label>Пауза між обертами на вибування (с)</label><input type="number" id="auGap" min="1" max="60" step="1"></div>
   </div>
+  <h3>Донати Donatello</h3>
+  <div class="row" style="max-width:300px">
+    <div><label>Гривень за 1000 балів</label><input type="number" id="auDonPer1000" min="1" max="100000" step="1"></div>
+  </div>
+  <div class="hint" id="auDonHint">Округлення вниз: 10 грн = 1 000 балів, 100 грн = 10 000, 15 грн = 1 000.</div>
   <div class="hint">Колесо крутить саме до переможця. Коли лишається 5 лотів і менше, пауза зростає: ×1.2, ×1.4, ×1.6, ×1.8, ×2.</div>
   <h3>Центр колеса</h3>
   <div class="seg auseg" id="auCenterSeg">

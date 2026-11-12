@@ -24,6 +24,9 @@ type Settings struct {
 	Chat         ChatSettings   `json:"chat"`
 	GameMin      int            `json:"gameMin"` // хвилин на гру переможця (етап 2)
 	VoteMin      int            `json:"voteMin"` // хвилин на голосування за продовження
+	// Donatello: токен API (лише на цьому ПК) і скільки гривень дає 1 бал замовлення СабДею
+	DonToken       string `json:"donToken"`
+	DonUAHPerPoint int    `json:"donUahPerPoint"` // за замовчуванням 30: 120 грн = 4 бали
 }
 
 // Налаштування вкладки «Чат» (вигляд чату в програмі та в окремому вікні).
@@ -57,6 +60,10 @@ type Entry struct {
 	// як нік виглядає в чаті Twitch (з повідомлення, що прийшло разом із замовленням)
 	Color  string      `json:"color,omitempty"`
 	Badges []ChatBadge `json:"badges,omitempty"`
+	// донат Donatello: бали вже пораховано з гривень (тір/стаж не застосовуються)
+	Donation  bool    `json:"donation,omitempty"`
+	DonPoints int     `json:"donPoints,omitempty"`
+	UAH       float64 `json:"uah,omitempty"`
 }
 
 type SeenReward struct {
@@ -87,6 +94,9 @@ type State struct {
 	Vote     VoteState `json:"vote"`
 	// «Переглядовий» — аукціон
 	Auction AuctionState `json:"auction"`
+	// Donatello: уже бачені донати (щоб не зарахувати двічі) і чи запам'ятали історію при першому підключенні
+	DonSeen []string `json:"donSeen"`
+	DonInit bool     `json:"donInit"`
 }
 
 func defaultSettings() Settings {
@@ -136,6 +146,10 @@ func (s *Settings) normalize() {
 	if s.ObsPort < 1024 || s.ObsPort > 65000 {
 		s.ObsPort = defaultObsPort
 	}
+	if s.DonUAHPerPoint < 1 || s.DonUAHPerPoint > 100000 {
+		s.DonUAHPerPoint = 30
+	}
+	s.DonToken = strings.TrimSpace(s.DonToken)
 }
 
 func loadState(file string) State {

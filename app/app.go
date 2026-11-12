@@ -40,6 +40,7 @@ type Snapshot struct {
 	Log        []LogLine         `json:"log"`
 	Obs        OverlayInfo       `json:"obs"`
 	ChatWindow bool              `json:"chatWindow"`
+	Don        DonStatus         `json:"don"`       // підключення до Donatello
 	SubBadges  map[string]string `json:"subBadges"` // значки підписки каналу: версія ("0", "3", "2012", "3036"…) → картинка // чат відкрито в окремому вікні — вкладка заблокована
 }
 
@@ -61,6 +62,8 @@ type App struct {
 	tokMu    sync.Mutex
 	token    *Tokens
 
+	donCancel  context.CancelFunc // опитування Donatello
+	don        DonStatus
 	badgeMu    sync.Mutex
 	badgeCache map[string]subInfo
 	badgeImgs  map[string]badgeImg
@@ -120,12 +123,18 @@ func (a *App) startup(ctx context.Context) {
 	port := a.st.Settings.ObsPort
 	a.mu.Unlock()
 	a.overlay.start(port)
+	a.restartDonatello()
 	if low := strings.ToLower(a.baseDir); strings.Contains(low, `\temp\`) || strings.Contains(low, `\tmp\`) {
 		a.logf("⚠ Програму запущено з тимчасової папки (архіву) — налаштування й токени зникнуть. Розпакуйте PhillBot.exe у звичайну папку.")
 	}
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	a.mu.Lock()
+	if a.donCancel != nil {
+		a.donCancel()
+	}
+	a.mu.Unlock()
 	if a.overlay != nil {
 		a.overlay.stop()
 	}
@@ -153,7 +162,7 @@ func (a *App) snapshotLocked() Snapshot {
 	}
 	return Snapshot{State: st, Auth: auth, Conn: a.conn, Rewards: append([]Reward(nil), a.rewards...), RewardsErr: a.rewErr,
 		BaseDir: a.baseDir, ClientID: a.clientID, Now: time.Now().UnixMilli(), Log: append([]LogLine(nil), a.logLines...), Obs: obs,
-		ChatWindow: a.chatWinClients > 0 || a.chatWinPending, SubBadges: a.subBadges()}
+		ChatWindow: a.chatWinClients > 0 || a.chatWinPending, SubBadges: a.subBadges(), Don: a.don}
 }
 
 // подія для головного вікна і для оверлеїв OBS
@@ -441,8 +450,9 @@ func (a *App) SelectReward(id, title string) Snapshot {
 
 func (a *App) SaveSettings(s Settings) Snapshot {
 	var oldPort int
+	var oldTok string
 	snap := a.mutate(func(st *State) {
-		oldPort = st.Settings.ObsPort
+		oldPort, oldTok = st.Settings.ObsPort, st.Settings.DonToken
 		s.RewardID, s.RewardTitle = st.Settings.RewardID, st.Settings.RewardTitle
 		s.normalize()
 		st.Settings = s
@@ -450,6 +460,12 @@ func (a *App) SaveSettings(s Settings) Snapshot {
 			st.Session.RemainingMs = int64(s.DurationMin) * 60000
 		}
 	})
+	if strings.TrimSpace(s.DonToken) != oldTok {
+		a.mu.Lock()
+		a.st.DonInit, a.st.DonSeen = false, nil // новий токен — історію донатів знову лише запам'ятати
+		a.mu.Unlock()
+		a.restartDonatello()
+	}
 	if a.overlay != nil && s.ObsPort != oldPort {
 		a.overlay.stop()
 		a.overlay.start(s.ObsPort)

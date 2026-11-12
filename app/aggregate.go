@@ -30,6 +30,9 @@ func normKey(s string) string {
 }
 
 func pointsOf(s Settings, e Entry) int {
+	if e.Donation { // донат Donatello — бали вже з гривень
+		return e.DonPoints
+	}
 	if e.Tier == 0 {
 		return s.NonSubPoints
 	}

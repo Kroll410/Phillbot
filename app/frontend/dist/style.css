@@ -953,3 +953,12 @@ button.cidnext{flex:0 0 auto;min-width:110px;height:44px;padding:0 22px;font-wei
 .wcdrop-t span{color:var(--muted);font-size:12.5px}
 .wcdrop-h{grid-column:2;margin:0}
 .wcdrop:not(:has(.wcprev)) .wcdrop-t,.wcdrop:not(:has(.wcprev)) .wcdrop-h{grid-column:1 / -1}
+
+/* Donatello: індикатор у шапці, позначка донату в таблицях і стрічці */
+.donpill{font:600 11.5px/1 var(--font-ui);padding:5px 9px;border-radius:999px;background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+.donpill.on{color:#ffd36b;border-color:rgba(255,211,107,.35);background:rgba(255,211,107,.08)}
+.donpill.err{color:#ff8a80;border-color:rgba(255,90,82,.4);background:rgba(255,90,82,.08)}
+.donchip{display:inline-flex;align-items:center;font:700 12px/1 var(--font-ui);color:#1a1300;background:linear-gradient(90deg,#ffd36b,#ffb300);padding:3px 7px;border-radius:6px;margin-left:6px;white-space:nowrap}
+td > .donchip{margin-left:0}
+#donStatus .ok{color:#5cf29a} #donStatus .err{color:#ff8a80}
+#donToken{font-family:var(--font-mono)}

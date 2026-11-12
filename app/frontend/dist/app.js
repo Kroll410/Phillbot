@@ -650,20 +650,25 @@ const CHIP_DROP = (el, i) => [{transform: "none", opacity: 1}, {transform: `tran
 async function resetAnimSubday(){
   resetting = true;
   $("collChips").classList.add("dropping");
+  // по черзі, щоб було видно: 1) падають збори  2) з'їжджають рядки, цифри біжать до нуля  3) коротка пауза
+  const chips = animOut($("collChips").querySelectorAll(".cchip"), CHIP_DROP, {dur: 750, stagger: 110, max: 10});
+  await sleep(350);
   await Promise.all([
-    animOut($("tableWrap").querySelectorAll("tbody > tr"), ROW_OUT),
-    animOut($("collChips").querySelectorAll(".cchip"), CHIP_DROP, {dur: 620, stagger: 70}),
-    countTo0($("sEntries")), countTo0($("sUsers")), countTo0($("sPoints")),
+    chips,
+    animOut($("tableWrap").querySelectorAll("tbody > tr"), ROW_OUT, {dur: 560, stagger: 55, max: 16}),
+    countTo0($("sEntries"), undefined, 1100), countTo0($("sUsers"), undefined, 1100), countTo0($("sPoints"), undefined, 1100),
   ]);
+  await sleep(250);
 }
 async function resetAnimAuction(){
   auResetting = true;
   await Promise.all([
-    animOut($("auList").querySelectorAll("tbody > tr, .autop-i"), ROW_OUT),
-    animOut($("auFeed").querySelectorAll(".fbid"), [{transform: "none", opacity: 1}, {transform: "translateX(48px)", opacity: 0}]),
-    $("wheel").animate([{opacity: 1}, {opacity: .15}], {duration: 450, fill: "forwards"}).finished.catch(() => {}),
-    countTo0($("auLots")), countTo0($("auBids")), countTo0($("auSum"), fmtN),
+    animOut($("auList").querySelectorAll("tbody > tr, .autop-i"), ROW_OUT, {dur: 560, stagger: 55, max: 16}),
+    animOut($("auFeed").querySelectorAll(".fbid"), [{transform: "none", opacity: 1}, {transform: "translateX(48px)", opacity: 0}], {dur: 560, stagger: 55, max: 16}),
+    $("wheel").animate([{opacity: 1}, {opacity: .15}], {duration: 800, fill: "forwards"}).finished.catch(() => {}),
+    countTo0($("auLots"), undefined, 1100), countTo0($("auBids"), undefined, 1100), countTo0($("auSum"), fmtN, 1100),
   ]);
+  await sleep(250);
 }
 /* ---------- етапи СабДею: 1 збір → 2 гра переможця ---------- */
 // переможця можна вибрати раз на збір: після експорту в Marbles і поки його ще не вибрано
@@ -901,8 +906,8 @@ function renderAll(){
     if(S.stream && S.stream.id !== lastStreamKey){ lastStreamKey = S.stream.id; loadStreams(); }
     const ck = (S.past||[]).length + ":" + S.collN + ":" + S.session.status;
     if(ck !== lastCollKey){ lastCollKey = ck; if(streams.length) loadStreams(); }
-    renderStreamBar();
-    renderStats(); renderTable(); renderRewardCurrent(); renderObs(); renderChat(); renderSteps(); slideAll();
+    if(!resetting){ renderStreamBar(); renderStats(); renderTable(); renderRewardCurrent(); renderSteps(); }
+    renderObs(); renderChat(); slideAll();
     renderAuction();
     if($("subdayModal").classList.contains("show")) renderRewardGrid();
     if(!chatLoaded){ chatLoaded = true; api().GetChat().then(m => { chatPending = (m||[]).concat(chatPending); }); }

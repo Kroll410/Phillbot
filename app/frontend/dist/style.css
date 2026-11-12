@@ -800,7 +800,7 @@ button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--gr
 .auundo{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;color:var(--muted)}
 .auundo:not(:disabled){color:var(--text)}
 .auundo:disabled{opacity:.45;cursor:default}
-.auside .auundo span{display:none}
+.auside .auundo{display:none}
 /* верхня смуга аукціону — в один рядок, нижча: колонкам більше висоти */
 .aubar{padding:6px 12px;gap:14px;grid-template-columns:auto auto auto 1fr}
 .aubar-l{flex-direction:row;align-items:center;gap:10px}

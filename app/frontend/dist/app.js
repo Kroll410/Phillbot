@@ -15,7 +15,14 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const fmtTime = ms => { ms = Math.max(0, ms); const t = Math.ceil(ms/1000), m = Math.floor(t/60), s = t%60; return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`; };
 const fmtClock = ts => new Date(ts).toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
 const norm = t => String(t).toLowerCase().replace(/\s+/g," ").trim().replace(/[.!?,;:…]+$/,"").trim();
-function toast(msg, ms=2600){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),ms); }
+function toast(msg, ms=2600){} // нижні сповіщення прибрано з додатку (дії видно з самого інтерфейсу)
+// підказки при наведенні (title) прибрано всюди: знімаємо атрибут і з нових елементів
+(() => {
+  const strip = n => { if(n.nodeType !== 1) return; if(n.hasAttribute("title")) n.removeAttribute("title"); n.querySelectorAll("[title]").forEach(e => e.removeAttribute("title")); };
+  new MutationObserver(ms => ms.forEach(m => m.type === "attributes" ? (m.target.hasAttribute("title") && m.target.removeAttribute("title")) : m.addedNodes.forEach(strip)))
+    .observe(document.documentElement, {subtree: true, childList: true, attributes: true, attributeFilter: ["title"]});
+  strip(document.body);
+})();
 function confirmBox(text, yes="Так", no="Скасувати"){ return new Promise(res=>{ $("modalText").textContent=text; $("modalYes").textContent=yes; $("modalNo").textContent=no; $("modal").classList.add("show");
   const done=v=>{ $("modal").classList.remove("show"); $("modalYes").onclick=$("modalNo").onclick=null; res(v); };
   $("modalYes").onclick=()=>done(true); $("modalNo").onclick=()=>done(false); }); }
@@ -637,12 +644,15 @@ function animOut(els, frames, {dur = 420, stagger = 30, max = 14} = {}){
   })));
 }
 const ROW_OUT = [{transform: "none", opacity: 1}, {transform: "translateX(-48px)", opacity: 0}];
-const CHIP_DROP = (el, i) => [{transform: "none", opacity: 1}, {transform: `translateY(28px) rotate(${i % 2 ? 9 : -9}deg)`, opacity: 0}];
+// картки зборів падають і тануть, не виходячи за межі рядка (без смуги прокрутки)
+const CHIP_DROP = (el, i) => [{transform: "none", opacity: 1}, {transform: `translateY(6px) rotate(${i % 2 ? 4 : -4}deg) scale(.96)`, opacity: .5, offset: .5},
+  {transform: `translateY(12px) rotate(${i % 2 ? 8 : -8}deg) scale(.9)`, opacity: 0}];
 async function resetAnimSubday(){
   resetting = true;
+  $("collChips").classList.add("dropping");
   await Promise.all([
     animOut($("tableWrap").querySelectorAll("tbody > tr"), ROW_OUT),
-    animOut($("collChips").querySelectorAll(".cchip"), CHIP_DROP, {dur: 460, stagger: 55}),
+    animOut($("collChips").querySelectorAll(".cchip"), CHIP_DROP, {dur: 620, stagger: 70}),
     countTo0($("sEntries")), countTo0($("sUsers")), countTo0($("sPoints")),
   ]);
 }
@@ -722,11 +732,11 @@ async function holdDone(){
       if(pastStream || view){ pastStream = null; view = null; renderAll(); } // з перегляду — спершу до поточного
       await resetAnimSubday();
       const snap = await call("NewStream");
-      resetting = false; setState(snap); loadStreams();
+      resetting = false; $("collChips").classList.remove("dropping"); setState(snap); loadStreams();
       const w = $("tableWrap"); w.classList.remove("slidein"); void w.offsetWidth; w.classList.add("slidein");
       $("collChips").querySelectorAll(".cchip").forEach(c => c.animate([{transform: "translateY(-10px)", opacity: 0}, {transform: "none", opacity: 1}], {duration: 380, easing: "ease-out"}));
       toast("Почато новий стрім");
-    } catch(e){ resetting = false; renderAll(); }
+    } catch(e){ resetting = false; $("collChips").classList.remove("dropping"); renderAll(); }
     finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); }, 500); }
     return;
   }
@@ -737,9 +747,16 @@ async function holdDone(){
     try{ setState(await call("AuctionRemoveLot", btn.dataset.lot)); if(l) toast(`Лот «${l.name}» видалено`); } catch(e){ renderAuList(); }
     return;
   }
-  if(action === "resetspins"){ // повернути всі лоти на колесо
+  if(action === "resetspins"){ // повернути всі лоти на колесо (і зупинити автооберти)
     holding = null;
+    stopAutoRun();
     try{ setState(await call("AuctionResetSpins")); toast("Колесо скинуто"); } catch(e){} finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); renderSpinBtn(); }, 500); }
+    return;
+  }
+  if(action === "spin" && AU().cfg.spinMode !== "instant"){ // на вибування — автооберти до переможця
+    holding = null;
+    setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); }, 500);
+    autoRun();
     return;
   }
   if(action === "spin"){ // колесо: результат від Go (random.org), тут лише анімація
@@ -1030,7 +1047,7 @@ function chanceOf(lot){
 
 // ----- вікно 1: лоти -----
 const auFresh = new Set();
-let auDrag = null, auListDirty = false, auEdit = false; // id лота, який перетягують; режим редагування
+let auDrag = null, auListDirty = false, auEdit = false, auRun = null, auLeaving = false; // auRun — автооберти «на вибування» // id лота, який перетягують; режим редагування
 function renderAuList(){
   // не перемальовуємо таблицю посеред перетягування чи затискання кнопки в ній
   const typing = document.activeElement && document.activeElement.matches("input.edit") && auListEl.contains(document.activeElement);
@@ -1044,14 +1061,29 @@ function renderAuList(){
   if(auSwapped){ // стисло: топ-3 та інформація
     // завжди топ-3: переможець — найвище, далі за сумою (вибулі теж, приглушені)
     const win = lots.find(l => l.id === au.winner);
-    const top = (win ? [win, ...lots.filter(l => l !== win)] : lots).slice(0, 3);
+    // під час автообертів — усі лоти, що ще на колесі; інакше — топ-3 (переможець найвище)
+    const top = auRun && !au.winner ? lots.filter(l => !gone(l)) : (win ? [win, ...lots.filter(l => l !== win)] : lots).slice(0, 3);
+    if(auRun){
+      const keep = new Set(top.map(l => l.id));
+      const leaving = [...auListEl.querySelectorAll(".autop-i[data-lot]")].filter(el => !keep.has(el.dataset.lot));
+      if(auLeaving) return;
+      if(leaving.length){ // вибулий лот виїжджає вправо, рядок згортається — потім перемальовуємо
+        auLeaving = true;
+        Promise.all(leaving.map(el => { const h = el.offsetHeight + "px";
+          return el.animate([{transform: "none", opacity: 1, height: h}, {transform: "translateX(70px)", opacity: 0, height: h, offset: .55},
+            {transform: "translateX(70px)", opacity: 0, height: "0px", paddingTop: "0px", paddingBottom: "0px", marginTop: "-8px"}],
+            {duration: 700, easing: "ease-in", fill: "forwards"}).finished.catch(() => {}); }))
+          .then(() => { auLeaving = false; renderAuList(); });
+        return;
+      }
+    }
     // FLIP: запам'ятати, де були рядки, щоб плавно пересунути (переможець «злітає» нагору)
     const before = {};
     auListEl.querySelectorAll(".autop-i[data-lot]").forEach(el => before[el.dataset.lot] = el.getBoundingClientRect().top);
     $("auList").innerHTML = `<div class="autop">` + top.map((l, i) => `<div class="autop-i${au.winner === l.id ? " win wglow" : ""}${gone(l) && au.winner !== l.id ? " out" : ""}" data-lot="${esc(l.id)}" style="--c:${lotColor(l.id)}">
         <span class="rk">${i + 1}</span><span class="nm" title="${esc(l.name)}">${esc(l.name)}</span><span class="am" title="${fmtN(l.amount)} балів">${l.hidden ? "приховано" : au.winner === l.id ? `Переміг із ${(chanceOf(l) * 100).toFixed(1)}%` : `${(chanceOf(l) * 100).toFixed(1)}%`}</span>
         <span class="bar"><i style="width:${(chanceOf(l) * 100).toFixed(1)}%"></i></span></div>`).join("")
-      + `</div>` + (au.lots.length > 3 ? `<div class="auinfo">і ще ${au.lots.length - 3} ${au.lots.length - 3 === 1 ? "лот" : "лотів"}</div>` : "");
+      + `</div>` + (!auRun && au.lots.length > 3 ? `<div class="auinfo">і ще ${au.lots.length - 3} ${au.lots.length - 3 === 1 ? "лот" : "лотів"}</div>` : "");
     auListEl.querySelectorAll(".autop-i[data-lot]").forEach(el => {
       const was = before[el.dataset.lot], now = el.getBoundingClientRect().top;
       if(was === undefined){ if(Object.keys(before).length) el.animate([{opacity: 0, transform: "translateY(10px)"}, {opacity: 1, transform: "none"}], {duration: 450, easing: "ease-out"}); return; }
@@ -1241,7 +1273,9 @@ function placeCenter(hub){
   img.classList.toggle("emote", c.kind === "emote");
 }
 const easeSpin = t => 1 - Math.pow(1 - t, 4);
+let spinToken = 0, spinEndP = Promise.resolve(); // токен — щоб «Скинути колесо» зупиняло оберт; проміс — кінець анімації
 function animateSpin(sp){
+  const tok = ++spinToken; let endRes; spinEndP = new Promise(r => endRes = r);
   const secs = sp.ids.map((id, i) => ({id, w: sp.weights[i]}));
   const TAU = Math.PI * 2, tgt = -sp.pos * TAU; // точка pos на колі — під стрілкою зверху
   const from = wRot, delta = ((tgt - from) % TAU + TAU) % TAU + TAU * 6, dur = 7000, t0 = performance.now();
@@ -1249,19 +1283,25 @@ function animateSpin(sp){
   let finished = false;
   const done = () => {
     if(finished) return; finished = true;
+    if(tok !== spinToken){ endRes(); return; } // оберт зупинено («Скинути колесо»)
     wRot = tgt;
     const lot = lotById(sp.pick);
-    if(sp.mode === "instant" || sp.ids.length <= 1){ wAnim = null; wheelDraw(secs); showWinner(); return; }
+    if(sp.mode === "instant" || sp.ids.length <= 1){ wAnim = null; wheelDraw(secs); showWinner(); endRes(); return; }
     // вибування: сектор тьмяніє, потім колесо перебудовується без нього
     $("wResult").innerHTML = `Вибуває: <b>${esc(lot ? lot.name : "?")}</b>`; $("wResult").className = "wresult show out";
     wFade = {id: sp.pick, k: 1};
     const f0 = performance.now();
     const fade = now => { if(!wFade) return; const k = Math.min(1, (now - f0) / 900); wFade.k = 1 - k; wheelDraw(secs); if(k < 1) requestAnimationFrame(fade); };
     requestAnimationFrame(fade);
-    setTimeout(() => { wAnim = null; wFade = null; wRot = 0; if(!sp.final) $("wResult").className = "wresult"; wheelDraw(); renderSpinBtn(); renderAuList(); if(sp.final) showWinner(); }, 1700);
+    renderAuList(); // лот, що вибуває, виїжджає зі списку одночасно з «Вибуває: …»
+    setTimeout(() => {
+      if(tok !== spinToken){ endRes(); return; }
+      wAnim = null; wFade = null; wRot = 0; if(!sp.final) $("wResult").className = "wresult"; wheelDraw(); renderSpinBtn(); renderAuList(); if(sp.final) showWinner(); endRes();
+    }, 1700);
   };
   const step = now => {
     if(finished) return;
+    if(tok !== spinToken){ finished = true; endRes(); return; }
     const t = Math.min(1, (now - t0) / dur); wRot = from + delta * easeSpin(t); wheelDraw(secs);
     if(t < 1) requestAnimationFrame(step); else done();
   };
@@ -1290,15 +1330,52 @@ function renderSpinBtn(){
   if(!S) return;
   const au = AU(), t = au.timer.status, btn = $("auSpin"), act = au.lots.filter(l => !l.out && !l.hidden && l.amount > 0).length;
   if(holding && (holding.btn === btn || holding.btn === $("auReset"))) return;
-  const why = wAnim ? "Колесо крутиться…" : (t === "running" || t === "paused") ? "Спершу завершіть прийом ставок" : au.winner ? "Переможця визначено" : !act ? "На колесі немає лотів"
+  const why = auRun ? "Іде вибування…" : wAnim ? "Колесо крутиться…" : (t === "running" || t === "paused") ? "Спершу завершіть прийом ставок" : au.winner ? "Переможця визначено" : !act ? "На колесі немає лотів"
     : !auSwapped ? "Розгорніть колесо у велике вікно, щоб крутити" : "";
   // поки колесо крутиться — вікна не міняються місцями
-  document.querySelectorAll("[data-swap]").forEach(s => { s.disabled = !!wAnim; s.title = wAnim ? "Колесо крутиться — дочекайтеся результату" : "Поміняти вікна місцями"; });
+  document.querySelectorAll("[data-swap]").forEach(s => { s.disabled = !!wAnim || !!auRun; s.title = wAnim || auRun ? "Колесо крутиться — дочекайтеся результату" : "Поміняти вікна місцями"; });
+  $("auWrap").querySelector(".wctl").classList.toggle("auto", !!auRun); // під час вибування — лише «Скинути колесо»
   btn.disabled = !!why; btn.title = why || "Затисніть і тримайте, щоб крутити колесо";
   btn.querySelector(".wl").textContent = au.cfg.spinMode === "instant" || act <= 2 ? "Крутити" : "Крутити на вибування";
-  $("auReset").disabled = !!wAnim || (!au.lots.some(l => l.out) && !au.winner);
+  $("auReset").disabled = auRun ? false : (!!wAnim || (!au.lots.some(l => l.out) && !au.winner));
 }
 $("auSpin").insertAdjacentHTML("afterbegin", LIQUID);
+/* ---------- автооберти «на вибування» ----------
+   крутить сам із паузою з налаштувань (5 с); коли на колесі ≤5 лотів — пауза ×1.2, ×1.4, ×1.6, ×1.8, ×2 */
+function spinGap(){
+  const n = AU().lots.filter(l => !l.out && !l.hidden && l.amount > 0).length;
+  const f = n <= 5 ? Math.min(2, 1 + .2 * (6 - n)) : 1;
+  return (AU().cfg.spinGapSec || 5) * 1000 * f;
+}
+function setRunUI(on){
+  $("auWrap").classList.toggle("autorun", on);
+  renderAuList(); renderSpinBtn();
+}
+async function autoRun(){
+  if(auRun) return;
+  const run = auRun = {stop: false};
+  setRunUI(true);
+  try{
+    while(!run.stop){
+      setState(await call("AuctionSpin"));
+      await spinEndP;
+      if(run.stop || AU().winner) break;
+      const end = Date.now() + spinGap();
+      while(!run.stop && Date.now() < end){
+        $("wResult").innerHTML = `Наступний оберт через <b>${Math.ceil((end - Date.now()) / 1000)} с</b>`; $("wResult").className = "wresult show next";
+        await new Promise(r => setTimeout(r, 150));
+      }
+      if(!run.stop) $("wResult").className = "wresult";
+    }
+  } catch(e){}
+  finally { if(auRun === run){ auRun = null; setRunUI(false); } }
+}
+function stopAutoRun(){
+  if(auRun){ auRun.stop = true; auRun = null; }
+  spinToken++; wAnim = null; wFade = null; // зупинити оберт, що йде
+  $("wResult").className = "wresult";
+  setRunUI(false);
+}
 // «Скинути колесо» — затисканням, червона «фарба» (як «Завершити гру»)
 $("auReset").insertAdjacentHTML("afterbegin", LIQUID);
 $("auReset").querySelector(".liquid").insertAdjacentHTML("beforeend", `<span class="ink"><i></i><i></i><i></i></span>`);
@@ -1407,7 +1484,7 @@ function auModeSeg(){
 document.querySelectorAll("#auModeSeg .tab").forEach(b => b.onclick = () => { auModePending = b.dataset.mode; auModeSeg(); });
 $("auSettingsBtn").onclick = () => {
   auPending = null; auShowAll = false; auModePending = null; auCenterPending = null;
-  $("auMin").value = AU().cfg.durationMin || 10;
+  $("auMin").value = AU().cfg.durationMin || 10; $("auGap").value = AU().cfg.spinGapSec || 5;
   auRewardGrid(); openModal("auctionModal"); requestAnimationFrame(() => { auModeSeg(); auCenterUI(); });
   if(((AU().cfg || {}).center || {}).kind === "emote") loadEmotes();
   if(!(S.rewards || []).length) withLoading([$("auctionModal").querySelector(".box"), $("auRewardRefresh")], () => call("RefreshRewards")).then(() => auRewardGrid());
@@ -1417,7 +1494,7 @@ $("auctionSave").onclick = async () => {
   if(center.kind === "emote" && !center.url) center = {kind: ""}; // вкладку відкрили, але емодзі не вибрали
   if(center.kind === "file" && !center.name) center = {kind: ""};
   const cfg = {...AU().cfg, center, rewardIds: auPending ?? AU().cfg.rewardIds, spinMode: auModePending || AU().cfg.spinMode,
-    durationMin: Math.min(180, Math.max(1, Math.round(n("auMin", 10))))};
+    durationMin: Math.min(180, Math.max(1, Math.round(n("auMin", 10)))), spinGapSec: Math.min(60, Math.max(1, Math.round(n("auGap", 5))))};
   setState(await call("AuctionSaveSettings", cfg));
   const noText = cfg.rewardIds.map(rewardById).filter(r => r && r.is_user_input_required === false);
   closeModal("auctionModal"); auPending = null; auCenterPending = null; wheelDraw();
@@ -1452,7 +1529,7 @@ function renderAuction(){
   $("auLots").textContent = au.lots.filter(l => !l.out && !l.hidden).length;
   $("auBids").textContent = au.feed.length;
   $("auSum").textContent = fmtN(au.lots.reduce((a, l) => a + l.amount, 0));
-  renderAuWarn(); renderAuUndo(); if(!wAnim) renderAuList(); renderAuFeed(); renderWheel(); renderAuTimer();
+  renderAuWarn(); renderAuUndo(); renderWheel(); if(!wAnim) renderAuList(); renderAuFeed(); renderAuTimer();
   if($("auctionModal").classList.contains("show")) auRewardGrid();
 }
 // нова ставка — підсвітка й рамка-індикатор навколо стрічки (як нові замовлення в СабДеї)

@@ -920,3 +920,19 @@ button.cidnext{flex:0 0 auto;min-width:110px;height:44px;padding:0 22px;font-wei
 .scardbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .scardbtns button{height:38px;border-radius:10px;font-weight:600;min-width:0}
 .winbtn.newstreambtn{width:100%;min-width:0;padding:0 10px}
+
+/* автооберти «на вибування»: «Крутити» зникає, лишається «Скинути колесо» */
+.wctl{transition:grid-template-columns .45s cubic-bezier(.2,.9,.25,1),gap .45s}
+.wctl.auto{grid-template-columns:0fr 1fr;gap:0}
+.wctl #auSpin{transition:opacity .3s,transform .45s}
+.wctl.auto #auSpin{opacity:0;transform:scale(.9);pointer-events:none;padding:0;overflow:hidden}
+.wresult.next{border-color:transparent;background:linear-gradient(#1f1f23,#1f1f23) padding-box,var(--grad) border-box;color:#e9dcff}
+/* під час вибування «Ставки» з'їжджають униз і зникають, лоти розгортаються на все місце */
+.auside>.auwin{flex:0 0 auto;transition:flex-grow .6s cubic-bezier(.2,.9,.25,1)}
+.aufeedcard{transition:flex-grow .6s cubic-bezier(.2,.9,.25,1),opacity .4s ease,transform .6s cubic-bezier(.2,.9,.25,1),padding .6s,margin .6s,border-width .6s}
+.auwrap.autorun .auside>.auwin{flex-grow:1}
+.auwrap.autorun .aufeedcard{flex-grow:0;flex-basis:0;opacity:0;transform:translateY(80px);padding-top:0;padding-bottom:0;margin-top:-16px;border-width:0;overflow:hidden;pointer-events:none}
+.auwrap.autorun .aulist{overflow:auto}
+/* падіння карток зборів (новий стрім): без смуги прокрутки і без обрізання */
+.cchips.dropping{overflow:visible}
+#toast{display:none!important}

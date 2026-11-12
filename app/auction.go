@@ -63,7 +63,8 @@ type AuctionSettings struct {
 	RewardsSet  bool        `json:"rewardsSet"`  // стрімер сам вибрав нагороди — автовибір більше не втручається
 	DurationMin int         `json:"durationMin"` // 10 хв за замовчуванням
 	SpinMode    string      `json:"spinMode"`    // elim — на вибування (за замовчуванням) | instant — одразу результат
-	Center      WheelCenter `json:"center"`      // емодзі каналу або власна картинка / GIF у центрі колеса
+	Center      WheelCenter `json:"center"`
+	SpinGapSec  int         `json:"spinGapSec"` // «на вибування»: пауза між автоматичними обертами (с), за замовчуванням 5      // емодзі каналу або власна картинка / GIF у центрі колеса
 }
 
 const maxAuctionRewards = 5
@@ -131,6 +132,9 @@ func (au *AuctionState) normalize() {
 	}
 	if au.Cfg.DurationMin < 1 || au.Cfg.DurationMin > 180 {
 		au.Cfg.DurationMin = 10
+	}
+	if au.Cfg.SpinGapSec < 1 || au.Cfg.SpinGapSec > 60 {
+		au.Cfg.SpinGapSec = 5
 	}
 	if au.Cfg.SpinMode != "instant" {
 		au.Cfg.SpinMode = "elim"

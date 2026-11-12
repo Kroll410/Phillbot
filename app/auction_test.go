@@ -71,7 +71,7 @@ func TestAuctionFlow(t *testing.T) {
 	}
 	// до 5 нагород; вибір стрімера вимикає автовибір
 	a.AuctionSaveSettings(AuctionSettings{RewardIDs: []string{"1", "2", "3", "4", "5", "6"}})
-	if len(au.Cfg.RewardIDs) != 5 || !au.Cfg.RewardsSet || au.Cfg.SpinMode != "elim" || au.Cfg.DurationMin != 10 {
+	if len(au.Cfg.RewardIDs) != 5 || !au.Cfg.RewardsSet || au.Cfg.SpinMode != "elim" || au.Cfg.DurationMin != 10 || au.Cfg.SpinGapSec != 5 {
 		t.Fatalf("cfg %+v", au.Cfg)
 	}
 	if a.isAuctionReward("zz", "Квиток") {

@@ -901,3 +901,6 @@ tr[draggable="true"] input{cursor:text}
 .winbtn.holdend.full{border-color:#55555f;box-shadow:0 0 22px rgba(0,200,83,.35),0 0 40px rgba(145,71,255,.4)}
 .winbtn.iconhold,.winbtn.iconhold:hover,.winbtn.iconhold.pressed{border-color:transparent}
 .winbtn.iconhold:hover{color:var(--text)}
+/* колесо в мінімізованому вікні — без кнопок «Крутити» і «Скинути колесо» */
+.auside .wctl{display:none}
+.auside .wheelbox{height:340px;flex-basis:340px}

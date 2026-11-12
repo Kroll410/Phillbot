@@ -1,0 +1,58 @@
+name: Build SubDay
+
+# Кожен пуш у main і PR — тести + збірка exe (артефакт на 14 днів).
+# Тег v* (наприклад v0.1.0) — ще й GitHub Release з SubDay.exe.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app/go.mod
+          cache-dependency-path: app/go.sum
+
+      - name: Тести
+        run: go test ./...
+
+      - name: Тести консольного бота
+        working-directory: bot
+        run: go test ./...
+
+      - name: Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.1
+
+      - name: Збірка
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { "dev-$($env:GITHUB_SHA.Substring(0,7))" }
+          wails build -clean -skipbindings -trimpath -ldflags "-s -w -X main.version=$version"
+          Get-Item build/bin/SubDay.exe | Select-Object Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SubDay-${{ github.sha }}
+          path: app/build/bin/SubDay.exe
+          retention-days: 14
+
+      - name: Реліз
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/bin/SubDay.exe
+          generate_release_notes: true

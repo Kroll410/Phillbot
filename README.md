@@ -25,7 +25,15 @@ cd app
 go test .
 wails build -clean -skipbindings -trimpath -ldflags "-s -w"
 ```
-Результат — `app/build/bin/SubDay.exe`.
+Результат — `app/build/bin/SubDay.exe`. Сам exe в git не комітиться (`*.exe` у `.gitignore`).
+
+## GitHub Actions і релізи
+`.github/workflows/build.yml` на кожен пуш у `main` і PR проганяє тести й збирає exe (артефакт запуску, 14 днів).
+Реліз — пушнути тег, Action сам створить GitHub Release з `SubDay.exe`:
+```
+git tag v0.1.0
+git push origin v0.1.0
+```
 
 ## Збірка чорновика
 ```

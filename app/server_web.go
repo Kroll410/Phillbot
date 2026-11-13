@@ -331,7 +331,10 @@ func (s *webServer) handler() http.Handler {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer") // секрет віджета в адресі не має витікати
-		if !strings.HasPrefix(r.URL.Path, "/w/") {
+		switch {
+		case r.URL.Path == "/demo":
+			h.Set("X-Frame-Options", "SAMEORIGIN") // кадри на сторінці /demo/all
+		case !strings.HasPrefix(r.URL.Path, "/w/"):
 			h.Set("X-Frame-Options", "DENY")
 		}
 		if s.cfg.secure() {
@@ -848,6 +851,10 @@ func (s *webServer) serveUI(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = io.WriteString(w, page)
+	case "/demo/all":
+		// «палітра»: усі екрани демо поруч, кожен — живе /demo?scene=… у зменшеному кадрі
+		w.Header().Set("Cache-Control", "no-store")
+		serveEmbedded(w, r, webFS, "web/demo/all.html")
 	case "/demo/demo-backend.js", "/demo/demo.js":
 		w.Header().Set("Cache-Control", "no-store")
 		serveEmbedded(w, r, webFS, "web"+p)

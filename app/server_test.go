@@ -548,7 +548,10 @@ func TestServerDemoPublic(t *testing.T) {
 	if !strings.Contains(page, `/demo/demo-backend.js`) || strings.Contains(page, `src="web.js"`) || strings.Contains(page, "лише за запрошенням") {
 		t.Fatal("demo page must load the demo backend, not web.js or the login page")
 	}
-	for _, p := range []string{"/demo/demo-backend.js", "/demo/demo.js", "/app.js", "/style.css"} {
+	if resp.Header.Get("X-Frame-Options") != "SAMEORIGIN" {
+		t.Fatal("/demo must be frameable by /demo/all only (same origin)")
+	}
+	for _, p := range []string{"/demo/all", "/demo/demo-backend.js", "/demo/demo.js", "/app.js", "/style.css"} {
 		r, err := http.Get(srv.URL + p)
 		if err != nil || r.StatusCode != 200 {
 			t.Fatal(p, err, r.StatusCode)

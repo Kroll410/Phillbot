@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PhillBot — усі екрани</title>
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+  @font-face{font-family:"Unbounded";font-display:swap;font-weight:200 900;src:url(/fonts/unbounded-cyrillic-wght-normal.woff2) format("woff2-variations");unicode-range:U+0400-045F,U+0490-0491}
+  @font-face{font-family:"Unbounded";font-display:swap;font-weight:200 900;src:url(/fonts/unbounded-latin-wght-normal.woff2) format("woff2-variations");unicode-range:U+0000-00FF,U+2000-206F}
+  :root{--bg:#0b0b0d;--panel:#18181b;--line:#2a2a30;--text:#efeff1;--muted:#adadb8;--accent:#9147ff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;padding:28px 32px 48px}
+  header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;max-width:1680px;margin:0 auto 24px}
+  h1{font:700 22px/1.2 "Unbounded","Segoe UI",sans-serif;margin:0}
+  header p{margin:0;color:var(--muted)}
+  header a{color:#bf94ff}
+  h2{font:600 12px/1.3 "Segoe UI Variable Text","Segoe UI",sans-serif;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:28px 0 12px}
+  section{max-width:1680px;margin:0 auto}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(520px,1fr));gap:20px}
+  figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  figcaption{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line)}
+  figcaption b{font-weight:600}
+  figcaption a{color:var(--muted);font-size:12.5px;text-decoration:none}
+  figcaption a:hover,figcaption a:focus-visible{color:#bf94ff}
+  .shot{position:relative;aspect-ratio:1440/900;overflow:hidden;background:#0e0e10}
+  .shot iframe{position:absolute;left:0;top:0;width:1440px;height:900px;border:0;transform-origin:0 0;pointer-events:none}
+  .shot .wait{position:absolute;left:14px;bottom:12px;color:var(--muted);font-size:12px}
+  a:focus-visible{outline:2px solid #bf94ff;outline-offset:2px}
+  @media (max-width:600px){body{padding:20px 16px}.grid{grid-template-columns:1fr}}
+</style></head>
+<body>
+<header>
+  <h1>PhillBot — усі екрани</h1>
+  <p>Живе демо на вигаданих даних. Натисніть «Відкрити», щоб покерувати екраном. · <a href="/">Увійти</a></p>
+</header>
+<main id="board"></main>
+<script>
+(function(){
+  "use strict";
+  const groups = [
+    ["СабДей", [["subday", "Збір замовлень"], ["game", "Гра переможця й голосування"], ["streams", "Журнал стрімів"]]],
+    ["Переглядовий", [["auction", "Аукціон: прийом ставок"], ["wheel", "Колесо на вибування"]]],
+    ["Налаштування", [["settings", "Загальні налаштування"], ["subdaysettings", "Налаштування СабДею"], ["ausettings", "Налаштування аукціону"]]],
+  ];
+  const board = document.getElementById("board"), frames = [];
+  groups.forEach(([title, items]) => {
+    const sec = document.createElement("section");
+    sec.innerHTML = `<h2>${title}</h2><div class="grid"></div>`;
+    items.forEach(([scene, name]) => {
+      const f = document.createElement("figure");
+      f.innerHTML = `<figcaption><b>${name}</b><a href="/demo?scene=${scene}" target="_blank" rel="noopener">Відкрити ↗</a></figcaption>
+        <div class="shot"><span class="wait">Завантаження…</span></div>`;
+      sec.querySelector(".grid").appendChild(f);
+      frames.push({scene, name, shot: f.querySelector(".shot")});
+    });
+    board.appendChild(sec);
+  });
+  const fit = () => frames.forEach(x => { if(x.ifr) x.ifr.style.transform = `scale(${x.shot.clientWidth / 1440})`; });
+  addEventListener("resize", fit);
+  // кадри вантажаться по черзі: кожне демо на старті запам'ятовує свою вкладку, і так вони не переплутаються
+  (function next(i){
+    if(i >= frames.length) return;
+    const x = frames[i], ifr = document.createElement("iframe");
+    ifr.src = `/demo?scene=${x.scene}&embed=1`; ifr.title = x.name; ifr.tabIndex = -1; ifr.setAttribute("aria-hidden", "true");
+    x.ifr = ifr; x.shot.appendChild(ifr); fit();
+    ifr.addEventListener("load", () => { const w = x.shot.querySelector(".wait"); if(w) w.remove(); setTimeout(() => next(i + 1), 150); }, {once: true});
+  })(0);
+})();
+</script>
+</body></html>

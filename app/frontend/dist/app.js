@@ -18,8 +18,11 @@ const norm = t => String(t).toLowerCase().replace(/\s+/g," ").trim().replace(/[.
 function toast(msg, ms=2600){} // нижні сповіщення прибрано з додатку (дії видно з самого інтерфейсу)
 // підказки при наведенні (title) прибрано всюди: знімаємо атрибут і з нових елементів
 (() => {
-  const strip = n => { if(n.nodeType !== 1) return; if(n.hasAttribute("title")) n.removeAttribute("title"); n.querySelectorAll("[title]").forEach(e => e.removeAttribute("title")); };
-  new MutationObserver(ms => ms.forEach(m => m.type === "attributes" ? (m.target.hasAttribute("title") && m.target.removeAttribute("title")) : m.addedNodes.forEach(strip)))
+  // кнопкам без тексту (шестерні, іконки) підказка лишається як aria-label — для екранних читачів
+  const drop = e => { const t = e.getAttribute("title"); e.removeAttribute("title");
+    if(t && !e.hasAttribute("aria-label") && e.matches("button,a") && !e.textContent.trim()) e.setAttribute("aria-label", t); };
+  const strip = n => { if(n.nodeType !== 1) return; if(n.hasAttribute("title")) drop(n); n.querySelectorAll("[title]").forEach(drop); };
+  new MutationObserver(ms => ms.forEach(m => m.type === "attributes" ? (m.target.hasAttribute("title") && drop(m.target)) : m.addedNodes.forEach(strip)))
     .observe(document.documentElement, {subtree: true, childList: true, attributes: true, attributeFilter: ["title"]});
   strip(document.body);
 })();
@@ -425,11 +428,11 @@ function renderTable(){
     const max = Math.max(1,...rows.map(r=>r.points)), total = rows.reduce((a,r)=>a+r.points,0)||1;
     if(!rows.length){ wrap.innerHTML = `<div class="empty">${D().entries.length?"Нічого не знайдено":"Замовлень поки немає"}</div>`; return; }
     const counted = countedSet(), pm = pointsMap();
-    wrap.innerHTML = `<table class="dnd summary"><thead><tr><th class="gripcol"></th><th style="width:44px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:220px">Частка</th>${th("Людей","count","num")}<th style="width:1%"></th><th style="width:44px"></th></tr></thead><tbody>${
+    wrap.innerHTML = `<table class="dnd summary"><thead><tr><th class="gripcol"></th><th style="width:44px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th class="sharecol">Частка</th>${th("Людей","count","num")}<th style="width:1%"></th><th style="width:44px"></th></tr></thead><tbody>${
       rows.map((g,i)=>{
         const open = openGroups.has(g.key);
-        const main = `<tr class="grow${open?" open":""}" data-key="${esc(g.key)}" data-name="${esc(g.name)}"${DRAG()}><td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${i+1}</td><td><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
-        <td class="num pts">${g.points}</td><td><div class="share"><div class="track"><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div></div><span>${(g.points/total*100).toFixed(0)}%</span></div></td>
+        const main = `<tr class="grow${open?" open":""}" data-key="${esc(g.key)}" data-name="${esc(g.name)}"${DRAG()}><td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${i+1}</td><td class="sumname"><b>${esc(g.name)}</b>${g.variants.size>1?` <span class="muted" title="${esc([...g.variants.keys()].join(" | "))}">(${g.variants.size} варіанти)</span>`:""}</td>
+        <td class="num pts">${g.points}</td><td class="sharecol"><div class="share"><div class="track"><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div></div><span>${(g.points/total*100).toFixed(0)}%</span></div></td>
         <td class="num">${g.count}</td><td class="wincell">${canPickWinner() && g.points>0 ? `<button class="winbtn" data-win="${esc(g.name)}" title="Затисніть і тримайте, щоб вибрати переможцем">${LIQUID}<span class="wl">Переможець</span></button>` : ""}</td><td class="chev" title="${open?"Згорнути":"Показати замовлення"}"><span></span></td></tr>`;
         if(!open) return main;
         const list = D().entries.filter(e=>counted.has(e.id) && norm(e.text)===g.key).sort((a,b)=>(pm.get(b.id)||0)-(pm.get(a.id)||0) || a.ts-b.ts);
@@ -532,6 +535,7 @@ function slideSeg(box){
 }
 function slideAll(){ slideSeg($("modes")); slideSeg(document.querySelector(".tabs .seg")); }
 addEventListener("resize", slideAll);
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(slideAll); // ширина вкладок змінюється, коли довантажиться шрифт
 function showMode(m){
   mode = m === "viewing" ? m : "subday"; // вкладку «Чат» прибрано з перемикача
   try{ localStorage.setItem("phillbot-mode", mode); }catch(e){}
@@ -570,7 +574,15 @@ function denyMode(btn){
   } else denyBusy = false;
   const home = btn.dataset.mode === "subday" ? "viewing" : "subday"; // вкладка, що зайнята
   if(mode !== home) showMode(home);
-  toast(home === "viewing" ? "Спершу завершіть аукціон (прийом ставок)" : S.phase === "play" ? "Спершу завершіть гру в СабДеї" : "Спершу завершіть збір у СабДеї");
+  modeNote(home === "viewing" ? "Спершу завершіть аукціон (прийом ставок)" : S.phase === "play" ? "Спершу завершіть гру в СабДеї" : "Спершу завершіть збір у СабДеї");
+}
+// причина відмови — коротка примітка під перемикачем режимів
+let modeNoteT = 0;
+function modeNote(msg){
+  const box = $("modes"); let n = $("modeNote");
+  if(!n){ n = document.createElement("div"); n.id = "modeNote"; n.className = "modenote"; n.setAttribute("role", "status"); box.appendChild(n); }
+  n.textContent = msg; n.classList.add("show");
+  clearTimeout(modeNoteT); modeNoteT = setTimeout(() => n.classList.remove("show"), 2800);
 }
 document.querySelectorAll(".mode-tab[data-mode]").forEach(b => b.onclick = () => {
   if(b.dataset.mode === mode) return; // уже відкрита — без анімації переходу
@@ -859,6 +871,18 @@ document.addEventListener("pointerdown", e => {
 });
 // відпустили раніше (де завгодно) — рідина стікає назад
 ["pointerup","pointercancel"].forEach(t => document.addEventListener(t, () => holdCancel()));
+// з клавіатури: затиснути Пробіл або Enter на кнопці — те саме, що затиснути мишею
+const HOLD_KEYS = [" ", "Enter"];
+document.addEventListener("keydown", e => {
+  if(!HOLD_KEYS.includes(e.key)) return;
+  const b = e.target.closest && e.target.closest("button[data-win], button[data-hold]"); if(!b || b.disabled) return;
+  e.preventDefault(); if(!e.repeat) holdStart(b);
+});
+document.addEventListener("keyup", e => {
+  if(!HOLD_KEYS.includes(e.key)) return;
+  const b = e.target.closest && e.target.closest("button[data-win], button[data-hold]"); if(!b) return;
+  e.preventDefault(); holdCancel();
+});
 window.addEventListener("blur", () => holdCancel());
 
 // зелено-фіолетові блискітки, що злітаються від меж екрана

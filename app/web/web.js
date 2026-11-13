@@ -107,7 +107,7 @@
     d.id = "webDataBox";
     d.innerHTML = `<h3>Дані каналу</h3>
       <div class="hint" id="delChannelHint">Видалити всю історію, налаштування й вхід цього каналу з PhillBot. Скасувати не можна — спершу можна зробити «Усе .zip».</div>
-      <div class="row"><button class="winbtn holdend" data-hold="web:deletechannel" title="Затисніть і тримайте">${ink.outerHTML}<span class="wl">Видалити дані каналу</span></button></div>
+      <div class="row"><button class="winbtn holdend" data-hold="web:deletechannel" title="Затисніть і тримайте">${ink.outerHTML}<span class="wl">Видалити дані каналу</span></button><span class="holdhint">Затисніть і тримайте</span></div>
       <div class="hint legallinks"><a href="/privacy" target="_blank" rel="noopener">Політика конфіденційності</a> · <a href="/terms" target="_blank" rel="noopener">Умови користування</a></div>`;
     const actions = box.querySelector(".row.actions");
     box.insertBefore(d, actions);
@@ -123,7 +123,7 @@
       if (document.getElementById("adminLink")) return;
       const a = document.createElement("a");
       a.id = "adminLink"; a.href = "/admin"; a.textContent = "Доступ"; a.className = "adminlink";
-      box.parentNode.insertBefore(a, box);
+      box.parentNode.prepend(a); // перед Donatello й індикатором з'єднання, щоб не читалось як статус доступу
     };
     add();
   }).catch(() => {});

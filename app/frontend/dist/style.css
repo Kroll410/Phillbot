@@ -966,7 +966,7 @@ td > .donchip{margin-left:0}
 .donlink .ok{color:#5cf29a} .donlink .err{color:#ff8a80}
 .donurl{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
 .donurl code{flex:1;min-width:0;overflow-wrap:anywhere;color:#e9dcff;font:500 12.5px var(--font-mono)}
-#ngrokToken,#donKey,#ngrokDomain{font-family:var(--font-mono)}
+#ngrokToken,#donKey{font-family:var(--font-mono)}
 /* ---------- два рівні вкладок ----------
    1-й рівень (шапка: СабДей / Переглядовий) — градієнтна «таблетка».
    2-й рівень (Підсумок / Замовлення / Журнал, перемикачі у вікнах налаштувань) — текст з градієнтним підкресленням, що ковзає. */

@@ -583,10 +583,10 @@ document.querySelectorAll(".modal").forEach(m => m.addEventListener("mousedown",
 
 // Загальні: віджет і порт OBS, файли; праворуч — Donatello через ngrok
 $("generalBtn").onclick = () => {
-  $("ngrokToken").value = S.settings.ngrokToken || ""; $("ngrokDomain").value = S.settings.ngrokDomain || ""; $("donKey").value = S.settings.donKey || ""; $("donLink")._k = "";
+  $("ngrokToken").value = S.settings.ngrokToken || ""; $("donKey").value = S.settings.donKey || ""; $("donLink")._k = "";
   $("obsPort").value = S.settings.obsPort; renderObs(); openModal("generalModal"); renderDon();
 };
-$("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round(n("obsPort",17841)), ngrokToken: $("ngrokToken").value.trim(), ngrokDomain: $("ngrokDomain").value.trim(), donKey: $("donKey").value.trim()}); closeModal("generalModal"); toast("Збережено"); };
+$("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round(n("obsPort",17841)), ngrokToken: $("ngrokToken").value.trim(), donKey: $("donKey").value.trim()}); closeModal("generalModal"); toast("Збережено"); };
 // Donatello через ngrok: статус тунелю і посилання для колбеків
 function renderDon(){
   const d = S.don || {state: "off"}, pill = $("donPill");

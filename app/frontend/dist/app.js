@@ -742,7 +742,7 @@ async function resetAnimSubday(){
 // решта розходиться на їхнє місце), наприкінці — порожнє колесо
 function drainWheel(total = 900){
   return new Promise(res => {
-    let done = false; const finish = () => { if(done) return; done = true; wFade = null; wheelDraw([]); res(); };
+    let done = false; const finish = () => { if(done) return; done = true; wFade = null; wheelDraw([]); wDrawn = []; res(); };
     let secs = wheelSectors().map(s => ({...s}));
     if(wAnim || !secs.length || !$("wheelBox").clientWidth){ finish(); return; }
     $("wResult").className = "wresult";
@@ -1337,9 +1337,10 @@ $("auFeed").addEventListener("click", async e => {
 // ----- вікно 2: колесо -----
 const wheelCv = $("wheel"), wctx = wheelCv.getContext("2d");
 let wRot = 0, wAnim = null, lastSpinAt = null, wFade = null; // wFade — сектор, що вибуває (згасає)
+let wFadeMap = null, wDrawn = null, wMorphTok = 0; // wFadeMap — прозорість секторів під час морфу; wDrawn — сектори, які зараз на колесі
 function wheelDraw(secs){
   if(!S) return;
-  if(!secs) secs = wAnim ? wAnim.secs : wheelSectors();
+  if(!secs){ secs = wAnim ? wAnim.secs : wheelSectors(); if(!wAnim) wDrawn = secs; }
   const box = $("wheelBox"); if(!box.clientWidth) return;
   const size = Math.max(60, Math.floor(Math.min(box.clientWidth, box.clientHeight || box.clientWidth)));
   const dpr = devicePixelRatio || 1;
@@ -1357,7 +1358,7 @@ function wheelDraw(secs){
   const total = secs.reduce((a, s) => a + s.w, 0);
   let a0 = wRot - Math.PI / 2;
   for(const s of secs){
-    const a1 = a0 + s.w / total * Math.PI * 2, lot = lotById(s.id), fade = wFade && wFade.id === s.id ? wFade.k : 1;
+    const a1 = a0 + s.w / total * Math.PI * 2, lot = lotById(s.id), fade = wFade && wFade.id === s.id ? wFade.k : wFadeMap && wFadeMap.has(s.id) ? wFadeMap.get(s.id) : 1;
     c.beginPath(); c.moveTo(cx, cx); c.arc(cx, cx, R, a0, a1); c.closePath();
     c.globalAlpha = .25 + .75 * fade; c.fillStyle = lotColor(s.id); c.fill(); c.globalAlpha = 1;
     c.strokeStyle = "rgba(14,14,16,.55)"; c.lineWidth = secs.length > 60 ? .5 : 1.5; c.stroke();
@@ -1479,6 +1480,34 @@ function renderMini(){
 const setMiniOpen = v => { wMiniOpen = v; try{ localStorage.setItem("phillbot-wminiopen", v ? "1" : "0"); }catch(e){} renderMini(); };
 $("wMiniExpand").onclick = () => setMiniOpen(true);
 $("wMiniCollapse").onclick = () => setMiniOpen(false);
+// зміна лотів на колесі — плавно: новий лот проявляється й розростається (дзеркально до вибування),
+// решта сектори розходяться/стискаються до нових розмірів; прибрані — тьмяніють і стискаються
+function morphWheel(){
+  const next = wheelSectors(), prev = wDrawn;
+  const same = prev && prev.length === next.length && prev.every((s, i) => s.id === next[i].id && Math.abs(s.w - next[i].w) < 1e-9);
+  if(!prev || same || !$("wheelBox").clientWidth){ wheelDraw(); return; }
+  const tok = ++wMorphTok, sum = a => a.reduce((x, s) => x + s.w, 0) || 1;
+  const pf = new Map(prev.map(s => [s.id, s.w / sum(prev)])), nf = new Map(next.map(s => [s.id, s.w / sum(next)]));
+  const order = next.map(s => s.id); // прибрані лишаються на своїх старих місцях
+  prev.forEach((s, i) => { if(!nf.has(s.id)) order.splice(Math.min(i, order.length), 0, s.id); });
+  const DUR = 650, t0 = performance.now(), ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const step = now => {
+    if(tok !== wMorphTok || wAnim) return;
+    const t = Math.min(1, (now - t0) / DUR), e = ease(t);
+    wFadeMap = new Map();
+    const cur = order.map(id => {
+      const a = pf.get(id) || 0, b = nf.get(id) || 0;
+      if(!pf.has(id)) wFadeMap.set(id, Math.min(1, t * 1.6)); // новий — проявляється
+      if(!nf.has(id)) wFadeMap.set(id, 1 - Math.min(1, t * 1.6)); // прибраний — тьмяніє
+      return {id, w: a * (1 - e) + b * e};
+    }).filter(s => s.w > 1e-6);
+    if(cur.length) wheelDraw(cur);
+    if(t < 1) requestAnimationFrame(step);
+    else { wFadeMap = null; wheelDraw(); }
+  };
+  requestAnimationFrame(step);
+  setTimeout(() => { if(tok === wMorphTok && wFadeMap){ wFadeMap = null; wheelDraw(); } }, DUR + 400); // якщо кадри призупинено
+}
 function renderWheel(){
   const au = AU(), sp = au.spin;
   renderMini();
@@ -1487,7 +1516,7 @@ function renderWheel(){
   if(lastSpinAt === null) lastSpinAt = sp ? sp.at : 0;
   if(!sp) lastSpinAt = 0;
   if(wAnim) return;
-  wheelDraw();
+  morphWheel();
   const w = lotById(au.winner);
   if(w){ $("wResult").innerHTML = `Переможець: <b>${esc(w.name)}</b>`; $("wResult").className = "wresult show win"; }
   else $("wResult").className = "wresult";

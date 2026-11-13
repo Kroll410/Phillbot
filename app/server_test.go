@@ -577,3 +577,19 @@ func TestServerStaticCache(t *testing.T) {
 		r.Body.Close()
 	}
 }
+
+// Кешовані app.js / style.css підключаються з міткою версії — після деплою браузер бере нові файли.
+func TestServerAssetVersion(t *testing.T) {
+	_, srv := authServer(t)
+	r, err := http.Get(srv.URL + "/demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(r.Body)
+	r.Body.Close()
+	for _, want := range []string{`href="style.css?v=` + assetVer + `"`, `src="/app.js?v=` + assetVer + `"`} {
+		if !strings.Contains(string(b), want) {
+			t.Fatal("no versioned asset:", want)
+		}
+	}
+}

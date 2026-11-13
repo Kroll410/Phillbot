@@ -36,10 +36,16 @@
   <div class="row exportrow"><button data-export="subday">СабДей .csv</button><button data-export="auction">Аукціон .csv</button><button data-export="zip">Усе .zip</button></div>
   <div class="row desktoponly datarow"><button id="openBase">Папка програми</button></div>
   <div class="row actions" style="margin-top:20px">
-    <span class="legallinks webonly"><a href="/privacy" target="_blank" rel="noopener">Конфіденційність</a> · <a href="/terms" target="_blank" rel="noopener">Умови</a></span>
     <button data-close="generalModal">Скасувати</button>
     <button id="generalSave" class="primary">Зберегти</button>
   </div>
+  <!-- вебверсія: приватність і видалення даних (кнопку додає web.js) -->
+  <section class="privacybox webblock" aria-labelledby="privacyTitle">
+    <h3 id="privacyTitle">Приватність</h3>
+    <p>PhillBot обробляє дані відповідно до GDPR і Угоди розробника Twitch: зберігає лише потрібне для роботи, нічого не продає й не використовує для реклами. Усі дані каналу можна видалити будь-коли.</p>
+    <div class="row" id="privacyActions"></div>
+    <p class="legal">Детальніше: <a href="/privacy" target="_blank" rel="noopener">Конфіденційність</a> · <a href="/terms" target="_blank" rel="noopener">Умови користування</a></p>
+  </section>
 </div>
 <div class="box settings donbox">
   <h2>Донати Donatello</h2>

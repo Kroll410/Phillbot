@@ -90,7 +90,7 @@
   document.documentElement.classList.add("web");
   connect();
 
-  // загальні налаштування → «Дані за весь час»: червона кнопка «Видалити дані каналу» (затискання, як «Вийти»)
+  // загальні налаштування → «Приватність»: червона кнопка «Видалити дані каналу» (затискання, як «Вийти»)
   window.webHold = async (action, btn) => {
     if (action !== "deletechannel") return;
     const r = await fetch("api/account/delete", {method: "POST", headers: {"X-PhillBot": "1"}, credentials: "same-origin"}).catch(() => null);
@@ -99,14 +99,14 @@
     if (lbl) { lbl.textContent = "Не вдалося — ще раз"; setTimeout(() => lbl.textContent = "Видалити дані каналу", 2500); }
   };
   const addDataBox = () => {
-    const after = document.querySelector("#generalModal .exportrow");
+    const place = document.getElementById("privacyActions");
     const ink = document.querySelector("#logoutBtn .liquid"); // та сама «червона фарба», що в кнопці «Вийти»
-    if (!after || !ink) { setTimeout(addDataBox, 300); return; }
+    if (!place || !ink) { setTimeout(addDataBox, 300); return; }
     if (document.getElementById("webDataBox")) return;
     const d = document.createElement("div");
-    d.id = "webDataBox"; d.className = "row";
+    d.id = "webDataBox";
     d.innerHTML = `<button class="winbtn holdend" data-hold="web:deletechannel">${ink.outerHTML}<span class="wl">Видалити дані каналу</span></button>`;
-    after.after(d);
+    place.appendChild(d);
   };
   addEventListener("load", addDataBox);
 

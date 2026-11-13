@@ -816,6 +816,22 @@ func serveEmbedded(w http.ResponseWriter, r *http.Request, fsys fs.FS, name stri
 // ---------- інтерфейс стрімера ----------
 
 // index.html з мостом web.js (замість Wails) перед app.js; хто не увійшов — сторінка входу
+// assetVer — мітка версії в адресах app.js / style.css: вони кешуються на годину, а після деплою
+// нова сторінка одразу бере нові файли (у тестовій збірці — час запуску сервера)
+var assetVer = func() string {
+	if version != "dev" {
+		return version
+	}
+	return strconv.FormatInt(time.Now().Unix(), 36)
+}()
+
+func bustAssets(page string) string {
+	for _, f := range []string{`href="style.css`, `src="chatrender.js`, `src="app.js`} {
+		page = strings.Replace(page, f+`"`, f+`?v=`+assetVer+`"`, 1)
+	}
+	return page
+}
+
 func (s *webServer) serveUI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -833,7 +849,7 @@ func (s *webServer) serveUI(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		page := strings.Replace(string(b), `<script src="app.js`, `<script src="web.js"></script>`+"\n"+`<script src="app.js`, 1)
+		page := strings.Replace(bustAssets(string(b)), `<script src="app.js`, `<script src="web.js"></script>`+"\n"+`<script src="app.js`, 1)
 		page = strings.Replace(page, "</head>", faviconTags+"</head>", 1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
@@ -846,7 +862,7 @@ func (s *webServer) serveUI(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		page := strings.Replace(string(b), `<script src="app.js`, `<script src="/demo/demo-backend.js"></script><script src="/demo/demo.js"></script>`+"\n"+`<script src="/app.js`, 1)
+		page := strings.Replace(bustAssets(string(b)), `<script src="app.js`, `<script src="/demo/demo-backend.js"></script><script src="/demo/demo.js"></script>`+"\n"+`<script src="/app.js`, 1)
 		page = strings.Replace(page, "</head>", faviconTags+"</head>", 1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")

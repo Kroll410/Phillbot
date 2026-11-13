@@ -1057,6 +1057,11 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px soli
 .lablink{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .lablink a{font-size:12px;color:var(--muted)} .lablink a:hover{color:var(--brand-text)}
 .datarow{margin-top:8px}
-.row.actions .legallinks{margin-right:auto;font-size:12px;color:var(--muted);flex:0 0 auto}
-.row.actions .legallinks a{color:var(--muted)} .row.actions .legallinks a:hover{color:var(--brand-text)}
 .webonly{display:none} html.web .webonly{display:inline}
+/* приватність (вебверсія): окремий блок під кнопками дій */
+.webblock{display:none} html.web .webblock{display:block}
+.privacybox{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.privacybox h3{margin-top:0}
+#generalModal .privacybox p{margin:4px 0 10px;font-size:12.5px;line-height:1.5;color:var(--muted)}
+.privacybox .legal a{color:var(--muted)} .privacybox .legal a:hover{color:var(--brand-text)}
+.privacybox #webDataBox{margin-top:0}

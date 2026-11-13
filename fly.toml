@@ -1,6 +1,6 @@
 # Приклад для Fly.io: fly launch --no-deploy --copy-config (див. docs/DEPLOY.md)
 app = "phillbot"            # змініть на свою унікальну назву
-primary_region = "waw"
+primary_region = "fra"
 
 # Контекст збірки — тека app/, тому деплой запускайте звідти:
 #   cd app && fly deploy -c ../fly.toml --dockerfile Dockerfile

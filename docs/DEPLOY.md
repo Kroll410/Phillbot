@@ -59,7 +59,7 @@ docker run --rm -p 127.0.0.1:8080:8080 -v phillbot-data:/data \
 
 ```bash
 fly launch --no-deploy --copy-config -c fly.toml   # задайте унікальну назву app
-fly volumes create phillbot_data --size 1 --region waw
+fly volumes create phillbot_data --size 1 --region fra
 fly secrets set TWITCH_CLIENT_ID=… TWITCH_CLIENT_SECRET=… PHILLBOT_KEY=… PHILLBOT_ADMIN=<ваш_логін>
 cd app
 fly deploy -c ../fly.toml --dockerfile Dockerfile --build-arg VERSION=$(git describe --tags --always)
@@ -103,7 +103,7 @@ fly secrets set PHILLBOT_DATABASE_URL='postgres://користувач:паро�
 **Fly Postgres / Managed Postgres:**
 
 ```bash
-fly postgres create --name phillbot-db --region waw
+fly postgres create --name phillbot-db --region fra
 fly postgres attach phillbot-db -a <назва_app>   # сам задасть секрет DATABASE_URL
 ```
 

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PhillBot — усі екрани</title>
+<meta name="description" content="Усі екрани PhillBot на одній сторінці: збір замовлень, гра переможця, аукціон, колесо й налаштування — живе демо на вигаданих даних.">
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
   @font-face{font-family:"Unbounded";font-display:swap;font-weight:200 900;src:url(/fonts/unbounded-cyrillic-wght-normal.woff2) format("woff2-variations");unicode-range:U+0400-045F,U+0490-0491}
@@ -55,14 +56,23 @@
   }));
   const fit = () => frames.forEach(x => { if(x.ifr) x.ifr.style.transform = `scale(${x.shot.clientWidth / 1440})`; });
   addEventListener("resize", fit);
-  // кадри вантажаться по черзі: кожне демо на старті запам'ятовує свою вкладку, і так вони не переплутаються
-  (function next(i){
-    if(i >= frames.length) return;
-    const x = frames[i], ifr = document.createElement("iframe");
+  // кадр вантажиться, лише коли наближається до екрана (кожен — окреме живе демо, не варто запускати всі одразу);
+  // і по одному: кожне демо на старті запам'ятовує свою вкладку, і так вони не переплутаються
+  const queue = []; let busy = false;
+  const pump = () => {
+    if(busy || !queue.length) return;
+    busy = true;
+    const x = queue.shift(), ifr = document.createElement("iframe");
     ifr.src = `/demo?scene=${x.scene}&embed=1`; ifr.title = x.name; ifr.tabIndex = -1; ifr.setAttribute("aria-hidden", "true");
     x.ifr = ifr; x.shot.appendChild(ifr); fit();
-    ifr.addEventListener("load", () => { const w = x.shot.querySelector(".wait"); if(w) w.remove(); setTimeout(() => next(i + 1), 150); }, {once: true});
-  })(0);
+    ifr.addEventListener("load", () => { const w = x.shot.querySelector(".wait"); if(w) w.remove(); setTimeout(() => { busy = false; pump(); }, 150); }, {once: true});
+  };
+  // перевірка за координатами (не IntersectionObserver): працює й там, де сторінка ще не малюється
+  const check = () => frames.forEach(x => {
+    if(x.queued || x.shot.getBoundingClientRect().top > innerHeight + 200) return;
+    x.queued = true; queue.push(x); pump();
+  });
+  addEventListener("scroll", check, {passive: true}); addEventListener("resize", check); check();
 })();
 </script>
 </body></html>

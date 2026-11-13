@@ -865,6 +865,12 @@ func (s *webServer) serveUI(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 		serveEmbedded(w, r, webFS, "web"+p)
 	default:
+		// статика інтерфейсу: шрифти не змінюються — місяць у кеші; app.js / style.css — година, щоб оновлення доходили швидко
+		if strings.HasPrefix(p, "/fonts/") {
+			w.Header().Set("Cache-Control", "public, max-age=2592000")
+		} else {
+			w.Header().Set("Cache-Control", "public, max-age=3600")
+		}
 		serveEmbedded(w, r, assets, "frontend/dist"+p)
 	}
 }

@@ -565,3 +565,15 @@ func TestServerDemoPublic(t *testing.T) {
 	}
 	r.Body.Close()
 }
+
+// Статика інтерфейсу кешується (шрифти — довго), а сторінки — ні.
+func TestServerStaticCache(t *testing.T) {
+	_, srv := authServer(t)
+	for p, want := range map[string]string{"/fonts/unbounded-latin-wght-normal.woff2": "max-age=2592000", "/app.js": "max-age=3600", "/demo": "no-store"} {
+		r, err := http.Get(srv.URL + p)
+		if err != nil || r.StatusCode != 200 || !strings.Contains(r.Header.Get("Cache-Control"), want) {
+			t.Fatal(p, err, r.StatusCode, r.Header.Get("Cache-Control"))
+		}
+		r.Body.Close()
+	}
+}

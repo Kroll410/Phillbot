@@ -4,17 +4,12 @@ package main
 // СабДей — це стрім. Кожен «Старт» відкриває наступний збір замовлень цього стріму (Збір 1, Збір 2…).
 // Новий стрім починається автоматично, якщо від останньої активності минуло понад streamGap, або вручну (NewStream).
 //
-// Збереження:
-//   streams/<id стріму>.json            — увесь стрім: усі збори з налаштуваннями балів і замовленнями;
-//   exports/<id стріму>/збір_NN.csv     — таблиця кожного збору для Excel (UTF-8 з BOM, роздільник «;»).
-// Файли перезаписуються, коли збір завершується, і востаннє — перед наступним «Старт» (з правками після завершення).
+// Збереження — у внутрішній БД (store.go): стріми, збори, замовлення. CSV — лише на вимогу
+// (експорт у налаштуваннях) і файл для Marbles.
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -131,69 +126,31 @@ func collectionCSV(s Settings, entries []Entry) string {
 	return b.String()
 }
 
-// CSV поточного збору: exports/<стрім>/збір_NN.csv. Викликати під a.mu. Порожній збір не зберігається.
-func (a *App) writeCSVLocked() string {
-	if len(a.st.Entries) == 0 || a.st.Stream.ID == "" {
-		return ""
-	}
-	dir := filepath.Join(a.exportsDir, a.st.Stream.ID)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return ""
-	}
-	p := filepath.Join(dir, fmt.Sprintf("збір_%02d.csv", a.st.CollN))
-	data := append([]byte{0xEF, 0xBB, 0xBF}, []byte(collectionCSV(a.st.Settings, a.st.Entries))...)
-	if err := os.WriteFile(p, data, 0644); err != nil {
-		go a.logf("Не вдалося записати %s — можливо, файл відкритий в Excel", p)
-		return ""
-	}
-	return p
-}
-
-// streams/<стрім>.json — усі збори стріму, включно з поточним (якщо в ньому є замовлення).
-func (a *App) writeStreamLocked() {
-	if a.st.Stream.ID == "" {
-		return
-	}
-	f := StreamFile{ID: a.st.Stream.ID, StartedAt: a.st.Stream.StartedAt, Collections: append([]Collection(nil), a.st.Past...)}
-	if len(a.st.Entries) > 0 {
-		f.Collections = append(f.Collections, a.currentCollectionLocked())
-	}
-	if len(f.Collections) == 0 {
-		return
-	}
-	if err := os.MkdirAll(a.streamsDir, 0755); err != nil {
-		return
-	}
-	b, _ := json.MarshalIndent(f, "", "  ")
-	_ = writeFileAtomic(filepath.Join(a.streamsDir, a.st.Stream.ID+".json"), b)
-}
-
-// зберегти поточний збір (CSV + файл стріму). Викликати під a.mu.
-func (a *App) persistCollectionLocked() string {
+// поточному збору — стрім і номер (самі дані пише saveLocked у БД). Викликати під a.mu.
+func (a *App) persistCollectionLocked() {
 	a.initStreamLocked() // замовлення без стріму (старий стан / додано вручну до старту)
 	if a.st.CollN == 0 && len(a.st.Entries) > 0 {
 		a.st.CollN = len(a.st.Past) + 1
 	}
-	csv := a.writeCSVLocked()
-	a.writeStreamLocked()
-	return csv
 }
 
-// Перенести поточний збір у минулі збори стріму (після остаточного збереження). Викликати під a.mu.
-func (a *App) archiveLocked() string {
+// Перенести поточний збір у завершені збори стріму. Викликати під a.mu.
+func (a *App) archiveLocked() {
 	if len(a.st.Entries) == 0 {
-		return ""
+		return
 	}
-	csv := a.persistCollectionLocked()
+	a.persistCollectionLocked()
 	a.st.Past = append(a.st.Past, a.currentCollectionLocked())
-	return csv
 }
 
 // Почати новий стрім (попередній уже збережено). Викликати під a.mu.
 func (a *App) beginStreamLocked(now time.Time) {
+	if a.store != nil && a.st.Stream.ID != "" {
+		a.saveLocked() // спершу дописати в БД завершені збори старого стріму — далі вони зникнуть з пам'яті
+	}
 	info := newStreamInfo(now)
 	base := info.ID
-	for i := 2; info.ID == a.st.Stream.ID || fileExists(filepath.Join(a.streamsDir, info.ID+".json")); i++ {
+	for i := 2; info.ID == a.st.Stream.ID || (a.store != nil && a.store.streamExists(info.ID)); i++ {
 		info.ID = base + "-" + strconv.Itoa(i) // ніколи не перезаписувати інший стрім
 	}
 	a.st.Stream = info
@@ -233,7 +190,6 @@ func (a *App) NewStream() Snapshot {
 			s.Status, s.RemainingMs, s.FinishedAt = "finished", 0, time.Now().UnixMilli()
 		}
 		a.archiveLocked()
-		a.writeStreamLocked()
 		a.endPlayLocked()
 		st.Entries = []Entry{}
 		st.SeenRedeems = []string{}
@@ -262,27 +218,12 @@ func (a *App) ListStreams() []StreamMeta {
 	a.mu.Unlock()
 
 	out := []StreamMeta{}
-	seen := map[string]bool{}
-	files, _ := filepath.Glob(filepath.Join(a.streamsDir, "*.json"))
-	for _, p := range files {
-		id := strings.TrimSuffix(filepath.Base(p), ".json")
-		if !streamIDRe.MatchString(id) || id == cur.ID {
-			continue
+	if a.store != nil {
+		for _, m := range a.store.streamMetas() {
+			if m.ID != cur.ID && m.Collections > 0 {
+				out = append(out, m)
+			}
 		}
-		b, err := os.ReadFile(p)
-		if err != nil {
-			continue
-		}
-		var f StreamFile
-		if json.Unmarshal(b, &f) != nil {
-			continue
-		}
-		m := StreamMeta{ID: id, StartedAt: f.StartedAt, Collections: len(f.Collections)}
-		for _, c := range f.Collections {
-			m.Orders += len(c.Entries)
-		}
-		out = append(out, m)
-		seen[id] = true
 	}
 	if cur.ID != "" {
 		out = append(out, StreamMeta{ID: cur.ID, StartedAt: cur.StartedAt, Collections: curColls, Orders: curOrders, Current: true})
@@ -291,18 +232,27 @@ func (a *App) ListStreams() []StreamMeta {
 	return out
 }
 
-// GetStream — збори минулого стріму для перегляду.
+// GetStream — збори стріму для перегляду (поточного — разом із поточним збором).
 func (a *App) GetStream(id string) (StreamFile, error) {
 	if !streamIDRe.MatchString(id) {
 		return StreamFile{}, errors.New("невідомий стрім")
 	}
-	b, err := os.ReadFile(filepath.Join(a.streamsDir, id+".json"))
-	if err != nil {
-		return StreamFile{}, errors.New("файл стріму не знайдено")
+	a.mu.Lock()
+	if id == a.st.Stream.ID {
+		f := StreamFile{ID: id, StartedAt: a.st.Stream.StartedAt, Collections: append([]Collection(nil), a.st.Past...)}
+		if len(a.st.Entries) > 0 {
+			f.Collections = append(f.Collections, a.currentCollectionLocked())
+		}
+		a.mu.Unlock()
+		return f, nil
 	}
-	var f StreamFile
-	if err := json.Unmarshal(b, &f); err != nil {
-		return StreamFile{}, err
+	a.mu.Unlock()
+	if a.store == nil {
+		return StreamFile{}, errors.New("стрім не знайдено")
+	}
+	f, err := a.store.streamFile(id)
+	if err != nil {
+		return StreamFile{}, errors.New("стрім не знайдено")
 	}
 	return f, nil
 }

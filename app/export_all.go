@@ -1,14 +1,11 @@
 package main
 
 // Експорт «за весь час» із загальних налаштувань: СабДей .csv, Аукціон .csv, усе в .zip.
-// Джерела — те, що програма вже зберігає: streams/*.json (+ поточний стрім з пам'яті),
-// старі архіви history/subday_*.json, аукціони history/auction_*.json (+ поточний аукціон з пам'яті).
-// Коли з'явиться внутрішня БД, зміняться лише loadAllSubday / loadAllAuctions.
+// Джерело — внутрішня БД (store.go) + поточний збір і аукціон з пам'яті.
 
 import (
 	"archive/zip"
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -37,7 +34,7 @@ type auctionRec struct {
 	Winner string
 }
 
-// усі збори СабДею: збережені стріми, поточний стрім (з пам'яті — найсвіжіший), старі архіви
+// усі збори СабДею: завершені збори з БД + поточний збір з пам'яті
 func (a *App) loadAllSubday() []subdayColl {
 	a.mu.Lock()
 	curID := a.st.Stream.ID
@@ -50,42 +47,16 @@ func (a *App) loadAllSubday() []subdayColl {
 		cur = append(cur, c)
 	}
 	a.mu.Unlock()
-
 	var out []subdayColl
-	files, _ := filepath.Glob(filepath.Join(a.streamsDir, "*.json"))
-	for _, p := range files {
-		var f StreamFile
-		if b, err := os.ReadFile(p); err != nil || json.Unmarshal(b, &f) != nil {
-			continue
-		}
-		if f.ID == "" {
-			f.ID = strings.TrimSuffix(filepath.Base(p), ".json")
-		}
-		if f.ID == curID {
-			continue
-		}
-		for _, c := range f.Collections {
-			c.Settings.normalize() // правила балів фіксовані; старі файли могли їх не мати
-			out = append(out, subdayColl{f.ID, c})
+	if a.store != nil {
+		for _, sc := range a.store.allCollections() {
+			if sc.Stream != curID {
+				out = append(out, sc)
+			}
 		}
 	}
 	for _, c := range cur {
 		out = append(out, subdayColl{curID, c})
-	}
-	// архіви до появи стрімів: кожен — окремий «стрім» з одним збором
-	old, _ := filepath.Glob(filepath.Join(a.historyDir, "subday_*.json"))
-	for _, p := range old {
-		var f struct {
-			Entries  []Entry `json:"entries"`
-			Settings Settings
-			Session  Timer `json:"session"`
-		}
-		if b, err := os.ReadFile(p); err != nil || json.Unmarshal(b, &f) != nil || len(f.Entries) == 0 {
-			continue
-		}
-		f.Settings.normalize()
-		id := "архів_" + strings.TrimSuffix(strings.TrimPrefix(filepath.Base(p), "subday_"), ".json")
-		out = append(out, subdayColl{id, Collection{N: 1, StartedAt: f.Session.StartedAt, FinishedAt: f.Session.FinishedAt, Settings: f.Settings, Entries: f.Entries}})
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Stream != out[j].Stream {
@@ -96,34 +67,26 @@ func (a *App) loadAllSubday() []subdayColl {
 	return out
 }
 
-func auctionID(start int64) string {
-	if start == 0 {
-		start = time.Now().UnixMilli()
-	}
-	return time.UnixMilli(start).Format("2006-01-02_15-04-05")
-}
-
-// усі аукціони: history/auction_*.json, поточний — з пам'яті (новіший за файл)
+// усі аукціони: з БД; поточний — з пам'яті (у БД його ставки можуть бути повніші, ніж останні 300 у пам'яті — беремо з БД, якщо він там є)
 func (a *App) loadAllAuctions() []auctionRec {
 	byID := map[string]auctionRec{}
-	files, _ := filepath.Glob(filepath.Join(a.historyDir, "auction_*.json"))
-	for _, p := range files {
-		var f struct {
-			Lots   []Lot  `json:"lots"`
-			Feed   []Bid  `json:"feed"`
-			Winner string `json:"winner"`
+	if a.store != nil {
+		for _, r := range a.store.allAuctions() {
+			byID[r.ID] = r
 		}
-		if b, err := os.ReadFile(p); err != nil || json.Unmarshal(b, &f) != nil || len(f.Lots) == 0 {
-			continue
-		}
-		id := strings.TrimSuffix(strings.TrimPrefix(filepath.Base(p), "auction_"), ".json")
-		byID[id] = auctionRec{id, f.Lots, f.Feed, f.Winner}
 	}
 	a.mu.Lock()
 	au := a.st.Auction
 	if len(au.Lots) > 0 {
-		id := auctionID(au.Timer.StartedAt)
-		byID[id] = auctionRec{id, append([]Lot(nil), au.Lots...), append([]Bid(nil), au.Feed...), au.Winner}
+		id := au.ID
+		if id == "" {
+			id = auctionID(au.Timer.StartedAt)
+		}
+		r := auctionRec{id, append([]Lot(nil), au.Lots...), append([]Bid(nil), au.Feed...), au.Winner}
+		if old, ok := byID[id]; ok && len(old.Feed) > len(r.Feed) {
+			r.Feed = old.Feed
+		}
+		byID[id] = r
 	}
 	a.mu.Unlock()
 	out := make([]auctionRec, 0, len(byID))

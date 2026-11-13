@@ -159,12 +159,18 @@ func (s *Settings) normalize() {
 	s.NgrokDomain = ngrokDomain(s.NgrokDomain)
 }
 
+// loadState — стан зі старого subday_state.json (лише для перенесення в БД).
 func loadState(file string) State {
 	st := defaultState()
 	b, err := os.ReadFile(file)
 	if err == nil {
 		_ = json.Unmarshal(b, &st)
 	}
+	return fixState(st)
+}
+
+// fixState — привести збережений стан до ладу після запуску: правила балів, таймери, що вийшли, поки програма була закрита.
+func fixState(st State) State {
 	st.Settings.normalize()
 	if st.Session.Status == "idle" || st.Session.Status == "" { // ще не почато — завжди повні 10 хв
 		st.Session.RemainingMs = int64(st.Settings.DurationMin) * 60000

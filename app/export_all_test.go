@@ -11,6 +11,10 @@ import (
 
 func TestExportAll(t *testing.T) {
 	a := newTestApp(t)
+	a.store.Close() // файли попередньої версії: перенесуться в БД при першому відкритті нової версії
+	for _, f := range []string{"phillbot.db", "phillbot.db-wal", "phillbot.db-shm"} {
+		_ = os.Remove(filepath.Join(a.baseDir, f))
+	}
 	s := defaultSettings()
 	// збережений стрім + поточний з пам'яті + старий архів
 	_ = os.MkdirAll(a.streamsDir, 0755)
@@ -21,6 +25,14 @@ func TestExportAll(t *testing.T) {
 		[]byte(`{"entries":[{"id":"o","user":"Old","tier":1,"months":1,"text":"Hades"}],"settings":{}}`), 0644)
 	_ = os.WriteFile(filepath.Join(a.historyDir, "auction_2026-11-02_20-00-00.json"),
 		[]byte(`{"lots":[{"id":"l1","name":"Elden Ring","amount":6000,"bids":2,"users":[{"name":"Zo","amount":5000},{"name":"Kat","amount":1000}]},{"id":"l2","name":"Doom","amount":1000,"bids":1,"out":1}],"feed":[{"id":"b1","ts":1,"user":"Zo","amount":5000,"text":"elden","lotId":"l1"}],"winner":"l1"}`), 0644)
+	a.openStore()
+	if a.store == nil || a.storeErr != "" {
+		t.Fatal(a.storeErr)
+	}
+	t.Cleanup(func() { a.store.Close() })
+	if _, err := os.Stat(a.streamsDir + ".migrated"); err != nil {
+		t.Fatal("old files must be renamed, not deleted")
+	}
 	a.st.Settings = s
 	a.st.Stream = StreamInfo{ID: "2026-11-13_19-00-00"}
 	a.st.CollN = 1
@@ -33,7 +45,7 @@ func TestExportAll(t *testing.T) {
 		t.Fatalf("collections: %d", len(colls))
 	}
 	sub := string(subdayAllCSV(colls))
-	for _, want := range []string{"\xEF\xBB\xBFsep=;", "Mira;;3;2;;;6;Celeste;так;Celeste", "\"Hollow; Knight\"", "донат", ";120;4;Hades", "архів_2026-10-01_10-00-00"} {
+	for _, want := range []string{"\xEF\xBB\xBFsep=;", "Mira;;3;2;;;6;Celeste;так;Celeste", "\"Hollow; Knight\"", "донат", ";120;4;Hades", "2026-10-01_10-00-00-a"} {
 		if !strings.Contains(sub, want) {
 			t.Errorf("subday csv lacks %q:\n%s", want, sub)
 		}

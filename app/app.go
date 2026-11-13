@@ -50,6 +50,9 @@ type App struct {
 
 	baseDir, configFile, tokensFile, stateFile, historyDir, exportsDir, streamsDir string
 
+	store    *Store // внутрішня БД (phillbot.db); nil — БД недоступна, стан пишеться в subday_state.json
+	storeErr string
+
 	mu       sync.Mutex
 	st       State
 	auth     AuthInfo
@@ -103,7 +106,7 @@ func NewApp() *App {
 	a.historyDir = filepath.Join(a.baseDir, "history")
 	a.streamsDir = filepath.Join(a.baseDir, "streams")
 	a.exportsDir = filepath.Join(a.baseDir, "exports")
-	a.st = loadState(a.stateFile)
+	a.openStore()
 	a.initStreamLocked()
 	a.conn = ConnInfo{Status: "off", Text: "Не підключено"}
 	return a
@@ -126,6 +129,9 @@ func (a *App) startup(ctx context.Context) {
 	a.mu.Unlock()
 	a.overlay.start(port)
 	a.restartTunnel()
+	if a.storeErr != "" {
+		a.logf("⚠ %s", a.storeErr)
+	}
 	if low := strings.ToLower(a.baseDir); strings.Contains(low, `\temp\`) || strings.Contains(low, `\tmp\`) {
 		a.logf("⚠ Програму запущено з тимчасової папки (архіву) — налаштування й токени зникнуть. Розпакуйте PhillBot.exe у звичайну папку.")
 	}
@@ -177,7 +183,41 @@ func (a *App) emitEvent(name string, data any) {
 	}
 }
 
+// openStore — відкрити phillbot.db; першого разу перенести туди дані з JSON-файлів попередніх версій.
+func (a *App) openStore() {
+	st, err := openStore(filepath.Join(a.baseDir, "phillbot.db"), "local")
+	if err != nil {
+		a.storeErr = "База даних недоступна (" + err.Error() + ") — стан зберігається у subday_state.json"
+		a.st = loadState(a.stateFile)
+		return
+	}
+	a.store = st
+	if old, ok, err := st.migrateFiles(a.baseDir); err != nil {
+		a.storeErr = "Не вдалося перенести дані в БД: " + err.Error()
+	} else if ok {
+		a.st = old
+		if err := st.Sync(&a.st); err != nil {
+			a.storeErr = "Не вдалося записати перенесені дані: " + err.Error()
+		}
+	}
+	loaded, ok, err := st.Load()
+	if err != nil {
+		a.storeErr = "Не вдалося прочитати БД: " + err.Error()
+	}
+	if ok {
+		a.st = fixState(loaded)
+	} else {
+		a.st = fixState(defaultState())
+	}
+}
+
 func (a *App) saveLocked() {
+	if a.store != nil {
+		if err := a.store.Sync(&a.st); err != nil {
+			go a.logf("Не вдалося зберегти в БД: %v", err)
+		}
+		return
+	}
 	b, err := json.MarshalIndent(a.st, "", "  ")
 	if err == nil {
 		_ = writeFileAtomic(a.stateFile, b)
@@ -699,15 +739,15 @@ func (a *App) AddManual(user string, tier, months int, text string) (Snapshot, e
 	return a.mutate(func(st *State) { st.Entries = append(st.Entries, e) }), nil
 }
 
-// Новий збір: поточний архівується в history/, замовлення очищаються.
+// Новий збір: поточний переходить у завершені збори стріму, замовлення очищаються.
 func (a *App) NewSession() (string, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	p := a.archiveLocked()
+	a.archiveLocked()
 	a.st.Entries = []Entry{}
 	a.st.SeenRedeems = []string{}
 	a.st.Session = Timer{Status: "idle", RemainingMs: int64(a.st.Settings.DurationMin) * 60000}
 	a.saveLocked()
 	a.emitLocked()
-	return p, nil
+	return "", nil
 }

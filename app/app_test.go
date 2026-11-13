@@ -34,8 +34,27 @@ func newTestApp(t *testing.T) *App {
 	a.historyDir = filepath.Join(dir, "history")
 	a.exportsDir = filepath.Join(dir, "exports")
 	a.streamsDir = filepath.Join(dir, "streams")
-	a.st = defaultState()
+	a.openStore()
+	if a.store == nil {
+		t.Fatal(a.storeErr)
+	}
+	t.Cleanup(func() { a.store.Close() })
 	return a
+}
+
+// стан, яким його побачить програма після перезапуску (окреме з'єднання з тією самою БД)
+func reloadState(t *testing.T, a *App) State {
+	t.Helper()
+	s, err := openStore(filepath.Join(a.baseDir, "phillbot.db"), "local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	st, ok, err := s.Load()
+	if err != nil || !ok {
+		t.Fatalf("reload: ok=%v err=%v", ok, err)
+	}
+	return fixState(st)
 }
 
 func TestTimerAndRedeems(t *testing.T) {
@@ -82,10 +101,7 @@ func TestTimerAndRedeems(t *testing.T) {
 	if _, ok := a.st.SeenRewards["r2"]; !ok {
 		t.Fatal("seen reward not stored")
 	}
-	if _, err := os.Stat(a.stateFile); err != nil {
-		t.Fatal("state not saved")
-	}
-	st := loadState(a.stateFile)
+	st := reloadState(t, a)
 	if st.Settings.RewardID != "r1" {
 		t.Fatal("reload")
 	}
@@ -106,9 +122,11 @@ func TestManualAndArchive(t *testing.T) {
 	if s.Entries[0].Months != 0 || s.Entries[0].Text != "Hades" {
 		t.Fatal(s.Entries[0])
 	}
-	p, err := a.NewSession()
-	if err != nil || p == "" || len(a.st.Entries) != 0 || len(a.st.Past) != 1 {
-		t.Fatal(p, err)
+	if _, err := a.NewSession(); err != nil || len(a.st.Entries) != 0 || len(a.st.Past) != 1 {
+		t.Fatal(err)
+	}
+	if st := reloadState(t, a); len(st.Past) != 1 || len(st.Past[0].Entries) != 1 || st.Past[0].Entries[0].Text != "Hades" {
+		t.Fatalf("archived collection not in DB: %+v", st.Past)
 	}
 }
 
@@ -170,8 +188,8 @@ func TestExport(t *testing.T) {
 	if fs, _ := os.ReadDir(r.Dir); len(fs) != 1 || filepath.Base(r.Dir) != "last" {
 		t.Fatal("last folder must hold exactly one file", fs)
 	}
-	if hs, _ := os.ReadDir(filepath.Join(a.baseDir, "marbles", "history")); len(hs) < 1 {
-		t.Fatal("history copies missing")
+	if _, err := os.Stat(filepath.Join(a.baseDir, "marbles", "history")); err == nil {
+		t.Fatal("no dated copies: history lives in the DB")
 	}
 	b, _ := os.ReadFile(r.Path)
 	if b[0] != 0xEF || b[1] != 0xBB || b[2] != 0xBF || string(b[3:]) != "Ой так\r\nОй так\r\n" {
@@ -214,13 +232,10 @@ func TestEachStartIsNewCollection(t *testing.T) {
 	}
 	a.FinishTimer()
 	streamID := a.st.Stream.ID
-	files, _ := filepath.Glob(filepath.Join(a.exportsDir, streamID, "*.csv"))
-	if len(files) != 1 || filepath.Base(files[0]) != "збір_01.csv" {
-		t.Fatal("no csv after finish", files)
+	if _, err := os.Stat(a.exportsDir); err == nil {
+		t.Fatal("CSV must be written only on demand")
 	}
-	b, _ := os.ReadFile(files[0])
-	txt := string(b)
-	if !strings.HasPrefix(txt, "\xEF\xBB\xBFsep=;\r\n") || !strings.Contains(txt, "Dark Souls;158;2;") {
+	if txt := collectionCSV(a.st.Settings, a.st.Entries); !strings.HasPrefix(txt, "sep=;\r\n") || !strings.Contains(txt, "Dark Souls;158;2;") {
 		t.Fatalf("%q", txt)
 	}
 	s := a.AddTime(60000) // +1 хв після завершення не діє

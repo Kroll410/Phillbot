@@ -134,7 +134,7 @@ func TestStateSurvivesRestart(t *testing.T) {
 	a.st.Auction.Timer.EndsAt = time.Now().UnixMilli() - 1000 // «вимкнули» програму, поки йшов таймер
 	a.saveLocked()
 	a.mu.Unlock()
-	st := loadState(a.stateFile)
+	st := reloadState(t, a)
 	if st.Stream.ID != a.st.Stream.ID || len(st.Past) != 1 || st.CollN != 2 {
 		t.Fatalf("stream not restored: %s past=%d n=%d", st.Stream.ID, len(st.Past), st.CollN)
 	}

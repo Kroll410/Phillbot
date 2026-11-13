@@ -636,7 +636,6 @@ const DON_HEART = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-
 const donChip = uah => `<span class="donchip">${DON_HEART}<i>₴</i><b>${fmtUAH(uah)}</b></span>`;
 const fmtUAH = v => { const x = Number(v) || 0; return x % 1 ? x.toFixed(2).replace(".", ",") : String(x); };
 $("openBase").onclick = () => call("OpenFolder", "");
-$("openCsv").onclick = () => call("OpenFolder", "exports");
 // експорт за весь час: діалог «Зберегти як», потім програма показує файл у провіднику
 document.querySelectorAll("[data-export]").forEach(b => b.onclick = async () => {
   if(b.classList.contains("is-loading")) return;

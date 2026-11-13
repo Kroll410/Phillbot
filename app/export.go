@@ -71,14 +71,14 @@ func (a *App) MarbleLines() []string {
 	return marbleLines(a.st.Settings, a.st.Entries)
 }
 
-// Записує subday_marbles.csv (+ копію з датою), кладе шлях у буфер обміну і запускає гру через Steam.
+// Записує subday_marbles.csv, кладе шлях у буфер обміну і запускає гру через Steam.
 func (a *App) ExportMarbles(launch bool) (MarblesResult, error) {
 	clean := a.MarbleLines()
 	if len(clean) == 0 {
 		return MarblesResult{}, errors.New("немає замовлень з балами > 0")
 	}
 	// marbles/last — тека, де лежить ЛИШЕ файл останнього збору; її шлях копіюється в буфер.
-	// Копії всіх експортів з датою — у marbles/history.
+	// Лише останній файл для гри; історія замовлень — у БД.
 	dir := filepath.Join(a.baseDir, "marbles", "last")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return MarblesResult{}, err
@@ -94,10 +94,6 @@ func (a *App) ExportMarbles(launch bool) (MarblesResult, error) {
 	p := filepath.Join(dir, "subday_marbles.csv")
 	if err := os.WriteFile(p, data, 0644); err != nil {
 		return MarblesResult{}, errors.New("не вдалося записати файл (" + err.Error() + ") — можливо, він відкритий в іншій програмі")
-	}
-	hist := filepath.Join(a.baseDir, "marbles", "history")
-	if os.MkdirAll(hist, 0755) == nil {
-		_ = os.WriteFile(filepath.Join(hist, "subday_marbles_"+time.Now().Format("2006-01-02_15-04-05")+".csv"), data, 0644)
 	}
 	res := MarblesResult{Path: p, Dir: dir, Lines: len(clean), Copied: setClipboard(dir)}
 	a.mu.Lock()

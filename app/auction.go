@@ -9,13 +9,9 @@ package main
 import (
 	crand "crypto/rand"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -99,6 +95,7 @@ type Spin struct {
 }
 
 type AuctionState struct {
+	ID      string          `json:"id"` // id аукціону в БД (дата старту); новий аукціон — порожній
 	Cfg     AuctionSettings `json:"cfg"`
 	Timer   Timer           `json:"timer"`
 	Lots    []Lot           `json:"lots"`
@@ -446,7 +443,6 @@ func (a *App) AuctionFinish() Snapshot {
 		t := &st.Auction.Timer
 		if t.Status == "running" || t.Status == "paused" {
 			t.Status, t.RemainingMs, t.FinishedAt = "finished", 0, time.Now().UnixMilli()
-			a.saveAuctionLocked()
 		}
 	})
 }
@@ -747,9 +743,6 @@ func (a *App) AuctionSpin() (Snapshot, error) {
 			}
 		}
 		au.Spin = sp
-		if au.Winner != "" {
-			a.saveAuctionLocked()
-		}
 	})
 	return snap, nil
 }
@@ -768,29 +761,9 @@ func (a *App) AuctionResetSpins() Snapshot {
 // Новий аукціон: поточний зберігається в history/, лоти й стрічка очищуються (налаштування лишаються).
 func (a *App) AuctionNew() Snapshot {
 	return a.mutate(func(st *State) {
-		a.saveAuctionLocked()
 		st.Auction = AuctionState{Cfg: st.Auction.Cfg} // історія об'єднань теж очищується
 		st.Auction.normalize()
 	})
-}
-
-// history/auction_<дата>.json — копія аукціону (лоти, ставки, переможець). Викликати під a.mu.
-func (a *App) saveAuctionLocked() {
-	au := a.st.Auction
-	if len(au.Lots) == 0 {
-		return
-	}
-	if err := os.MkdirAll(a.historyDir, 0755); err != nil {
-		return
-	}
-	start := au.Timer.StartedAt
-	if start == 0 {
-		start = time.Now().UnixMilli()
-	}
-	lots := append([]Lot(nil), au.Lots...)
-	sort.SliceStable(lots, func(i, j int) bool { return lots[i].Amount > lots[j].Amount })
-	b, _ := json.MarshalIndent(map[string]any{"savedAt": time.Now().Format(time.RFC3339), "lots": lots, "feed": au.Feed, "winner": au.Winner}, "", "  ")
-	_ = writeFileAtomic(filepath.Join(a.historyDir, "auction_"+time.UnixMilli(start).Format("2006-01-02_15-04-05")+".json"), b)
 }
 
 // таймер прийому ставок (з ticker під a.mu)
@@ -798,7 +771,6 @@ func (a *App) tickAuctionLocked(now int64) bool {
 	t := &a.st.Auction.Timer
 	if t.Status == "running" && t.EndsAt <= now {
 		t.Status, t.RemainingMs, t.FinishedAt = "finished", 0, now
-		a.saveAuctionLocked()
 		return true
 	}
 	return false

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PhillBot — Privacy Policy</title>
+<style>
+  :root{--bg:#0e0e10;--panel:#18181b;--line:#2a2a30;--text:#efeff1;--muted:#adadb8;--grad:linear-gradient(90deg,#00c853,#9147ff)}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 Inter,"Segoe UI",system-ui,sans-serif;padding:16px}
+  .wrap{max-width:760px;margin:0 auto}
+  .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;font-size:14px}
+  .top a{color:#c9a6ff;text-decoration:none}
+  .top a:hover{text-decoration:underline}
+  .lang a{color:var(--muted)}
+  .lang b{color:var(--text)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px 24px;overflow-wrap:anywhere}
+  .logo{font:700 26px/1.2 Inter,"Segoe UI",sans-serif;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;margin:0 0 6px}
+  h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:17px;margin:28px 0 8px;padding-top:4px}
+  p,li{color:#d4d4da}
+  p{margin:0 0 12px}
+  ul{margin:0 0 12px;padding-left:22px}
+  li{margin:0 0 4px}
+  .muted{color:var(--muted);font-size:13.5px}
+  a{color:#c9a6ff}
+  code{background:#0e0e10;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:13px}
+  table{width:100%;border-collapse:collapse;margin:0 0 12px;font-size:14px}
+  th,td{text-align:left;vertical-align:top;border-bottom:1px solid var(--line);padding:7px 8px 7px 0}
+  th{color:var(--muted);font-weight:600}
+  .tw{overflow-x:auto}
+</style></head>
+<body><div class="wrap">
+<nav class="top">
+  <a href="/">← PhillBot</a>
+  <span class="lang"><a href="/privacy" hreflang="uk">Українська</a> · <b>English</b></span>
+</nav>
+<main class="card">
+  <p class="logo">PhillBot</p>
+  <h1>Privacy Policy</h1>
+  <p class="muted">Version of {{UPDATED}} · <a href="/en/terms">Terms of Use</a></p>
+
+  <h2>1. Who we are and what this document covers</h2>
+  <p>PhillBot ({{PUBLIC_URL}}) is a free tool for Twitch streamers, available by invitation only (allowlist). It lets a streamer:</p>
+  <ul>
+    <li>collect game orders paid with channel points ("SubDay");</li>
+    <li>run an auction with a wheel ("Viewing Day");</li>
+    <li>run a "1/2" chat poll;</li>
+    <li>show a timer widget in OBS;</li>
+    <li>accept Donatello donations as orders or bids.</li>
+  </ul>
+  <p>The service is run by {{OPERATOR}}, an individual in Ukraine ("we"). This page explains what data we collect, why, where and for how long we keep it, and how to have it deleted. Questions: {{CONTACT}}.</p>
+
+  <h2>2. What data we process</h2>
+  <h3 style="font-size:15px;margin:14px 0 6px">2.1. Streamers (people who sign in)</h3>
+  <ul>
+    <li>Twitch id, login and display name;</li>
+    <li>Twitch OAuth tokens — stored encrypted (AES-256-GCM);</li>
+    <li>session cookie — only its hash is stored in the database;</li>
+    <li>time of last sign-in;</li>
+    <li>settings, including the Donatello callback key and reward IDs;</li>
+    <li>access log: sign-in, refusal, adding to and removing from the list — with timestamps.</li>
+  </ul>
+  <p>We request these permissions from Twitch: <code>channel:read:redemptions</code>, <code>channel:read:subscriptions</code>, <code>user:read:chat</code>, <code>moderator:read:followers</code>.</p>
+
+  <h3 style="font-size:15px;margin:14px 0 6px">2.2. Channel viewers</h3>
+  <p>We receive this data from Twitch because the streamer connected their channel to PhillBot.</p>
+  <p><b>Stored in history:</b></p>
+  <ul>
+    <li>channel point reward redemptions: Twitch id, login, name, text, name color, badges;</li>
+    <li>subscription tier and tenure, number of gifted subscriptions over 30 days;</li>
+    <li>"1/2" chat votes during a poll (by id).</li>
+  </ul>
+  <p><b>Kept only in server memory</b> (never written to disk, gone after a restart):</p>
+  <ul>
+    <li>chat messages;</li>
+    <li>follower status.</li>
+  </ul>
+
+  <h3 style="font-size:15px;margin:14px 0 6px">2.3. Donatello donors</h3>
+  <p>When a streamer connects the Donatello callback, we receive:</p>
+  <ul>
+    <li>the name the donor entered;</li>
+    <li>the message;</li>
+    <li>amount and currency;</li>
+    <li>donation id.</li>
+  </ul>
+
+  <h3 style="font-size:15px;margin:14px 0 6px">2.4. What we do not collect</h3>
+  <p>There is no analytics, advertising or tracking. We hold no payment data — donations go through Donatello.</p>
+
+  <h2>3. Why, and on what basis</h2>
+  <ul>
+    <li><b>Streamers:</b> providing the service (performance of a contract — the <a href="/en/terms">Terms of Use</a>).</li>
+    <li><b>Viewers and donors:</b> the streamer's legitimate interest in running an interactive activity that you chose to take part in (a reward, a donation, a vote).</li>
+  </ul>
+  <p>Data is used only to run these features. We do not sell it or use it for advertising or profiling.</p>
+
+  <h2>4. Who receives the data</h2>
+  <ul>
+    <li><b>Fly.io, Inc. (USA)</b> — hosting. Servers in Frankfurt (Germany), database on an encrypted volume.</li>
+    <li><b>Twitch</b> — the source of channel and viewer data; also, your browser loads badge and emote images from Twitch's CDN (<code>static-cdn.jtvnw.net</code>), so Twitch sees the visitor's IP address.</li>
+    <li><b>Donatello</b> — the source of donation data.</li>
+    <li><b>random.org</b> — we request only random numbers for the wheel from there. No personal data is sent.</li>
+  </ul>
+  <p>Data is not shared with or sold to anyone other than those named above. Because Fly.io is a US company, data may be processed outside Ukraine.</p>
+
+  <h2>5. Cookies and local storage</h2>
+  <div class="tw"><table>
+    <tr><th>Name</th><th>Lifetime</th><th>Purpose</th></tr>
+    <tr><td><code>pb_session</code></td><td>30 days</td><td>sign-in only; HttpOnly, Secure, SameSite=Lax</td></tr>
+    <tr><td><code>pb_state</code></td><td>10 min</td><td>protects the sign-in flow</td></tr>
+    <tr><td>localStorage</td><td>in your browser</td><td>interface settings only (tab, layout)</td></tr>
+  </table></div>
+
+  <h2>6. How long we keep data</h2>
+  <ul>
+    <li>History of collections, auctions and donations — <b>12 months</b>, then deleted automatically.</li>
+    <li>Access log — <b>12 months</b>.</li>
+    <li>If a streamer revokes access in Twitch, the token stops working, or an administrator removes them from the list: tokens are deleted <b>immediately</b>, the rest of the channel's data after <b>30 days</b> unless the streamer signs in again.</li>
+    <li>A streamer can delete all of their channel's data at any time in settings ("Delete channel data").</li>
+  </ul>
+
+  <h2>7. Your rights</h2>
+  <ul>
+    <li><b>Access and a copy.</b> A streamer exports a .zip in settings.</li>
+    <li><b>Correction.</b> A streamer edits data in the interface.</li>
+    <li><b>Deletion.</b> A streamer deletes it themselves. A viewer or donor sends a request to {{CONTACT}}; we complete it within 30 days, and the name is replaced with "deleted" throughout the history.</li>
+    <li><b>Objection.</b> You may object to the processing of your data — write to {{CONTACT}}.</li>
+    <li><b>Complaint.</b> To the Ukrainian Parliament Commissioner for Human Rights, or to the EU data protection authority where you live.</li>
+  </ul>
+  <p>So that we can find your data, include your Twitch login (for a donor — the name and approximate date of the donation) and the streamer's channel in your request.</p>
+
+  <h2>8. Security</h2>
+  <ul>
+    <li>HTTPS-only connections;</li>
+    <li>Twitch tokens are encrypted, the session cookie is stored only as a hash;</li>
+    <li>access to the service only from the allowlist, database on an encrypted volume.</li>
+  </ul>
+  <p>If a data incident occurs, we will notify Twitch (legal@twitch.tv) and the affected people.</p>
+
+  <h2>9. Children</h2>
+  <p>The service is not intended for children under 13. Streamers must meet Twitch's age requirements.</p>
+
+  <h2>10. The streamer's duty</h2>
+  <p>A streamer who connects a channel must inform their viewers about data processing, for example by placing a link to {{PUBLIC_URL}}/privacy in their Twitch channel panels.</p>
+
+  <h2>11. Changes</h2>
+  <p>We may update this policy. The version date is shown at the top; we will announce material changes in the service.</p>
+
+  <h2>12. Contact</h2>
+  <p>{{OPERATOR}} · {{CONTACT}}</p>
+</main>
+</div></body></html>

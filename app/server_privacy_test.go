@@ -3,6 +3,7 @@
 package main
 
 import (
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -168,5 +169,29 @@ func TestPrivacyPruneHistory(t *testing.T) {
 	_ = ws.base.db.QueryRow(`SELECT COUNT(*) FROM audit_log WHERE action = 'old'`).Scan(&audit)
 	if streams != 1 || entries != 1 || audit != 0 {
 		t.Fatalf("streams=%d entries=%d audit=%d (current stream must stay)", streams, entries, audit)
+	}
+}
+
+// Документи: /privacy, /terms, /en/… з підставленими власником і контактом; без незаповнених {{…}}.
+func TestLegalPages(t *testing.T) {
+	ws, srv := devServer(t)
+	ws.cfg.Contact, ws.cfg.Operator = "owner@example.test", "Tester"
+	for _, p := range []string{"/privacy", "/terms", "/en/privacy", "/en/terms"} {
+		resp, err := http.Get(srv.URL + p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		page := string(b)
+		if resp.StatusCode != 200 || strings.Contains(page, "{{") || !strings.Contains(page, "Tester") {
+			t.Fatalf("%s: %d placeholders=%v", p, resp.StatusCode, strings.Contains(page, "{{"))
+		}
+		if strings.HasSuffix(p, "privacy") && !strings.Contains(page, "owner@example.test") {
+			t.Fatal(p, "no contact")
+		}
+	}
+	if resp, _ := http.Get(srv.URL + "/en/nope"); resp.StatusCode != 404 {
+		t.Fatal("unknown legal page", resp.StatusCode)
 	}
 }

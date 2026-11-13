@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PhillBot — Політика конфіденційності</title>
+<style>
+  :root{--bg:#0e0e10;--panel:#18181b;--line:#2a2a30;--text:#efeff1;--muted:#adadb8;--grad:linear-gradient(90deg,#00c853,#9147ff)}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 Inter,"Segoe UI",system-ui,sans-serif;padding:16px}
+  .wrap{max-width:760px;margin:0 auto}
+  .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;font-size:14px}
+  .top a{color:#c9a6ff;text-decoration:none}
+  .top a:hover{text-decoration:underline}
+  .lang a{color:var(--muted)}
+  .lang b{color:var(--text)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px 24px;overflow-wrap:anywhere}
+  .logo{font:700 26px/1.2 Inter,"Segoe UI",sans-serif;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;margin:0 0 6px}
+  h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:17px;margin:28px 0 8px;padding-top:4px}
+  p,li{color:#d4d4da}
+  p{margin:0 0 12px}
+  ul{margin:0 0 12px;padding-left:22px}
+  li{margin:0 0 4px}
+  .muted{color:var(--muted);font-size:13.5px}
+  a{color:#c9a6ff}
+  code{background:#0e0e10;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:13px}
+  table{width:100%;border-collapse:collapse;margin:0 0 12px;font-size:14px}
+  th,td{text-align:left;vertical-align:top;border-bottom:1px solid var(--line);padding:7px 8px 7px 0}
+  th{color:var(--muted);font-weight:600}
+  .tw{overflow-x:auto}
+</style></head>
+<body><div class="wrap">
+<nav class="top">
+  <a href="/">← PhillBot</a>
+  <span class="lang"><b>Українська</b> · <a href="/en/privacy" hreflang="en">English</a></span>
+</nav>
+<main class="card">
+  <p class="logo">PhillBot</p>
+  <h1>Політика конфіденційності</h1>
+  <p class="muted">Редакція від {{UPDATED}} · <a href="/terms">Умови користування</a></p>
+
+  <h2>1. Хто ми і про що цей документ</h2>
+  <p>PhillBot ({{PUBLIC_URL}}) — безкоштовний інструмент для стрімерів Twitch, доступний лише за запрошенням (білий список). Він дає змогу:</p>
+  <ul>
+    <li>збирати замовлень ігор за бали каналу («СабДей»);</li>
+    <li>проводити аукціон із колесом («Переглядовий»);</li>
+    <li>проводити голосування в чаті «1/2»;</li>
+    <li>показувати віджет таймера в OBS;</li>
+    <li>приймати донати Donatello як замовлення або ставки.</li>
+  </ul>
+  <p>Сервіс веде {{OPERATOR}}, фізична особа, Україна (далі — «ми»). Тут описано, які дані ми збираємо, навіщо, де й скільки їх зберігаємо та як їх видалити. З питань пишіть на {{CONTACT}}.</p>
+
+  <h2>2. Які дані ми обробляємо</h2>
+  <h3 style="font-size:15px;margin:14px 0 6px">2.1. Стрімер (той, хто входить у сервіс)</h3>
+  <ul>
+    <li>Twitch id, логін і відображуване ім'я;</li>
+    <li>OAuth-токени Twitch — зберігаються зашифрованими (AES-256-GCM);</li>
+    <li>сесійна cookie — у базі зберігається лише її хеш;</li>
+    <li>час останнього входу;</li>
+    <li>налаштування, зокрема ключ колбека Donatello та ID нагород;</li>
+    <li>журнал доступу: вхід, відмова у вході, додавання й видалення зі списку — з часом події.</li>
+  </ul>
+  <p>Ми просимо в Twitch такі дозволи: <code>channel:read:redemptions</code>, <code>channel:read:subscriptions</code>, <code>user:read:chat</code>, <code>moderator:read:followers</code>.</p>
+
+  <h3 style="font-size:15px;margin:14px 0 6px">2.2. Глядачі каналу</h3>
+  <p>Ці дані ми отримуємо від Twitch, бо стрімер підключив свій канал до PhillBot.</p>
+  <p><b>Зберігаються в історії:</b></p>
+  <ul>
+    <li>використання нагород за бали каналу: Twitch id, логін, ім'я, текст, колір ніка, значки;</li>
+    <li>тір і стаж підписки, кількість подарованих підписок за 30 днів;</li>
+    <li>голоси «1/2» в чаті під час голосування (за id).</li>
+  </ul>
+  <p><b>Лише в пам'яті сервера</b> (на диск не записуються, зникають після перезапуску):</p>
+  <ul>
+    <li>повідомлення чату;</li>
+    <li>статус фоловера.</li>
+  </ul>
+
+  <h3 style="font-size:15px;margin:14px 0 6px">2.3. Донатери Donatello</h3>
+  <p>Коли стрімер підключає колбек Donatello, до нас надходить:</p>
+  <ul>
+    <li>ім'я, яке ввів донатер;</li>
+    <li>повідомлення;</li>
+    <li>сума й валюта;</li>
+    <li>id донату.</li>
+  </ul>
+
+  <h3 style="font-size:15px;margin:14px 0 6px">2.4. Чого ми не збираємо</h3>
+  <p>Аналітики, реклами й трекерів немає. Платіжних даних ми не маємо — донати проходять через Donatello.</p>
+
+  <h2>3. Навіщо і на якій підставі</h2>
+  <ul>
+    <li><b>Стрімер:</b> надання сервісу (виконання договору — <a href="/terms">Умови користування</a>).</li>
+    <li><b>Глядачі й донатери:</b> законний інтерес стрімера провести інтерактив, у якому вони самі беруть участь (нагорода, донат, голос).</li>
+  </ul>
+  <p>Дані використовуються лише для роботи цих функцій. Ми їх не продаємо й не використовуємо для реклами чи профілювання.</p>
+
+  <h2>4. Кому дані передаються</h2>
+  <ul>
+    <li><b>Fly.io, Inc. (США)</b> — хостинг. Сервери у Франкфурті (Німеччина), база даних на зашифрованому томі.</li>
+    <li><b>Twitch</b> — джерело даних про канал і глядачів; також картинки значків і емодзі браузер вантажить із CDN Twitch (<code>static-cdn.jtvnw.net</code>), тому Twitch бачить IP-адресу відвідувача.</li>
+    <li><b>Donatello</b> — джерело даних про донати.</li>
+    <li><b>random.org</b> — звідти запитуються лише випадкові числа для колеса. Персональні дані туди не передаються.</li>
+  </ul>
+  <p>Нікому, крім названих вище, дані не передаються і не продаються. Передавання на сервери Fly.io може означати, що дані оброблятимуться поза Україною.</p>
+
+  <h2>5. Cookie та локальне сховище</h2>
+  <div class="tw"><table>
+    <tr><th>Назва</th><th>Строк</th><th>Для чого</th></tr>
+    <tr><td><code>pb_session</code></td><td>30 днів</td><td>лише для входу; HttpOnly, Secure, SameSite=Lax</td></tr>
+    <tr><td><code>pb_state</code></td><td>10 хв</td><td>захист процесу входу</td></tr>
+    <tr><td>localStorage</td><td>у браузері</td><td>лише налаштування інтерфейсу (вкладка, розкладка)</td></tr>
+  </table></div>
+
+  <h2>6. Скільки зберігаємо</h2>
+  <ul>
+    <li>Історія зборів, аукціонів і донатів — <b>12 місяців</b>, потім видаляється автоматично.</li>
+    <li>Журнал доступу — <b>12 місяців</b>.</li>
+    <li>Якщо стрімер відкликав доступ у Twitch, токен перестав діяти або адміністратор прибрав його зі списку: токени видаляємо <b>одразу</b>, решту даних каналу — через <b>30 днів</b>, якщо стрімер не увійде знову.</li>
+    <li>Стрімер може будь-коли сам видалити всі дані свого каналу в налаштуваннях («Видалити дані каналу»).</li>
+  </ul>
+
+  <h2>7. Ваші права</h2>
+  <ul>
+    <li><b>Доступ і копія.</b> Стрімер робить експорт .zip у налаштуваннях.</li>
+    <li><b>Виправлення.</b> Стрімер редагує дані в інтерфейсі.</li>
+    <li><b>Видалення.</b> Стрімер видаляє сам. Глядач або донатер надсилає запит на {{CONTACT}}; ми виконуємо його до 30 днів, ім'я в усій історії замінюється на «видалено».</li>
+    <li><b>Заперечення.</b> Ви можете заперечити проти обробки ваших даних — напишіть на {{CONTACT}}.</li>
+    <li><b>Скарга.</b> Уповноваженому Верховної Ради України з прав людини або наглядовому органу з захисту даних ЄС за місцем вашого проживання.</li>
+  </ul>
+  <p>Щоб ми могли знайти ваші дані, у запиті вкажіть Twitch-логін (для донатера — ім'я та приблизну дату донату) і канал стрімера.</p>
+
+  <h2>8. Безпека</h2>
+  <ul>
+    <li>З'єднання лише через HTTPS;</li>
+    <li>токени Twitch зашифровані, сесійна cookie зберігається лише як хеш;</li>
+    <li>доступ до сервісу — лише з білого списку, база на зашифрованому томі.</li>
+  </ul>
+  <p>Якщо станеться інцидент із даними, ми повідомимо Twitch (legal@twitch.tv) і постраждалих осіб.</p>
+
+  <h2>9. Діти</h2>
+  <p>Сервіс не призначений для дітей до 13 років. Стрімер має відповідати вимогам Twitch щодо віку.</p>
+
+  <h2>10. Обов'язок стрімера</h2>
+  <p>Стрімер, який підключає канал, має поінформувати своїх глядачів про обробку даних, наприклад розмістивши посилання {{PUBLIC_URL}}/privacy у панелі каналу Twitch.</p>
+
+  <h2>11. Зміни</h2>
+  <p>Ми можемо оновлювати цю політику. Дата редакції вказана вгорі; про суттєві зміни повідомимо в сервісі.</p>
+
+  <h2>12. Контакти</h2>
+  <p>{{OPERATOR}} · {{CONTACT}}</p>
+</main>
+</div></body></html>

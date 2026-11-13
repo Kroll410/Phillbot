@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PhillBot — доступ</title>
+<style>
+  :root{--bg:#0e0e10;--panel:#18181b;--panel2:#1f1f23;--line:#2a2a30;--text:#efeff1;--muted:#adadb8;--grad:linear-gradient(90deg,#00c853,#9147ff)}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,"Segoe UI",system-ui,sans-serif;padding:24px 16px}
+  main{max-width:760px;margin:0 auto}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  h1{margin:0;font-size:20px}
+  a{color:#c9a6ff}
+  form{display:flex;gap:8px;margin:0 0 16px;flex-wrap:wrap}
+  input,select,button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  input{flex:1 1 200px}
+  button{cursor:pointer}
+  button.primary{background:var(--grad);border:0;font-weight:600}
+  .err{color:#ffb4ae;min-height:1.5em;margin:0 0 8px}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:500;font-size:12px}
+  tr:last-child td{border-bottom:0}
+  .off td{opacity:.45}
+  .tag{font-size:12px;color:var(--muted)}
+  @media (max-width:560px){th:nth-child(3),td:nth-child(3){display:none}}
+</style></head>
+<body>
+<main>
+  <header><h1>Доступ до PhillBot</h1><a href="/">← До програми</a></header>
+  <form id="add">
+    <input id="login" placeholder="Логін Twitch (наприклад, streamer_name)" autocomplete="off" spellcheck="false" required>
+    <select id="role"><option value="streamer">Стрімер</option><option value="admin">Адміністратор</option></select>
+    <button class="primary">Додати</button>
+  </form>
+  <p class="err" id="err" role="alert"></p>
+  <table><thead><tr><th>Логін</th><th>Роль</th><th>Останній вхід</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+</main>
+<script>
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  async function post(op, body){
+    const r = await fetch("/admin/api/" + op, {method:"POST", headers:{"Content-Type":"application/json","X-PhillBot":"1"}, body:JSON.stringify(body)});
+    if(!r.ok){ let m = r.statusText; try{ m = (await r.json()).error || m; }catch(_){} throw new Error(m); }
+  }
+  async function load(){
+    const r = await fetch("/admin/api/users");
+    if(!r.ok){ $("err").textContent = "Немає доступу"; return; }
+    const d = await r.json();
+    $("rows").innerHTML = d.users.map(u => `<tr class="${u.allowed ? "" : "off"}">
+      <td><b>${esc(u.displayName || u.login)}</b> <span class="tag">${u.displayName && u.displayName.toLowerCase() !== u.login ? esc(u.login) : ""}${u.twitchId ? "" : " · ще не входив"}</span></td>
+      <td>${u.role === "admin" ? "Адміністратор" : "Стрімер"}</td>
+      <td class="tag">${u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("uk-UA") : "—"}</td>
+      <td style="text-align:right">${u.login === d.me ? "" : u.allowed
+        ? `<button data-revoke="${esc(u.login)}">Прибрати</button>`
+        : `<button data-allow="${esc(u.login)}">Повернути</button>`}</td></tr>`).join("");
+  }
+  $("add").addEventListener("submit", async e => {
+    e.preventDefault(); $("err").textContent = "";
+    try{ await post("allow", {login: $("login").value, role: $("role").value}); $("login").value = ""; await load(); }
+    catch(err){ $("err").textContent = err.message; }
+  });
+  $("rows").addEventListener("click", async e => {
+    const b = e.target.closest("button"); if(!b) return;
+    $("err").textContent = "";
+    try{
+      if(b.dataset.revoke) await post("revoke", {login: b.dataset.revoke});
+      if(b.dataset.allow) await post("allow", {login: b.dataset.allow, role: "streamer"});
+      await load();
+    }catch(err){ $("err").textContent = err.message; }
+  });
+  load();
+})();
+</script>
+</body></html>

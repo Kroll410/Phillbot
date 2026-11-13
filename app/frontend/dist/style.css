@@ -334,6 +334,9 @@ tr.gdetail:hover{background:transparent}
 /* шапка: відступ між ніком і «Вийти» */
 #userBox{display:inline-flex;align-items:center;gap:14px}
 #userBox .uname{font-weight:700}
+/* вебверсія: посилання адміністратора на сторінку «Доступ» */
+.adminlink{color:var(--muted,#adadb8);text-decoration:none;font-size:13px;margin-right:12px}
+.adminlink:hover{color:#c9a6ff}
 /* вітання після входу */
 .welcome{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(14,14,16,.72);backdrop-filter:blur(6px);cursor:pointer;opacity:0;transition:opacity .45s}
 .welcome.play{opacity:1}

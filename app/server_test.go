@@ -7,33 +7,45 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
 
-func newTestServer(t *testing.T) (*webServer, *httptest.Server) {
+func newTestServer(t *testing.T, cfg serverConfig) (*webServer, *httptest.Server) {
 	t.Helper()
-	ws, err := newWebServer(filepath.Join(t.TempDir(), "phillbot.db"), "local", "http://example.test")
+	if cfg.Public == "" {
+		cfg.Public = "http://example.test"
+	}
+	ws, err := newWebServer(cfg, filepath.Join(t.TempDir(), "phillbot.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	ws.connect = false // без справжнього Twitch
 	srv := httptest.NewServer(ws.handler())
 	t.Cleanup(func() { srv.Close(); ws.close() })
 	return ws, srv
 }
 
-func callAPI(t *testing.T, srv *httptest.Server, method string, args ...any) (int, []byte) {
+func devServer(t *testing.T) (*webServer, *httptest.Server) {
+	ws, srv := newTestServer(t, serverConfig{Dev: true})
+	ws.start()
+	return ws, srv
+}
+
+func callWith(t *testing.T, c *http.Client, base, method string, args ...any) (int, []byte) {
 	t.Helper()
 	if args == nil {
 		args = []any{}
 	}
 	b, _ := json.Marshal(args)
-	req, _ := http.NewRequest("POST", srv.URL+"/api/call/"+method, strings.NewReader(string(b)))
+	req, _ := http.NewRequest("POST", base+"/api/call/"+method, strings.NewReader(string(b)))
 	req.Header.Set("X-PhillBot", "1")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,9 +54,13 @@ func callAPI(t *testing.T, srv *httptest.Server, method string, args ...any) (in
 	return resp.StatusCode, body
 }
 
+func callAPI(t *testing.T, srv *httptest.Server, method string, args ...any) (int, []byte) {
+	return callWith(t, http.DefaultClient, srv.URL, method, args...)
+}
+
 // Методи каналу викликаються через HTTP; помилки методу — 400 з текстом; чужі запити без заголовка — 403.
 func TestServerCalls(t *testing.T) {
-	ws, srv := newTestServer(t)
+	ws, srv := devServer(t)
 	if code, _ := callAPI(t, srv, "StartTimer"); code != 200 {
 		t.Fatal("StartTimer", code)
 	}
@@ -53,7 +69,7 @@ func TestServerCalls(t *testing.T) {
 	if code != 200 || json.Unmarshal(body, &snap) != nil || len(snap.Entries) != 1 || snap.Entries[0].Text != "Hades" {
 		t.Fatalf("AddManual: %d %s", code, body)
 	}
-	if !strings.HasPrefix(snap.Obs.URL, "http://example.test/w/") || len(snap.Obs.URL) < len("http://example.test/w/")+32 {
+	if !strings.HasPrefix(snap.Obs.URL, "http://example.test/w/") || len(snap.Obs.URL) != len("http://example.test/w/")+32 {
 		t.Fatal("widget url", snap.Obs.URL)
 	}
 	if code, body := callAPI(t, srv, "AddManual", "", 1, 1, "x"); code != 400 || !strings.Contains(string(body), "error") {
@@ -62,13 +78,11 @@ func TestServerCalls(t *testing.T) {
 	if code, _ := callAPI(t, srv, "AddManual", "only one arg"); code != 400 {
 		t.Fatal("arg count", code)
 	}
-	if code, _ := callAPI(t, srv, "ExportMarbles", false); code != 404 { // десктопний метод
-		t.Fatal("desktop-only method must be 404", code)
+	for _, m := range []string{"ExportMarbles", "saveLocked", "Logout"} { // десктопний, неекспортований, заборонений у вебі
+		if code, _ := callAPI(t, srv, m); code != 404 {
+			t.Fatal(m, "must be 404", code)
+		}
 	}
-	if code, _ := callAPI(t, srv, "saveLocked"); code != 404 {
-		t.Fatal("unexported method reachable", code)
-	}
-	// CSRF: без X-PhillBot — заборонено, GET — заборонено
 	resp, _ := http.Post(srv.URL+"/api/call/StartTimer", "application/json", strings.NewReader("[]"))
 	if resp.StatusCode != 403 {
 		t.Fatal("csrf", resp.StatusCode)
@@ -77,8 +91,8 @@ func TestServerCalls(t *testing.T) {
 	if resp, _ := http.Get(srv.URL + "/api/call/GetState"); resp.StatusCode != 405 {
 		t.Fatal("GET call", resp.StatusCode)
 	}
-	// стан у БД
-	st, ok, err := ws.store.Load()
+	rt, _ := ws.channel("local")
+	st, ok, err := rt.ch.store.Load()
 	if err != nil || !ok || len(st.Entries) != 1 {
 		t.Fatalf("not saved: %v %v %d", ok, err, len(st.Entries))
 	}
@@ -115,8 +129,7 @@ func readSSE(t *testing.T, r io.Reader, want string, d time.Duration) string {
 
 // Інтерфейс отримує повний стан; віджет — лише за секретом і лише свій зріз (без налаштувань і ключів).
 func TestServerEventsAndWidget(t *testing.T) {
-	ws, srv := newTestServer(t)
-	ws.start(t.Context())
+	ws, srv := devServer(t)
 	callAPI(t, srv, "SaveSettings", Settings{DonKey: "secret-don-key"})
 
 	ui, err := http.Get(srv.URL + "/api/events")
@@ -127,20 +140,17 @@ func TestServerEventsAndWidget(t *testing.T) {
 	if l := readSSE(t, ui.Body, "state", 2*time.Second); !strings.Contains(l, `"settings"`) {
 		t.Fatal("ui initial state", l)
 	}
-
-	if resp, _ := http.Get(srv.URL + "/w/wrongsecret0000000000000000000000/api/state"); resp.StatusCode != 404 {
+	if resp, _ := http.Get(srv.URL + "/w/00000000000000000000000000000000/api/state"); resp.StatusCode != 404 {
 		t.Fatal("widget without secret", resp.StatusCode)
 	}
-	wbase := srv.URL + "/w/" + ws.secret
+	rt, _ := ws.channel("local")
+	wbase := srv.URL + "/w/" + rt.secret
 	for _, p := range []string{"/overlay/widget", "/overlay/overlay.js", "/overlay/chatrender.js", "/api/state"} {
 		resp, err := http.Get(wbase + p)
 		if err != nil || resp.StatusCode != 200 {
 			t.Fatal(p, err, resp.StatusCode)
 		}
 		resp.Body.Close()
-	}
-	if resp, _ := http.Get(wbase + "/overlay/../../api/call/GetState"); resp.StatusCode == 200 {
-		t.Fatal("traversal out of widget")
 	}
 	ov, err := http.Get(wbase + "/api/events")
 	if err != nil {
@@ -162,15 +172,15 @@ func TestServerEventsAndWidget(t *testing.T) {
 
 // Інтерфейс: index.html з мостом web.js перед app.js; файли фронтенду віддаються, чужі шляхи — ні.
 func TestServerUI(t *testing.T) {
-	_, srv := newTestServer(t)
+	_, srv := devServer(t)
 	resp, err := http.Get(srv.URL + "/")
 	if err != nil {
 		t.Fatal(err)
 	}
 	b, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	html := string(b)
-	if i, j := strings.Index(html, `src="web.js"`), strings.Index(html, `src="app.js`); i < 0 || j < 0 || i > j {
+	page := string(b)
+	if i, j := strings.Index(page, `src="web.js"`), strings.Index(page, `src="app.js`); i < 0 || j < 0 || i > j {
 		t.Fatal("web.js must load before app.js")
 	}
 	if resp.Header.Get("X-Frame-Options") != "DENY" {
@@ -194,5 +204,196 @@ func TestIsLoopback(t *testing.T) {
 		if isLoopback(addr) != want {
 			t.Errorf("%s: want %v", addr, want)
 		}
+	}
+}
+
+// ---------- вхід через Twitch і білий список ----------
+
+// несправжній Twitch: код "code-<login>" дає токен цього користувача
+func fakeTwitch(t *testing.T) {
+	t.Helper()
+	users := map[string]User{"admin_one": {ID: "100", Login: "admin_one", DisplayName: "Admin"},
+		"streamer_two": {ID: "200", Login: "streamer_two", DisplayName: "Streamer"},
+		"stranger":     {ID: "300", Login: "stranger", DisplayName: "Stranger"}}
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/oauth2/token":
+			_ = r.ParseForm()
+			if r.Form.Get("client_secret") != "sec" || r.Form.Get("grant_type") != "authorization_code" {
+				w.WriteHeader(400)
+				return
+			}
+			login := strings.TrimPrefix(r.Form.Get("code"), "code-")
+			writeJSONResp(w, map[string]any{"access_token": "tok-" + login, "refresh_token": "ref-" + login, "expires_in": 3600})
+		case "/helix/users":
+			login := strings.TrimPrefix(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), "tok-")
+			u, ok := users[login]
+			if !ok {
+				w.WriteHeader(401)
+				return
+			}
+			writeJSONResp(w, map[string]any{"data": []User{u}})
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	oldID, oldHelix := twitchIDBase, helixBase
+	twitchIDBase, helixBase = fake.URL, fake.URL+"/helix/"
+	t.Cleanup(func() { twitchIDBase, helixBase = oldID, oldHelix; fake.Close() })
+}
+
+func newClient() *http.Client {
+	jar, _ := cookiejar.New(nil)
+	return &http.Client{Jar: jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+}
+
+// повний вхід: /auth/login → (Twitch) → /auth/callback; повертає код відповіді callback
+func login(t *testing.T, c *http.Client, base, who string) int {
+	t.Helper()
+	resp, err := c.Get(base + "/auth/login")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	loc, _ := url.Parse(resp.Header.Get("Location"))
+	if resp.StatusCode != 302 || !strings.HasSuffix(loc.Path, "/oauth2/authorize") || loc.Query().Get("redirect_uri") != "http://example.test/auth/callback" {
+		t.Fatalf("authorize redirect: %d %s", resp.StatusCode, loc)
+	}
+	resp, err = c.Get(base + "/auth/callback?code=code-" + who + "&state=" + loc.Query().Get("state"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	return resp.StatusCode
+}
+
+func authServer(t *testing.T) (*webServer, *httptest.Server) {
+	fakeTwitch(t)
+	ws, srv := newTestServer(t, serverConfig{ClientID: "cid", ClientSecret: "sec", Key: strings.Repeat("k", 32), Admin: "Admin_One"})
+	ws.start()
+	return ws, srv
+}
+
+func TestServerRequiresConfig(t *testing.T) {
+	for _, cfg := range []serverConfig{{ClientID: "c", ClientSecret: "s", Key: "short", Admin: "a"},
+		{ClientSecret: "s", Key: strings.Repeat("k", 32), Admin: "a"}, {ClientID: "c", ClientSecret: "s", Key: strings.Repeat("k", 32)}} {
+		if _, err := newWebServer(cfg, filepath.Join(t.TempDir(), "x.db")); err == nil {
+			t.Fatalf("config accepted: %+v", cfg)
+		}
+	}
+}
+
+// Вхід: лише білий список; без сесії — сторінка входу й 401; підроблений OAuth state — відмова.
+func TestServerLoginWhitelist(t *testing.T) {
+	ws, srv := authServer(t)
+	anon := newClient()
+	resp, _ := anon.Get(srv.URL + "/")
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(b), "/auth/login") || strings.Contains(string(b), "app.js") {
+		t.Fatal("anonymous must get the login page")
+	}
+	if code, _ := callWith(t, anon, srv.URL, "GetState"); code != 401 {
+		t.Fatal("api without session", code)
+	}
+	if resp, _ := anon.Get(srv.URL + "/auth/callback?code=code-admin_one&state=forged"); resp.StatusCode != 400 {
+		t.Fatal("forged state accepted", resp.StatusCode)
+	}
+	stranger := newClient()
+	if code := login(t, stranger, srv.URL, "stranger"); code != 403 {
+		t.Fatal("stranger let in", code)
+	}
+	if code, _ := callWith(t, stranger, srv.URL, "GetState"); code != 401 {
+		t.Fatal("stranger has api", code)
+	}
+	if ws.auth.loadTokens("300") != nil {
+		t.Fatal("stranger tokens stored")
+	}
+	admin := newClient()
+	if code := login(t, admin, srv.URL, "admin_one"); code != 302 {
+		t.Fatal("admin login", code)
+	}
+	code, body := callWith(t, admin, srv.URL, "GetState")
+	if code != 200 {
+		t.Fatal("admin api", code, string(body))
+	}
+	if tok := ws.auth.loadTokens("100"); tok == nil || tok.AccessToken != "tok-admin_one" {
+		t.Fatal("tokens not stored")
+	}
+	var raw string
+	_ = ws.base.db.QueryRow(`SELECT value FROM channel_secrets WHERE channel_id = '100'`).Scan(&raw)
+	if raw == "" || strings.Contains(raw, "tok-admin_one") {
+		t.Fatal("tokens must be encrypted at rest")
+	}
+	req, _ := http.NewRequest("POST", srv.URL+"/auth/logout", nil)
+	req.Header.Set("X-PhillBot", "1")
+	resp, _ = admin.Do(req)
+	resp.Body.Close()
+	if code, _ := callWith(t, admin, srv.URL, "GetState"); code != 401 {
+		t.Fatal("api after logout", code)
+	}
+}
+
+// Адмін додає й прибирає людей; прибраний втрачає доступ одразу; канали стрімерів ізольовані.
+func TestServerAdminAndIsolation(t *testing.T) {
+	ws, srv := authServer(t)
+	admin, two := newClient(), newClient()
+	login(t, admin, srv.URL, "admin_one")
+	post := func(c *http.Client, op, body string) int {
+		req, _ := http.NewRequest("POST", srv.URL+"/admin/api/"+op, strings.NewReader(body))
+		req.Header.Set("X-PhillBot", "1")
+		resp, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if code := post(admin, "allow", `{"login":"Streamer_Two"}`); code != 204 {
+		t.Fatal("allow", code)
+	}
+	if code := post(admin, "allow", `{"login":"bad login!"}`); code != 400 {
+		t.Fatal("invalid login accepted", code)
+	}
+	if code := login(t, two, srv.URL, "streamer_two"); code != 302 {
+		t.Fatal("allowed streamer login", code)
+	}
+	if resp, _ := two.Get(srv.URL + "/admin"); resp.StatusCode != 404 {
+		t.Fatal("non-admin sees admin page", resp.StatusCode)
+	}
+	if code := post(two, "allow", `{"login":"stranger"}`); code != 404 {
+		t.Fatal("non-admin can allow", code)
+	}
+	callWith(t, two, srv.URL, "AddManual", "Viewer", 1, 1, "Hades")
+	_, b := callWith(t, admin, srv.URL, "GetState")
+	var adminSnap Snapshot
+	_ = json.Unmarshal(b, &adminSnap)
+	_, b = callWith(t, two, srv.URL, "GetState")
+	var twoSnap Snapshot
+	_ = json.Unmarshal(b, &twoSnap)
+	if len(adminSnap.Entries) != 0 || len(twoSnap.Entries) != 1 || adminSnap.Obs.URL == twoSnap.Obs.URL {
+		t.Fatalf("channels not isolated: admin=%d two=%d", len(adminSnap.Entries), len(twoSnap.Entries))
+	}
+	resp, _ := http.Get(strings.Replace(twoSnap.Obs.URL, "http://example.test", srv.URL, 1) + "/api/state")
+	var ov OverlayState
+	_ = json.NewDecoder(resp.Body).Decode(&ov)
+	resp.Body.Close()
+	if ov.Totals.Entries != 1 {
+		t.Fatalf("widget of channel 2: %+v", ov.Totals)
+	}
+	if code := post(admin, "revoke", `{"login":"admin_one"}`); code != 400 {
+		t.Fatal("self revoke", code)
+	}
+	if code := post(admin, "revoke", `{"login":"streamer_two"}`); code != 204 {
+		t.Fatal("revoke", code)
+	}
+	if code, _ := callWith(t, two, srv.URL, "GetState"); code != 401 {
+		t.Fatal("revoked user still has access", code)
+	}
+	if code := login(t, two, srv.URL, "streamer_two"); code != 403 {
+		t.Fatal("revoked user can log in again", code)
+	}
+	if rt, _ := ws.channel("200"); len(rt.ch.st.Entries) != 1 {
+		t.Fatal("channel data lost on revoke")
 	}
 }

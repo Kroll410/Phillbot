@@ -27,6 +27,7 @@
       headers: {"Content-Type": "application/json", "X-PhillBot": "1"},
       body: JSON.stringify(args),
     });
+    if (r.status === 401) { location.reload(); throw new Error("потрібно увійти"); } // сесія скінчилась — сторінка входу
     const text = await r.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch (_) {}
@@ -40,6 +41,12 @@
     OpenOverlay: async p => { if (obsURL) window.open(obsURL + p, "_blank", "noopener"); },
     OpenFolder: async () => {},
     RevealFile: async () => {},
+    // вихід у вебверсії — кінець сесії в браузері; канал і далі працює (таймери, ставки)
+    Logout: async () => {
+      await fetch("auth/logout", {method: "POST", headers: {"X-PhillBot": "1"}, credentials: "same-origin"}).catch(() => {});
+      location.href = "/";
+    },
+    Login: async () => { location.href = "/auth/login"; },
   };
 
   window.go = {main: {App: new Proxy({}, {get: (_, name) => local[name] || ((...args) => invoke(String(name), args))})}};
@@ -53,4 +60,18 @@
   };
   document.documentElement.classList.add("web");
   connect();
+
+  // адміністратору — посилання на сторінку «Доступ» у шапці
+  fetch("admin/api/users", {credentials: "same-origin"}).then(r => {
+    if (!r.ok) return;
+    const add = () => {
+      const box = document.getElementById("userBox");
+      if (!box) { setTimeout(add, 300); return; }
+      if (document.getElementById("adminLink")) return;
+      const a = document.createElement("a");
+      a.id = "adminLink"; a.href = "/admin"; a.textContent = "Доступ"; a.className = "adminlink";
+      box.parentNode.insertBefore(a, box);
+    };
+    add();
+  }).catch(() => {});
 })();

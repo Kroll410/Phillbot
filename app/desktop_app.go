@@ -155,27 +155,9 @@ func (a *App) authFlow(forceLogin bool) {
 			return
 		}
 	}
-	a.tokMu.Lock()
-	a.token = tok
-	a.tokMu.Unlock()
-
-	u, err := a.fetchUser()
-	if err != nil {
+	if _, err := a.connect(tok); err != nil {
 		a.setAuth(AuthInfo{Status: "error", Message: fmtErr("Не вдалося отримати дані каналу", err)})
-		return
 	}
-	a.mu.Lock()
-	a.bc = u
-	a.auth = AuthInfo{Status: "ok", User: &u}
-	lctx, lcancel := context.WithCancel(context.Background())
-	a.listenCancel = lcancel
-	a.emitLocked()
-	a.mu.Unlock()
-	a.logf("Вхід виконано: канал %s", u.DisplayName)
-	go a.listen(lctx, u)
-	go a.loadBadges(u.ID)
-	go a.fillColors()
-	a.RefreshRewards()
 }
 
 func (a *App) SetClientID(id string) error {

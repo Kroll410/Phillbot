@@ -2,8 +2,12 @@
 
 package main
 
-// Вебсервер: інтерфейс стрімера (/), виклики методів каналу (/api/call/<Метод>), події (/api/events),
-// віджети OBS за секретним посиланням (/w/<секрет>/overlay/…).
+// Вебсервер PhillBot.
+//   /                      інтерфейс стрімера (після входу) або сторінка входу
+//   /auth/login, /auth/callback, /auth/logout   вхід через Twitch (OAuth, Confidential-клієнт), лише білий список
+//   /api/call/<Метод>      виклик методу свого каналу; /api/events — події свого каналу (SSE)
+//   /admin                 «Доступ»: білий список (лише адмін)
+//   /w/<секрет>/overlay/…  віджети OBS каналу за секретним посиланням
 
 import (
 	"context"
@@ -11,11 +15,14 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"html"
 	"io"
 	"io/fs"
 	"log"
 	"net/http"
+	"net/url"
 	"path"
 	"reflect"
 	"strings"
@@ -23,15 +30,29 @@ import (
 	"time"
 )
 
-// webHost — Host каналу у вебверсії: події йдуть у браузер стрімера й віджети через SSE.
+var twitchIDBase = "https://id.twitch.tv" // підміняється в тестах
+
+type serverConfig struct {
+	Public       string // https://домен (без / в кінці)
+	ClientID     string
+	ClientSecret string
+	Key          string // PHILLBOT_KEY — шифрування токенів каналів
+	Admin        string // логін Twitch першого адміна
+	Dev          bool   // без входу: один канал "local", користувач-адмін
+}
+
+func (c serverConfig) secure() bool { return strings.HasPrefix(c.Public, "https://") }
+
+// ---------- Host каналу ----------
+
+// webHost — Host каналу у вебверсії: події — у браузери стрімера й віджети (SSE), токени — у БД зашифровано.
 type webHost struct {
 	ch       *Channel
-	ui, ov   *sseHub // браузер стрімера / віджети OBS
+	chID     string
+	auth     *authStore
+	ui, ov   *sseHub // браузери стрімера / віджети OBS
 	notifyCh chan struct{}
 	obsURL   string // https://домен/w/<секрет>
-
-	tokMu sync.Mutex
-	tok   *Tokens // токени Twitch — у пам'яті до етапу входу (там вони підуть у БД зашифрованими)
 }
 
 func newHub() *sseHub { return &sseHub{clients: map[chan []byte]struct{}{}} }
@@ -49,14 +70,17 @@ func (h *webHost) Notify() {
 }
 func (h *webHost) Decorate(s *Snapshot) { s.Obs = OverlayInfo{Running: true, URL: h.obsURL} }
 func (h *webHost) SaveTokens(t *Tokens) {
-	h.tokMu.Lock()
-	h.tok = t
-	h.tokMu.Unlock()
+	if h.auth != nil {
+		if err := h.auth.saveTokens(h.chID, t); err != nil {
+			log.Printf("канал %s: токени не збережено: %v", h.chID, err)
+		}
+	}
 }
 func (h *webHost) LoadTokens() *Tokens {
-	h.tokMu.Lock()
-	defer h.tokMu.Unlock()
-	return h.tok
+	if h.auth == nil {
+		return nil
+	}
+	return h.auth.loadTokens(h.chID)
 }
 func (h *webHost) SettingsChanged(_, _ Settings) {} // ні порту віджета, ні ngrok — сервер і так публічний
 func (h *webHost) KeepWheelImage(string)         {}
@@ -76,12 +100,25 @@ func (h *webHost) overlayLoop(ctx context.Context) {
 	}
 }
 
-type webServer struct {
-	store  *Store
+// ---------- сервер і реєстр каналів ----------
+
+type chanRT struct {
 	ch     *Channel
 	host   *webHost
-	secret string // секрет посилання на віджети
-	cancel context.CancelFunc
+	secret string
+}
+
+type webServer struct {
+	cfg     serverConfig
+	base    *Store
+	auth    *authStore
+	ctx     context.Context
+	cancel  context.CancelFunc
+	connect bool // підключати канали до Twitch (у тестах — ні)
+
+	mu       sync.Mutex
+	chans    map[string]*chanRT
+	bySecret map[string]string
 }
 
 func randomHex(n int) string {
@@ -92,26 +129,92 @@ func randomHex(n int) string {
 	return hex.EncodeToString(b)
 }
 
-func newWebServer(dbFile, channelID, public string) (*webServer, error) {
-	store, err := openStore(dbFile, channelID)
+func newWebServer(cfg serverConfig, dbFile string) (*webServer, error) {
+	cfg.Public = strings.TrimRight(cfg.Public, "/")
+	if !cfg.Dev {
+		switch {
+		case cfg.ClientID == "" || cfg.ClientSecret == "":
+			return nil, errors.New("потрібні TWITCH_CLIENT_ID і TWITCH_CLIENT_SECRET (застосунок Twitch типу Confidential)")
+		case len(cfg.Key) < 32:
+			return nil, errors.New("потрібен PHILLBOT_KEY — щонайменше 32 випадкові символи (ним шифруються токени каналів)")
+		case normLogin(cfg.Admin) == "":
+			return nil, errors.New("потрібен PHILLBOT_ADMIN — логін Twitch адміністратора")
+		}
+	}
+	base, err := openStore(dbFile, "")
 	if err != nil {
 		return nil, err
 	}
-	secret := store.meta("widget_secret:" + channelID)
-	if len(secret) < 32 {
-		secret = randomHex(16)
-		if err := store.setMeta("widget_secret:"+channelID, secret); err != nil {
-			store.Close()
+	key := cfg.Key
+	if cfg.Dev && key == "" {
+		key = "dev-only-" + randomHex(16) // у розробці токени не зберігаються між запусками
+	}
+	auth, err := newAuthStore(base, key)
+	if err != nil {
+		base.Close()
+		return nil, err
+	}
+	if a := normLogin(cfg.Admin); a != "" {
+		if err := auth.allow(a, "admin", "PHILLBOT_ADMIN"); err != nil {
+			base.Close()
 			return nil, err
 		}
 	}
-	h := &webHost{ui: newHub(), ov: newHub(), notifyCh: make(chan struct{}, 1), obsURL: public + "/w/" + secret}
+	ctx, cancel := context.WithCancel(context.Background())
+	return &webServer{cfg: cfg, base: base, auth: auth, ctx: ctx, cancel: cancel, connect: !cfg.Dev,
+		chans: map[string]*chanRT{}, bySecret: map[string]string{}}, nil
+}
+
+// start — підняти канали, що вже входили (таймери й EventSub працюють і без відкритого браузера)
+func (s *webServer) start() {
+	for _, id := range s.auth.channelsWithTokens() {
+		if _, err := s.channel(id); err != nil {
+			log.Printf("канал %s: %v", id, err)
+		}
+	}
+	if s.cfg.Dev {
+		if rt, err := s.channel("local"); err == nil {
+			rt.ch.mu.Lock()
+			rt.ch.auth = AuthInfo{Status: "ok", User: &User{ID: "local", Login: "local", DisplayName: "Розробка"}}
+			rt.ch.mu.Unlock()
+		}
+	}
+	go func() {
+		t := time.NewTicker(time.Hour)
+		defer t.Stop()
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-t.C:
+				s.auth.pruneSessions()
+			}
+		}
+	}()
+}
+
+// channel — канал за id (id каналу Twitch); завантажується з БД при першому зверненні
+func (s *webServer) channel(id string) (*chanRT, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if rt := s.chans[id]; rt != nil {
+		return rt, nil
+	}
+	store := s.base.forChannel(id)
+	secret := store.meta("widget_secret:" + id)
+	if len(secret) < 32 {
+		secret = randomHex(16)
+		if err := store.setMeta("widget_secret:"+id, secret); err != nil {
+			return nil, err
+		}
+	}
+	h := &webHost{chID: id, auth: s.auth, ui: newHub(), ov: newHub(), notifyCh: make(chan struct{}, 1), obsURL: s.cfg.Public + "/w/" + secret}
 	ch := newChannel(h)
 	h.ch = ch
 	ch.store = store
+	ch.clientID, ch.clientSecret = s.cfg.ClientID, s.cfg.ClientSecret
 	st, ok, err := store.Load()
 	if err != nil {
-		store.Close()
 		return nil, fmt.Errorf("читання БД: %w", err)
 	}
 	if ok {
@@ -119,31 +222,72 @@ func newWebServer(dbFile, channelID, public string) (*webServer, error) {
 	}
 	ch.initStreamLocked()
 	ch.auth = AuthInfo{Status: "need_login"}
-	return &webServer{store: store, ch: ch, host: h, secret: secret}, nil
+	go ch.ticker(s.ctx)
+	go h.overlayLoop(s.ctx)
+	rt := &chanRT{ch: ch, host: h, secret: secret}
+	s.chans[id], s.bySecret[secret] = rt, id
+	if s.connect {
+		if tok := s.auth.loadTokens(id); tok != nil {
+			ch.auth = AuthInfo{Status: "checking"}
+			go s.connectChannel(rt, tok)
+		}
+	}
+	return rt, nil
 }
 
-func (s *webServer) start(ctx context.Context) {
-	ctx, s.cancel = context.WithCancel(ctx)
-	go s.ch.ticker(ctx)
-	go s.host.overlayLoop(ctx)
+func (s *webServer) connectChannel(rt *chanRT, tok *Tokens) {
+	if _, err := rt.ch.connect(tok); err != nil {
+		rt.ch.setAuth(AuthInfo{Status: "error", Message: "Не вдалося підключитися до Twitch — увійдіть ще раз"})
+		log.Printf("канал %s: %v", rt.host.chID, err)
+	}
 }
 
 func (s *webServer) close() {
-	if s.cancel != nil {
-		s.cancel()
+	s.cancel()
+	s.mu.Lock()
+	for _, rt := range s.chans {
+		rt.ch.mu.Lock()
+		if rt.ch.listenCancel != nil {
+			rt.ch.listenCancel()
+		}
+		rt.ch.saveLocked()
+		rt.ch.mu.Unlock()
 	}
-	s.ch.mu.Lock()
-	s.ch.saveLocked()
-	s.ch.mu.Unlock()
-	_ = s.store.Close()
+	s.mu.Unlock()
+	_ = s.base.Close()
+}
+
+// ---------- запити ----------
+
+const sessionCookie = "pb_session"
+
+// user — хто робить запит (nil — не увійшов або доступ забрали)
+func (s *webServer) user(r *http.Request) *WebUser {
+	if s.cfg.Dev {
+		return &WebUser{Login: "local", TwitchID: "local", DisplayName: "Розробка", Role: "admin", Allowed: true}
+	}
+	c, err := r.Cookie(sessionCookie)
+	if err != nil {
+		return nil
+	}
+	u, ok := s.auth.session(c.Value)
+	if !ok {
+		return nil
+	}
+	return &u
 }
 
 func (s *webServer) handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/call/", s.serveCall)
-	mux.HandleFunc("/api/events", func(w http.ResponseWriter, r *http.Request) {
-		serveSSE(w, r, s.host.ui, sseFrame("state", s.ch.GetState()))
-	})
+	mux.HandleFunc("/auth/login", s.serveLogin)
+	mux.HandleFunc("/auth/callback", s.serveCallback)
+	mux.HandleFunc("/auth/logout", s.serveLogout)
+	mux.HandleFunc("/api/call/", s.withChannel(s.serveCall))
+	mux.HandleFunc("/api/events", s.withChannel(func(w http.ResponseWriter, r *http.Request, rt *chanRT, _ *WebUser) {
+		serveSSE(w, r, rt.host.ui, sseFrame("state", rt.ch.GetState()))
+	}))
+	mux.HandleFunc("/admin", s.serveAdminPage)
+	mux.HandleFunc("/admin/api/", s.serveAdminAPI)
 	mux.HandleFunc("/w/", s.serveWidget)
 	mux.HandleFunc("/", s.serveUI)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -152,6 +296,9 @@ func (s *webServer) handler() http.Handler {
 		h.Set("Referrer-Policy", "no-referrer") // секрет віджета в адресі не має витікати
 		if !strings.HasPrefix(r.URL.Path, "/w/") {
 			h.Set("X-Frame-Options", "DENY")
+		}
+		if s.cfg.secure() {
+			h.Set("Strict-Transport-Security", "max-age=31536000")
 		}
 		defer func() {
 			if v := recover(); v != nil {
@@ -163,9 +310,158 @@ func (s *webServer) handler() http.Handler {
 	})
 }
 
+// withChannel — лише для того, хто увійшов: його власний канал
+func (s *webServer) withChannel(fn func(http.ResponseWriter, *http.Request, *chanRT, *WebUser)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		u := s.user(r)
+		if u == nil {
+			writeErr(w, http.StatusUnauthorized, "потрібно увійти")
+			return
+		}
+		rt, err := s.channel(u.TwitchID)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, "канал недоступний")
+			log.Printf("канал %s: %v", u.TwitchID, err)
+			return
+		}
+		fn(w, r, rt, u)
+	}
+}
+
+// ---------- вхід через Twitch ----------
+
+func (s *webServer) cookie(name, value, p string, maxAge int) *http.Cookie {
+	return &http.Cookie{Name: name, Value: value, Path: p, MaxAge: maxAge, HttpOnly: true, Secure: s.cfg.secure(), SameSite: http.SameSiteLaxMode}
+}
+
+func (s *webServer) serveLogin(w http.ResponseWriter, r *http.Request) {
+	if s.cfg.Dev {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	state := randomHex(16)
+	http.SetCookie(w, s.cookie("pb_state", state, "/auth", 600))
+	q := url.Values{"client_id": {s.cfg.ClientID}, "redirect_uri": {s.cfg.Public + "/auth/callback"},
+		"response_type": {"code"}, "scope": {strings.Join(scopes, " ")}, "state": {state}}
+	http.Redirect(w, r, twitchIDBase+"/oauth2/authorize?"+q.Encode(), http.StatusFound)
+}
+
+func (s *webServer) serveCallback(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	c, err := r.Cookie("pb_state")
+	http.SetCookie(w, s.cookie("pb_state", "", "/auth", -1))
+	if err != nil || q.Get("state") == "" || subtle.ConstantTimeCompare([]byte(c.Value), []byte(q.Get("state"))) != 1 {
+		s.loginPage(w, http.StatusBadRequest, "Вхід перервано — спробуйте ще раз.")
+		return
+	}
+	if q.Get("error") != "" || q.Get("code") == "" {
+		s.loginPage(w, http.StatusOK, "Вхід скасовано.")
+		return
+	}
+	tok, err := s.exchangeCode(q.Get("code"))
+	if err != nil {
+		log.Printf("вхід: обмін коду: %v", err)
+		s.loginPage(w, http.StatusBadGateway, "Twitch не підтвердив вхід — спробуйте ще раз.")
+		return
+	}
+	u, err := fetchTwitchUser(s.cfg.ClientID, tok.AccessToken)
+	if err != nil {
+		log.Printf("вхід: користувач: %v", err)
+		s.loginPage(w, http.StatusBadGateway, "Не вдалося отримати дані акаунта Twitch.")
+		return
+	}
+	wu, ok := s.auth.loginOK(u)
+	if !ok {
+		s.loginPage(w, http.StatusForbidden, "Доступ за запрошенням: акаунта «"+u.Login+"» немає в списку. Попросіть адміністратора додати вас.")
+		return
+	}
+	if err := s.auth.saveTokens(u.ID, tok); err != nil {
+		log.Printf("вхід: токени: %v", err)
+		s.loginPage(w, http.StatusInternalServerError, "Не вдалося зберегти вхід.")
+		return
+	}
+	rt, err := s.channel(u.ID)
+	if err != nil {
+		log.Printf("вхід: канал %s: %v", u.ID, err)
+		s.loginPage(w, http.StatusInternalServerError, "Канал недоступний.")
+		return
+	}
+	if s.connect {
+		rt.ch.setAuth(AuthInfo{Status: "checking"})
+		go s.connectChannel(rt, tok)
+	}
+	sess, err := s.auth.newSession(wu.Login)
+	if err != nil {
+		s.loginPage(w, http.StatusInternalServerError, "Не вдалося створити сесію.")
+		return
+	}
+	http.SetCookie(w, s.cookie(sessionCookie, sess, "/", int(sessionTTL.Seconds())))
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func (s *webServer) exchangeCode(code string) (*Tokens, error) {
+	st, b, err := postForm(twitchIDBase+"/oauth2/token", url.Values{"client_id": {s.cfg.ClientID}, "client_secret": {s.cfg.ClientSecret},
+		"code": {code}, "grant_type": {"authorization_code"}, "redirect_uri": {s.cfg.Public + "/auth/callback"}})
+	if err != nil {
+		return nil, err
+	}
+	if st != 200 || str(b, "access_token") == "" {
+		return nil, fmt.Errorf("HTTP %d", st)
+	}
+	return &Tokens{AccessToken: str(b, "access_token"), RefreshToken: str(b, "refresh_token"),
+		ExpiresAt: time.Now().Add(time.Duration(num(b, "expires_in", 3600)) * time.Second).UnixMilli()}, nil
+}
+
+func fetchTwitchUser(clientID, access string) (User, error) {
+	req, _ := http.NewRequest("GET", helixBase+"users", nil)
+	req.Header.Set("Client-Id", clientID)
+	req.Header.Set("Authorization", "Bearer "+access)
+	resp, err := httpc.Do(req)
+	if err != nil {
+		return User{}, err
+	}
+	defer resp.Body.Close()
+	var d struct {
+		Data []User `json:"data"`
+	}
+	if resp.StatusCode != 200 || json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&d) != nil || len(d.Data) == 0 || d.Data[0].ID == "" {
+		return User{}, fmt.Errorf("helix users: HTTP %d", resp.StatusCode)
+	}
+	return d.Data[0], nil
+}
+
+func (s *webServer) serveLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost || r.Header.Get("X-PhillBot") != "1" {
+		writeErr(w, http.StatusForbidden, "лише POST з X-PhillBot")
+		return
+	}
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		s.auth.endSession(c.Value)
+	}
+	http.SetCookie(w, s.cookie(sessionCookie, "", "/", -1))
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// сторінка входу (і повідомлення про відмову)
+func (s *webServer) loginPage(w http.ResponseWriter, code int, msg string) {
+	b, err := webFS.ReadFile("web/login.html")
+	if err != nil {
+		http.Error(w, msg, code)
+		return
+	}
+	page := strings.Replace(string(b), "<!--MSG-->", html.EscapeString(msg), 1)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(code)
+	_, _ = io.WriteString(w, page)
+}
+
 // ---------- виклики методів каналу ----------
 
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
+
+// методи каналу, яких у вебверсії немає: вихід — це кінець сесії (/auth/logout), а не відключення каналу від Twitch
+var webDenied = map[string]bool{"Logout": true}
 
 func writeErr(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -175,7 +471,7 @@ func writeErr(w http.ResponseWriter, code int, msg string) {
 
 // POST /api/call/<Метод> з тілом [арг1, арг2, …] → результат методу (JSON). Помилка методу — 400 {"error": …}.
 // Заголовок X-PhillBot: 1 обов'язковий: чужа сторінка не може надіслати його без дозволу CORS (захист від CSRF).
-func (s *webServer) serveCall(w http.ResponseWriter, r *http.Request) {
+func (s *webServer) serveCall(w http.ResponseWriter, r *http.Request, rt *chanRT, _ *WebUser) {
 	if r.Method != http.MethodPost {
 		writeErr(w, http.StatusMethodNotAllowed, "лише POST")
 		return
@@ -185,8 +481,8 @@ func (s *webServer) serveCall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimPrefix(r.URL.Path, "/api/call/")
-	m := reflect.ValueOf(s.ch).MethodByName(name)
-	if name == "" || !m.IsValid() {
+	m := reflect.ValueOf(rt.ch).MethodByName(name)
+	if name == "" || webDenied[name] || !m.IsValid() {
 		writeErr(w, http.StatusNotFound, "у вебверсії недоступно: "+name)
 		return
 	}
@@ -224,6 +520,72 @@ func (s *webServer) serveCall(w http.ResponseWriter, r *http.Request) {
 		res = out[0].Interface()
 	}
 	_ = json.NewEncoder(w).Encode(res)
+}
+
+// ---------- «Доступ»: білий список ----------
+
+func (s *webServer) admin(r *http.Request) *WebUser {
+	if u := s.user(r); u != nil && u.Role == "admin" {
+		return u
+	}
+	return nil
+}
+
+func (s *webServer) serveAdminPage(w http.ResponseWriter, r *http.Request) {
+	if s.admin(r) == nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	serveEmbedded(w, r, webFS, "web/admin.html")
+}
+
+// GET /admin/api/users; POST /admin/api/allow {"login","role"}; POST /admin/api/revoke {"login"}
+func (s *webServer) serveAdminAPI(w http.ResponseWriter, r *http.Request) {
+	me := s.admin(r)
+	if me == nil {
+		writeErr(w, http.StatusNotFound, "немає")
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	op := strings.TrimPrefix(r.URL.Path, "/admin/api/")
+	if op == "users" && r.Method == http.MethodGet {
+		list, err := s.auth.users()
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSONResp(w, map[string]any{"me": me.Login, "users": list})
+		return
+	}
+	if r.Method != http.MethodPost || r.Header.Get("X-PhillBot") != "1" {
+		writeErr(w, http.StatusForbidden, "лише POST з X-PhillBot")
+		return
+	}
+	var req struct{ Login, Role string }
+	if json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&req) != nil {
+		writeErr(w, http.StatusBadRequest, "некоректний запит")
+		return
+	}
+	var err error
+	switch op {
+	case "allow":
+		err = s.auth.allow(req.Login, req.Role, me.Login)
+	case "revoke":
+		if normLogin(req.Login) == me.Login {
+			err = errors.New("себе прибрати не можна")
+		} else {
+			err = s.auth.revoke(req.Login, me.Login)
+		}
+	default:
+		writeErr(w, http.StatusNotFound, "немає")
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ---------- події (SSE) ----------
@@ -264,10 +626,30 @@ func serveSSE(w http.ResponseWriter, r *http.Request, hub *sseHub, first []byte)
 
 // ---------- віджети OBS: /w/<секрет>/overlay/<сторінка>, /w/<секрет>/api/… ----------
 
+func (s *webServer) widgetChannel(secret string) *chanRT {
+	if len(secret) != 32 {
+		return nil
+	}
+	s.mu.Lock()
+	id, ok := s.bySecret[secret]
+	s.mu.Unlock()
+	if !ok {
+		if id = s.auth.channelBySecret(secret); id == "" {
+			return nil
+		}
+	}
+	rt, err := s.channel(id)
+	if err != nil || subtle.ConstantTimeCompare([]byte(rt.secret), []byte(secret)) != 1 {
+		return nil
+	}
+	return rt
+}
+
 func (s *webServer) serveWidget(w http.ResponseWriter, r *http.Request) {
 	rest := strings.TrimPrefix(r.URL.Path, "/w/")
 	sec, sub, _ := strings.Cut(rest, "/")
-	if subtle.ConstantTimeCompare([]byte(sec), []byte(s.secret)) != 1 {
+	rt := s.widgetChannel(sec)
+	if rt == nil {
 		http.NotFound(w, r)
 		return
 	}
@@ -278,13 +660,13 @@ func (s *webServer) serveWidget(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	switch sub = path.Clean("/" + sub); {
 	case sub == "/" || sub == "/overlay":
-		http.Redirect(w, r, "/w/"+s.secret+"/overlay/index", http.StatusFound)
+		http.Redirect(w, r, "/w/"+rt.secret+"/overlay/index", http.StatusFound)
 	case sub == "/api/state":
-		writeJSONResp(w, s.ch.overlayState())
+		writeJSONResp(w, rt.ch.overlayState())
 	case sub == "/api/chat":
-		writeJSONResp(w, s.ch.GetChat())
+		writeJSONResp(w, rt.ch.GetChat())
 	case sub == "/api/events":
-		serveSSE(w, r, s.host.ov, sseFrame("state", s.ch.overlayState()))
+		serveSSE(w, r, rt.host.ov, sseFrame("state", rt.ch.overlayState()))
 	case sub == "/overlay/chatrender.js":
 		serveEmbedded(w, r, assets, "frontend/dist/chatrender.js")
 	case strings.HasPrefix(sub, "/overlay/"):
@@ -315,7 +697,7 @@ func serveEmbedded(w http.ResponseWriter, r *http.Request, fsys fs.FS, name stri
 
 // ---------- інтерфейс стрімера ----------
 
-// index.html з підключеним мостом web.js (замість Wails) перед app.js
+// index.html з мостом web.js (замість Wails) перед app.js; хто не увійшов — сторінка входу
 func (s *webServer) serveUI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -324,15 +706,19 @@ func (s *webServer) serveUI(w http.ResponseWriter, r *http.Request) {
 	p := path.Clean(r.URL.Path)
 	switch p {
 	case "/", "/index.html":
+		if s.user(r) == nil {
+			s.loginPage(w, http.StatusOK, "")
+			return
+		}
 		b, err := assets.ReadFile("frontend/dist/index.html")
 		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
-		html := strings.Replace(string(b), `<script src="app.js`, `<script src="web.js"></script>`+"\n"+`<script src="app.js`, 1)
+		page := strings.Replace(string(b), `<script src="app.js`, `<script src="web.js"></script>`+"\n"+`<script src="app.js`, 1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		_, _ = io.WriteString(w, html)
+		_, _ = io.WriteString(w, page)
 	case "/web.js":
 		w.Header().Set("Cache-Control", "no-store")
 		serveEmbedded(w, r, webFS, "web/web.js")

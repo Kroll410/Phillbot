@@ -107,8 +107,11 @@ func (a *Channel) refresh(t *Tokens) *Tokens {
 	if t == nil || t.RefreshToken == "" {
 		return nil
 	}
-	code, b, err := postForm("https://id.twitch.tv/oauth2/token", url.Values{"client_id": {a.clientID},
-		"grant_type": {"refresh_token"}, "refresh_token": {t.RefreshToken}})
+	form := url.Values{"client_id": {a.clientID}, "grant_type": {"refresh_token"}, "refresh_token": {t.RefreshToken}}
+	if a.clientSecret != "" { // вебверсія: Confidential-клієнт оновлює токен разом із секретом
+		form.Set("client_secret", a.clientSecret)
+	}
+	code, b, err := postForm("https://id.twitch.tv/oauth2/token", form)
 	if err != nil || code != 200 {
 		return nil
 	}
@@ -410,6 +413,37 @@ func (a *Channel) runSession(ctx context.Context, u string, subscribe bool, bc U
 			}
 		}
 	}
+}
+
+// connect — канал отримав токени: дізнатись, чий це акаунт, і підключитись до Twitch (EventSub, нагороди, бейджі).
+// Спільне для десктопу (після Device Code) і вебверсії (після входу через OAuth).
+func (a *Channel) connect(tok *Tokens) (User, error) {
+	a.mu.Lock()
+	if a.listenCancel != nil {
+		a.listenCancel()
+		a.listenCancel = nil
+	}
+	a.mu.Unlock()
+	a.tokMu.Lock()
+	a.token = tok
+	a.tokMu.Unlock()
+	u, err := a.fetchUser()
+	if err != nil {
+		return User{}, err
+	}
+	a.mu.Lock()
+	a.bc = u
+	a.auth = AuthInfo{Status: "ok", User: &u}
+	lctx, lcancel := context.WithCancel(context.Background())
+	a.listenCancel = lcancel
+	a.emitLocked()
+	a.mu.Unlock()
+	a.logf("Вхід виконано: канал %s", u.DisplayName)
+	go a.listen(lctx, u)
+	go a.loadBadges(u.ID)
+	go a.fillColors()
+	go a.RefreshRewards()
+	return u, nil
 }
 
 func (a *Channel) listen(ctx context.Context, bc User) {

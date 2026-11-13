@@ -72,9 +72,10 @@ type Channel struct {
 	logLines []LogLine
 	bc       User
 
-	clientID string
-	tokMu    sync.Mutex
-	token    *Tokens
+	clientID     string
+	clientSecret string // лише вебверсія (Confidential-клієнт Twitch)
+	tokMu        sync.Mutex
+	token        *Tokens
 
 	giftSnap   map[string]int // активні подаровані підписки: дарувальник → кількість (Helix)
 	don        DonStatus      // підключення до Donatello

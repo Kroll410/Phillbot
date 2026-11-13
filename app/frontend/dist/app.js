@@ -1352,6 +1352,7 @@ function wheelDraw(secs){
   c.beginPath(); c.arc(cx, cx, R + 4, 0, Math.PI * 2); c.fillStyle = ring; c.fill();
   if(!secs.length){
     c.beginPath(); c.arc(cx, cx, R, 0, Math.PI * 2); c.fillStyle = "#1f1f23"; c.fill();
+    if(size < 160) return; // у міні-колесі напис не вміщається (поруч уже є «Лотів поки немає»)
     c.fillStyle = "#adadb8"; c.font = `600 ${Math.max(12, size / 22)}px Inter, sans-serif`;
     c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("Немає лотів", cx, cx); return;
   }

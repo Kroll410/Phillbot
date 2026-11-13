@@ -76,7 +76,6 @@ fly deploy -c ../fly.toml --dockerfile Dockerfile --build-arg VERSION=$(git desc
 
 - Донати Donatello (колбек на `/donatello/<секрет>` замість ngrok) — наступний етап.
 - Картинка в центрі колеса з власного файлу (емодзі каналу працюють).
-- Імпорт даних з десктопного `PhillBot.exe`.
 
 ## База даних
 

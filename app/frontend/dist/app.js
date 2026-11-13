@@ -762,9 +762,37 @@ function drainWheel(total = 900){
     setTimeout(finish, per * secs.length + 600); // якщо кадри призупинено (вкладка у фоні)
   });
 }
+// таймер аукціону плавно повертається до заданого часу (як «перемотування»), колір — «очікування»
+function rewindAuTimer(ms = 1000){
+  const el = $("auTimer"), parts = el.textContent.split(":").map(Number);
+  const from = parts.reduce((a, v) => a * 60 + (v || 0), 0) * 1000, to = (AU().cfg.durationMin || 10) * 60000;
+  el.className = "timer idle";
+  return new Promise(res => {
+    let done = false; const t0 = performance.now();
+    const fin = () => { if(done) return; done = true; el.textContent = fmtTime(to); res(); };
+    const step = now => { if(done) return; const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = fmtTime(Math.round((from + (to - from) * e) / 1000) * 1000); if(k < 1) requestAnimationFrame(step); else fin(); };
+    requestAnimationFrame(step); setTimeout(fin, ms + 300);
+  });
+}
+// статус «Очікування старту»: старий напис виїжджає вгору, новий — знизу
+async function swapAuStatus(){
+  const el = $("auStatus");
+  if(el.classList.contains("idle")) return;
+  await animDone(el.animate([{opacity: 1, transform: "none"}, {opacity: 0, transform: "translateY(-8px)"}], {duration: 220, easing: "ease-in", fill: "forwards"}), 400);
+  el.textContent = "Очікування старту"; el.className = "spill idle";
+  el.getAnimations().forEach(a => a.cancel());
+  await animDone(el.animate([{opacity: 0, transform: "translateY(8px)"}, {opacity: 1, transform: "none"}], {duration: 260, easing: "ease-out"}), 450);
+}
+// кнопки під колесом тьмяніють разом із секторами (новий аукціон — крутити ще нічого)
+function dimWheelBtns(){
+  return Promise.all([...document.querySelectorAll("#auWheelWin .wctl button")].map(b =>
+    animDone(b.animate([{opacity: getComputedStyle(b).opacity}, {opacity: .5}], {duration: 700, easing: "ease-out", fill: "forwards"}), 900))); // .5 — як у вимкненої кнопки, без стрибка після
+}
 async function resetAnimAuction(){
-  auResetting = true;
+  auResetting = true; auTimerAnim = true;
   await Promise.all([
+    rewindAuTimer(1000), swapAuStatus(), dimWheelBtns(),
     animOut($("auList").querySelectorAll("tbody > tr, .autop-i"), ROW_OUT, {dur: 560, stagger: 55, max: 16}),
     animOut($("auFeed").querySelectorAll(".fbid"), [{transform: "none", opacity: 1}, {transform: "translateX(48px)", opacity: 0}], {dur: 560, stagger: 55, max: 16}),
     drainWheel(900),
@@ -831,10 +859,11 @@ async function holdDone(){
     try{
       await resetAnimAuction();
       const snap = await call("AuctionNew");
-      auResetting = false; setState(snap);
+      auResetting = false; auTimerAnim = false; setState(snap);
+      document.querySelectorAll("#auWheelWin .wctl button, #auStatus").forEach(b => b.getAnimations().forEach(a => a.cancel()));
       $("wheel").getAnimations().forEach(a => a.cancel());
       toast("Почато новий аукціон");
-    } catch(e){ auResetting = false; $("wheel").getAnimations().forEach(a => a.cancel()); renderAuction(); }
+    } catch(e){ auResetting = false; auTimerAnim = false; $("wheel").getAnimations().forEach(a => a.cancel()); document.querySelectorAll("#auWheelWin .wctl button, #auStatus").forEach(b => b.getAnimations().forEach(a => a.cancel())); renderAuction(); renderAuTimer(); }
     finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); }, 500); }
     return;
   }
@@ -1148,8 +1177,9 @@ try{ auSwapped = localStorage.getItem("phillbot-auswap") === "1"; }catch(e){}
 $("auWrap").classList.toggle("swapped", auSwapped);
 
 // таймер прийому ставок
+let auTimerAnim = false; // «Новий аукціон»: таймер сам відкручується до заданого часу — не перемальовувати поверх
 function renderAuTimer(){
-  if(!S) return;
+  if(!S || auTimerAnim) return;
   const t = AU().timer, r = t.status === "running" ? t.endsAt - Date.now() : (t.remainingMs || 0), el = $("auTimer");
   el.textContent = fmtTime(t.status === "finished" ? 0 : r);
   el.className = "timer " + t.status + (t.status === "running" && r <= 30000 ? " low" : "");

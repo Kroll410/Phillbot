@@ -136,6 +136,11 @@ func TestTunnelOffWithoutToken(t *testing.T) {
 	if a.don.State != "off" || a.tunStop != nil {
 		t.Fatalf("tunnel without token: %+v", a.don)
 	}
+	a.st.Settings.NgrokToken = "00000000-1111-2222-3333-444444444444" // ключ у форматі Donatello замість токена ngrok
+	a.restartTunnel()
+	if a.don.State != "error" || !strings.Contains(a.don.Error, "ключ Donatello") || a.tunStop != nil {
+		t.Fatalf("uuid as ngrok token: %+v", a.don)
+	}
 	if !strings.Contains(ngrokErrText(errString("failed: ERR_NGROK_105 authtoken invalid")), "токен") {
 		t.Fatal("authtoken error text")
 	}

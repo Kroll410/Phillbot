@@ -9,11 +9,15 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"golang.ngrok.com/ngrok/v2"
 )
+
+// ключ колбека Donatello має вигляд UUID; authtoken ngrok — ні
+var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // нормалізація домену з налаштувань: «abc.ngrok-free.app», «https://abc.ngrok-free.app/» → «abc.ngrok-free.app»
 func ngrokDomain(s string) string {
@@ -32,6 +36,12 @@ func (a *App) restartTunnel() {
 	token, domain := strings.TrimSpace(a.st.Settings.NgrokToken), ngrokDomain(a.st.Settings.NgrokDomain)
 	if token == "" {
 		a.don = DonStatus{State: "off"}
+		a.emitLocked()
+		a.mu.Unlock()
+		return
+	}
+	if uuidRe.MatchString(token) { // це ключ колбека Donatello, а не токен ngrok
+		a.don = DonStatus{State: "error", Error: "У полі «Токен ngrok» — ключ Donatello. Сюди потрібен authtoken з dashboard.ngrok.com → Your Authtoken"}
 		a.emitLocked()
 		a.mu.Unlock()
 		return

@@ -586,7 +586,18 @@ $("generalBtn").onclick = () => {
   $("ngrokToken").value = S.settings.ngrokToken || ""; $("donKey").value = S.settings.donKey || ""; $("donLink")._k = "";
   $("obsPort").value = S.settings.obsPort; renderObs(); openModal("generalModal"); renderDon();
 };
-$("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round(n("obsPort",17841)), ngrokToken: $("ngrokToken").value.trim(), donKey: $("donKey").value.trim()}); closeModal("generalModal"); toast("Збережено"); };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+$("generalSave").onclick = async () => {
+  let tok = $("ngrokToken").value.trim(), key = $("donKey").value.trim();
+  // ключ Donatello (UUID) вставили в поле ngrok — переносимо його на місце і лишаємо вікно відкритим
+  if(UUID_RE.test(tok)){
+    if(!key){ key = tok; $("donKey").value = key; } tok = ""; $("ngrokToken").value = "";
+    await saveSettings({obsPort: Math.round(n("obsPort",17841)), ngrokToken: tok, donKey: key});
+    $("donLink")._k = ""; $("donLink").innerHTML = `<span class="err">Це був ключ колбека Donatello — його перенесено в поле «Ключ колбека». У поле «Токен ngrok» вставте authtoken з dashboard.ngrok.com → Your Authtoken і натисніть «Зберегти».</span>`;
+    $("ngrokToken").focus(); return;
+  }
+  await saveSettings({obsPort: Math.round(n("obsPort",17841)), ngrokToken: tok, donKey: key}); closeModal("generalModal"); toast("Збережено");
+};
 // Donatello через ngrok: статус тунелю і посилання для колбеків
 function renderDon(){
   const d = S.don || {state: "off"}, pill = $("donPill");

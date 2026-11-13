@@ -1116,7 +1116,8 @@ setInterval(renderExportBtn, 500); // таймер може завершитис
    Два вікна (лоти / колесо) міняються місцями з анімацією; під колесом завжди стрічка ставок. */
 const AU = () => S.auction || {cfg:{rewardIds:[]}, timer:{status:"idle"}, lots:[], feed:[]};
 const fmtN = x => Number(x||0).toLocaleString("uk-UA");
-const PAL = ["#00c853","#9147ff","#20b2aa","#c86bff","#5cf29a","#6a5cff","#2fd3c0","#e07bff","#3fa34d","#7c4dff","#00a884","#a970ff"];
+// лоти — чітко різні кольори (не відтінки одного), щоб на колесі й у списку кожен знаходився одразу
+const PAL = ["#4f8ff7","#e0952e","#e5604f","#2fb59a","#d66ba0","#8f6cf0","#7fae32","#3aa9cc","#e07a3a","#b25bd6","#c9a43a","#5d6ff0"];
 function lotColor(id){ const i = AU().lots.findIndex(l => l.id === id); return PAL[(i < 0 ? 0 : i) % PAL.length]; }
 const lotById = id => AU().lots.find(l => l.id === id);
 let auSwapped = false;
@@ -1351,7 +1352,7 @@ function wheelDraw(secs){
       let name = lot.name; while(name.length > 1 && c.measureText(name).width > maxW) name = name.slice(0, -2) + "…";
       const tx = flip ? -(R - 12) : R - 12;
       c.fillText(name, tx, two ? -fs * .45 : 0);
-      if(two){ c.font = `600 ${fs * .78}px Inter, sans-serif`; c.globalAlpha = .8 * fade; c.fillText(fmtN(lot.amount), tx, fs * .6); }
+      if(two){ c.font = `600 ${fs * .78}px Inter, sans-serif`; c.globalAlpha = .85 * fade; c.fillText((s.w / total * 100).toFixed(1).replace(".0", "") + "%", tx, fs * .6); } // шанс лота
       c.restore();
     }
     a0 = a1;

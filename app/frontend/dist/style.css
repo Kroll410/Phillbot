@@ -1021,3 +1021,6 @@ td > .donchip{margin-left:0}
 
 /* вебверсія: без локального сервера віджетів і ngrok — сервер і так публічний */
 html.web .desktoponly{display:none}
+#webDataBox .legallinks{margin-top:10px}
+#webDataBox .legallinks a{color:var(--muted,#adadb8)}
+#webDataBox .hint.err{color:#ff9a95}

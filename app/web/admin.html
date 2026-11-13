@@ -32,7 +32,15 @@
     <button class="primary">Додати</button>
   </form>
   <p class="err" id="err" role="alert"></p>
+  <h2 style="font-size:16px;margin:28px 0 6px">Видалити дані глядача</h2>
+  <p class="tag" style="margin:0 0 10px">На запит глядача чи донатера: його ім'я замінюється на «видалено» в усій історії всіх каналів (замовлення, ставки, лоти, подарунки).</p>
+  <form id="forget">
+    <input id="forgetName" placeholder="Логін Twitch або ім'я донатера" autocomplete="off" spellcheck="false" required>
+    <button>Видалити дані</button>
+  </form>
+  <p class="tag" id="forgetRes" role="status"></p>
   <table><thead><tr><th>Логін</th><th>Роль</th><th>Останній вхід</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+  <p class="tag" style="margin-top:24px"><a href="/privacy">Політика конфіденційності</a> · <a href="/terms">Умови користування</a></p>
 </main>
 <script>
 (function(){
@@ -59,6 +67,15 @@
     e.preventDefault(); $("err").textContent = "";
     try{ await post("allow", {login: $("login").value, role: $("role").value}); $("login").value = ""; await load(); }
     catch(err){ $("err").textContent = err.message; }
+  });
+  $("forget").addEventListener("submit", async e => {
+    e.preventDefault(); $("forgetRes").textContent = "";
+    const name = $("forgetName").value.trim();
+    if(!name || !confirm(`Замінити «${name}» на «видалено» в усій історії? Скасувати не можна.`)) return;
+    const r = await fetch("/admin/api/forget", {method:"POST", headers:{"Content-Type":"application/json","X-PhillBot":"1"}, body:JSON.stringify({login: name})});
+    if(!r.ok){ let m = r.statusText; try{ m = (await r.json()).error || m; }catch(_){} $("forgetRes").textContent = "Помилка: " + m; return; }
+    const d = await r.json(); $("forgetName").value = "";
+    $("forgetRes").textContent = d.changed ? `Готово: змінено записів — ${d.changed}.` : "Записів із таким ім'ям не знайдено.";
   });
   $("rows").addEventListener("click", async e => {
     const b = e.target.closest("button"); if(!b) return;

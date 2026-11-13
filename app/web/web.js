@@ -47,6 +47,28 @@
       location.href = "/";
     },
     Login: async () => { location.href = "/auth/login"; },
+    // лише для десктопу: Client ID, окреме вікно чату (у вебверсії їх не показуємо)
+    CancelLogin: async () => {}, ChangeClientID: async () => {}, OpenChatWindow: async () => {}, CloseChatWindow: async () => {},
+    PickWheelImage: async () => { throw new Error("Своя картинка в центрі колеса поки є лише в програмі для Windows"); },
+    SaveWheelImage: async () => { throw new Error("Своя картинка в центрі колеса поки є лише в програмі для Windows"); },
+    // Marbles: файл завантажується браузером (у грі його вибирають з «Завантажень»), гра — через steam://
+    ExportMarbles: async () => {
+      const r = await fetch("api/marbles", {credentials: "same-origin"});
+      if (r.status === 401) { location.reload(); throw new Error("потрібно увійти"); }
+      if (!r.ok) { let m = r.statusText; try { m = (await r.json()).error || m; } catch (_) {} throw new Error(m); }
+      const url = URL.createObjectURL(await r.blob());
+      const a = document.createElement("a");
+      a.href = url; a.download = "subday_marbles.csv";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      return {lines: Number(r.headers.get("X-Lines")) || 0, copied: false, path: "subday_marbles.csv"};
+    },
+    LaunchMarbles: async () => {
+      const a = document.createElement("a");
+      a.href = "steam://rungameid/1170970";
+      document.body.appendChild(a); a.click(); a.remove();
+      return true;
+    },
     // експорт за весь час — звичайне завантаження файлу браузером
     ExportAll: async kind => {
       const a = document.createElement("a");
@@ -67,6 +89,30 @@
   };
   document.documentElement.classList.add("web");
   connect();
+
+  // загальні налаштування: «Дані каналу» (видалити все — затисканням, червоним) і документи
+  window.webHold = async (action, btn) => {
+    if (action !== "deletechannel") return;
+    const r = await fetch("api/account/delete", {method: "POST", headers: {"X-PhillBot": "1"}, credentials: "same-origin"}).catch(() => null);
+    if (r && r.ok) { location.href = "/"; return; }
+    const hint = document.getElementById("delChannelHint");
+    if (hint) { hint.textContent = "Не вдалося видалити дані — спробуйте ще раз."; hint.classList.add("err"); }
+  };
+  const addDataBox = () => {
+    const box = document.querySelector("#generalModal .box.settings");
+    const ink = document.querySelector("#logoutBtn .liquid"); // та сама «червона фарба», що в кнопці «Вийти»
+    if (!box || !ink) { setTimeout(addDataBox, 300); return; }
+    if (document.getElementById("webDataBox")) return;
+    const d = document.createElement("div");
+    d.id = "webDataBox";
+    d.innerHTML = `<h3>Дані каналу</h3>
+      <div class="hint" id="delChannelHint">Видалити всю історію, налаштування й вхід цього каналу з PhillBot. Скасувати не можна — спершу можна зробити «Усе .zip».</div>
+      <div class="row"><button class="winbtn holdend" data-hold="web:deletechannel" title="Затисніть і тримайте">${ink.outerHTML}<span class="wl">Видалити дані каналу</span></button></div>
+      <div class="hint legallinks"><a href="/privacy" target="_blank" rel="noopener">Політика конфіденційності</a> · <a href="/terms" target="_blank" rel="noopener">Умови користування</a></div>`;
+    const actions = box.querySelector(".row.actions");
+    box.insertBefore(d, actions);
+  };
+  addEventListener("load", addDataBox);
 
   // адміністратору — посилання на сторінку «Доступ» у шапці
   fetch("admin/api/users", {credentials: "same-origin"}).then(r => {

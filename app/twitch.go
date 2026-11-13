@@ -460,6 +460,8 @@ func (a *Channel) listen(ctx context.Context, bc User) {
 			continue
 		}
 		if errors.Is(err, errNeedLogin) {
+			a.setConn("off", "Потрібен повторний вхід у Twitch")
+			a.host.AuthLost()
 			return
 		}
 		a.setConn("wait", fmt.Sprintf("Зв'язок втрачено (%v), перепідключення…", err))

@@ -484,3 +484,33 @@ func TestServerExportNeedsLogin(t *testing.T) {
 		t.Fatal("export without login", resp.StatusCode)
 	}
 }
+
+// Marbles у вебверсії: файл на завантаження, після нього можна вибирати переможця; без замовлень — 400.
+func TestServerMarbles(t *testing.T) {
+	ws, srv := devServer(t)
+	if resp, _ := http.Get(srv.URL + "/api/marbles"); resp.StatusCode != 400 {
+		t.Fatal("empty marbles must be 400", resp.StatusCode)
+	}
+	callAPI(t, srv, "StartTimer")
+	callAPI(t, srv, "AddManual", "Phill", 1, 3, "Hades")
+	callAPI(t, srv, "FinishTimer")
+	resp, err := http.Get(srv.URL + "/api/marbles")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 || resp.Header.Get("X-Lines") != "3" || !strings.Contains(resp.Header.Get("Content-Disposition"), "subday_marbles.csv") {
+		t.Fatal(resp.StatusCode, resp.Header)
+	}
+	if string(b) != "\xEF\xBB\xBFHades\r\nHades\r\nHades\r\n" {
+		t.Fatalf("%q", b)
+	}
+	rt, _ := ws.channel("local")
+	rt.ch.mu.Lock()
+	exported := rt.ch.st.Exported
+	rt.ch.mu.Unlock()
+	if !exported {
+		t.Fatal("winner pick must be enabled after the Marbles file")
+	}
+}

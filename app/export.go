@@ -3,6 +3,7 @@ package main
 // Експорт: файл для Marbles on Stream, таблиця для Excel (CSV з BOM), JSON.
 
 import (
+	"errors"
 	"math/rand"
 	"regexp"
 	"strings"
@@ -66,3 +67,21 @@ func (a *Channel) MarbleLines() []string {
 }
 
 var badName = regexp.MustCompile(`[^\p{L}\p{N}_\-.]+`)
+
+// marblesFile — вміст файлу для Marbles (UTF-8 з BOM, рядок на кулю); після нього можна вибирати переможця.
+// Вебверсія віддає його на завантаження (десктоп пише файл сам — ExportMarbles).
+func (a *Channel) marblesFile() ([]byte, int, error) {
+	clean := a.MarbleLines()
+	if len(clean) == 0 {
+		return nil, 0, errors.New("немає замовлень з балами > 0")
+	}
+	a.mu.Lock()
+	if !a.st.Exported {
+		a.st.Exported = true
+		a.saveLocked()
+		a.emitLocked()
+	}
+	a.mu.Unlock()
+	a.logf("Файл для Marbles завантажено (%d куль)", len(clean))
+	return encodeLines(clean), len(clean), nil
+}

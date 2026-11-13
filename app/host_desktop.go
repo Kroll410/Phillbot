@@ -70,3 +70,6 @@ func (h desktopHost) SettingsChanged(old, nu Settings) {
 }
 
 func (h desktopHost) KeepWheelImage(name string) { h.a.cleanWheelDir(name) }
+
+// десктоп: після втрати входу програма просто покаже «Увійти» (дані лишаються на цьому комп'ютері)
+func (h desktopHost) AuthLost() {}

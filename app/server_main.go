@@ -13,6 +13,8 @@
 //	TWITCH_CLIENT_SECRET   його секрет
 //	PHILLBOT_KEY           щонайменше 32 випадкові символи — ним шифруються токени каналів у БД (не змінювати!)
 //	PHILLBOT_ADMIN         логін Twitch адміністратора: він додає інших на сторінці /admin
+//	PHILLBOT_OPERATOR      хто надає сервіс (нік) — у політиці конфіденційності й умовах; за замовчуванням PhillBot
+//	PHILLBOT_CONTACT       пошта для запитів щодо даних (видалення тощо)
 //	PHILLBOT_DEV=1         розробка: без входу, один канал (лише коли сервер слухає 127.0.0.1/localhost)
 package main
 
@@ -65,6 +67,8 @@ func main() {
 		ClientSecret: env("TWITCH_CLIENT_SECRET", ""),
 		Key:          os.Getenv("PHILLBOT_KEY"),
 		Admin:        env("PHILLBOT_ADMIN", ""),
+		Operator:     env("PHILLBOT_OPERATOR", "PhillBot"),
+		Contact:      env("PHILLBOT_CONTACT", ""),
 		Dev:          os.Getenv("PHILLBOT_DEV") == "1",
 	}
 	if cfg.Dev && !isLoopback(addr) {

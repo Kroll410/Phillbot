@@ -51,6 +51,7 @@ type Host interface {
 	LoadTokens() *Tokens         // nil — токенів немає
 	SettingsChanged(old, nu Settings)
 	KeepWheelImage(name string) // картинка центру колеса змінилась — інші можна прибрати
+	AuthLost()                  // Twitch більше не приймає токени каналу (доступ відкликано / токен недійсний)
 }
 
 // Channel — один канал Twitch: стан, логіка СабДею й аукціону, підключення до Twitch, чат.
@@ -114,6 +115,8 @@ func (nopHost) LoadTokens() *Tokens { return nil }
 func (nopHost) SettingsChanged(_, _ Settings) {}
 
 func (nopHost) KeepWheelImage(string) {}
+
+func (nopHost) AuthLost() {}
 
 func newChannel(host Host) *Channel {
 	if host == nil {

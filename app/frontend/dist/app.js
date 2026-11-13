@@ -818,6 +818,7 @@ async function holdDone(){
     return;
   }
   if(action === "logout"){ holding = null; call("Logout"); return; }
+  if(action.startsWith("web:")){ holding = null; if(window.webHold) window.webHold(action.slice(4), btn); return; } // вебверсія: web.js
   if(action === "dellot"){ // видалити лот
     holding = null;
     const l = lotById(btn.dataset.lot);
@@ -1071,7 +1072,7 @@ async function exportMarbles(){
   try{
     const r = await api().ExportMarbles(false);
     await sleep(350);
-    btn.className = "mbtn ok"; label.textContent = r.copied ? "✓ Шлях скопійовано" : "✓ Файл створено";
+    btn.className = "mbtn ok"; label.textContent = r.copied ? "✓ Шлях скопійовано" : document.documentElement.classList.contains("web") ? "✓ Файл завантажено" : "✓ Файл створено";
     await sleep(1300);
     btn.className = "mbtn ok go"; label.textContent = "Запускаю гру…";
     const launched = await api().LaunchMarbles(); // запуск саме зараз

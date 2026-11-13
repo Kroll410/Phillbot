@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +40,8 @@ type serverConfig struct {
 	ClientSecret string
 	Key          string // PHILLBOT_KEY — шифрування токенів каналів
 	Admin        string // логін Twitch першого адміна
+	Operator     string // власник сервісу (для /privacy, /terms)
+	Contact      string // пошта для запитів щодо даних
 	Dev          bool   // без входу: один канал "local", користувач-адмін
 }
 
@@ -95,6 +98,15 @@ func (h *webHost) LoadTokens() *Tokens {
 func (h *webHost) SettingsChanged(_, _ Settings) {} // ні порту віджета, ні ngrok — сервер і так публічний
 func (h *webHost) KeepWheelImage(string)         {}
 
+// AuthLost — токени видаляються одразу; якщо стрімер не увійде знову за 30 днів, дані каналу видаляються (privacyLoop)
+func (h *webHost) AuthLost() {
+	if h.auth == nil {
+		return
+	}
+	h.auth.markDeauth(h.chID)
+	h.ch.setAuth(AuthInfo{Status: "error", Message: "Twitch більше не приймає вхід — увійдіть ще раз"})
+}
+
 // віджетам — їхній зріз стану, не частіше ніж раз на 200 мс
 func (h *webHost) overlayLoop(ctx context.Context) {
 	for {
@@ -113,6 +125,7 @@ func (h *webHost) overlayLoop(ctx context.Context) {
 // ---------- сервер і реєстр каналів ----------
 
 type chanRT struct {
+	cancel    context.CancelFunc // зупинити таймери, віджети й підключення каналу
 	ch        *Channel
 	host      *webHost
 	secret    string // віджети
@@ -191,18 +204,7 @@ func (s *webServer) start() {
 			rt.ch.mu.Unlock()
 		}
 	}
-	go func() {
-		t := time.NewTicker(time.Hour)
-		defer t.Stop()
-		for {
-			select {
-			case <-s.ctx.Done():
-				return
-			case <-t.C:
-				s.auth.pruneSessions()
-			}
-		}
-	}()
+	go s.privacyLoop(s.ctx) // раз на добу: канали без входу 30 днів, історія старша за 12 місяців, сесії
 }
 
 // channel — канал за id (id каналу Twitch); завантажується з БД при першому зверненні
@@ -236,9 +238,10 @@ func (s *webServer) channel(id string) (*chanRT, error) {
 	}
 	ch.initStreamLocked()
 	ch.auth = AuthInfo{Status: "need_login"}
-	go ch.ticker(s.ctx)
-	go h.overlayLoop(s.ctx)
-	rt := &chanRT{ch: ch, host: h, secret: secret, donSecret: donSecret}
+	cctx, cancel := context.WithCancel(s.ctx)
+	go ch.ticker(cctx)
+	go h.overlayLoop(cctx)
+	rt := &chanRT{cancel: cancel, ch: ch, host: h, secret: secret, donSecret: donSecret}
 	s.chans[id], s.bySecret[secret], s.byDon[donSecret] = rt, id, id
 	if s.connect {
 		if tok := s.auth.loadTokens(id); tok != nil {
@@ -263,6 +266,9 @@ func (s *webServer) connectChannel(rt *chanRT, tok *Tokens) {
 	if _, err := rt.ch.connect(tok); err != nil {
 		rt.ch.setAuth(AuthInfo{Status: "error", Message: "Не вдалося підключитися до Twitch — увійдіть ще раз"})
 		log.Printf("канал %s: %v", rt.host.chID, err)
+		if errors.Is(err, errNeedLogin) {
+			s.auth.markDeauth(rt.host.chID)
+		}
 	}
 }
 
@@ -311,6 +317,11 @@ func (s *webServer) handler() http.Handler {
 		serveSSE(w, r, rt.host.ui, sseFrame("state", rt.ch.GetState()))
 	}))
 	mux.HandleFunc("/api/export/", s.withChannel(s.serveExport))
+	mux.HandleFunc("/api/marbles", s.withChannel(s.serveMarbles))
+	mux.HandleFunc("/api/account/delete", s.withChannel(s.serveAccountDelete))
+	for _, p := range []string{"/privacy", "/terms", "/en/privacy", "/en/terms"} {
+		mux.HandleFunc(p, s.serveLegal)
+	}
 	mux.HandleFunc("/admin", s.serveAdminPage)
 	mux.HandleFunc("/admin/api/", s.serveAdminAPI)
 	mux.HandleFunc("/w/", s.serveWidget)
@@ -401,6 +412,7 @@ func (s *webServer) serveCallback(w http.ResponseWriter, r *http.Request) {
 		s.loginPage(w, http.StatusForbidden, "Доступ за запрошенням: акаунта «"+u.Login+"» немає в списку. Попросіть адміністратора додати вас.")
 		return
 	}
+	s.auth.clearDeauth(u.ID)
 	if err := s.auth.saveTokens(u.ID, tok); err != nil {
 		log.Printf("вхід: токени: %v", err)
 		s.loginPage(w, http.StatusInternalServerError, "Не вдалося зберегти вхід.")
@@ -569,6 +581,24 @@ func (s *webServer) serveExport(w http.ResponseWriter, r *http.Request, rt *chan
 	_, _ = w.Write(data)
 }
 
+// GET /api/marbles — файл для Marbles on Stream як завантаження (у браузері гру не запустиш із файлом — його вибирають у грі)
+func (s *webServer) serveMarbles(w http.ResponseWriter, r *http.Request, rt *chanRT, _ *WebUser) {
+	if r.Method != http.MethodGet {
+		writeErr(w, http.StatusMethodNotAllowed, "лише GET")
+		return
+	}
+	data, n, err := rt.ch.marblesFile()
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Disposition", `attachment; filename="subday_marbles.csv"`)
+	w.Header().Set("X-Lines", strconv.Itoa(n))
+	_, _ = w.Write(data)
+}
+
 // ---------- «Доступ»: білий список ----------
 
 func (s *webServer) admin(r *http.Request) *WebUser {
@@ -621,8 +651,19 @@ func (s *webServer) serveAdminAPI(w http.ResponseWriter, r *http.Request) {
 	case "revoke":
 		if normLogin(req.Login) == me.Login {
 			err = errors.New("себе прибрати не можна")
-		} else {
-			err = s.auth.revoke(req.Login, me.Login)
+		} else if err = s.auth.revoke(req.Login, me.Login); err == nil {
+			// без доступу канал не працює: токени — геть одразу, дані — через 30 днів, якщо доступ не повернуть
+			if u, ok := s.auth.user(req.Login); ok && u.TwitchID != "" {
+				s.stopChannel(u.TwitchID)
+				s.auth.markDeauth(u.TwitchID)
+			}
+		}
+	case "forget":
+		var n int
+		if n, err = s.forgetViewer(req.Login); err == nil {
+			s.auth.audit(me.Login, "forget-viewer", strconv.Itoa(n)+" записів")
+			writeJSONResp(w, map[string]int{"changed": n})
+			return
 		}
 	default:
 		writeErr(w, http.StatusNotFound, "немає")

@@ -33,22 +33,22 @@ const schemaVersion = 1
 
 var schema = []string{
 	`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
-	`CREATE TABLE IF NOT EXISTS channels (id TEXT PRIMARY KEY, live TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
-	`CREATE TABLE IF NOT EXISTS streams (channel_id TEXT NOT NULL, id TEXT NOT NULL, started_at INTEGER NOT NULL,
+	`CREATE TABLE IF NOT EXISTS channels (id TEXT PRIMARY KEY, live TEXT NOT NULL, updated_at BIGINT NOT NULL)`,
+	`CREATE TABLE IF NOT EXISTS streams (channel_id TEXT NOT NULL, id TEXT NOT NULL, started_at BIGINT NOT NULL,
 		PRIMARY KEY (channel_id, id))`,
 	`CREATE TABLE IF NOT EXISTS collections (channel_id TEXT NOT NULL, stream_id TEXT NOT NULL, n INTEGER NOT NULL,
-		started_at INTEGER, finished_at INTEGER, winner TEXT, settings TEXT NOT NULL,
+		started_at BIGINT, finished_at BIGINT, winner TEXT, settings TEXT NOT NULL,
 		PRIMARY KEY (channel_id, stream_id, n))`,
 	`CREATE TABLE IF NOT EXISTS entries (channel_id TEXT NOT NULL, id TEXT NOT NULL, stream_id TEXT NOT NULL, coll_n INTEGER NOT NULL,
-		ts INTEGER NOT NULL, login TEXT, text TEXT, data TEXT NOT NULL, PRIMARY KEY (channel_id, id))`,
+		ts BIGINT NOT NULL, login TEXT, text TEXT, data TEXT NOT NULL%SEQ%, PRIMARY KEY (channel_id, id))`,
 	`CREATE INDEX IF NOT EXISTS entries_coll ON entries (channel_id, stream_id, coll_n)`,
-	`CREATE TABLE IF NOT EXISTS auctions (channel_id TEXT NOT NULL, id TEXT NOT NULL, started_at INTEGER, finished_at INTEGER, winner TEXT,
+	`CREATE TABLE IF NOT EXISTS auctions (channel_id TEXT NOT NULL, id TEXT NOT NULL, started_at BIGINT, finished_at BIGINT, winner TEXT,
 		PRIMARY KEY (channel_id, id))`,
 	`CREATE TABLE IF NOT EXISTS lots (channel_id TEXT NOT NULL, auction_id TEXT NOT NULL, id TEXT NOT NULL, ord INTEGER NOT NULL,
-		name TEXT, amount INTEGER, data TEXT NOT NULL, PRIMARY KEY (channel_id, auction_id, id))`,
-	`CREATE TABLE IF NOT EXISTS bids (channel_id TEXT NOT NULL, auction_id TEXT NOT NULL, id TEXT NOT NULL, ts INTEGER NOT NULL,
-		amount INTEGER, data TEXT NOT NULL, PRIMARY KEY (channel_id, auction_id, id))`,
-	`CREATE TABLE IF NOT EXISTS seen (channel_id TEXT NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL, PRIMARY KEY (channel_id, kind, id))`,
+		name TEXT, amount BIGINT, data TEXT NOT NULL, PRIMARY KEY (channel_id, auction_id, id))`,
+	`CREATE TABLE IF NOT EXISTS bids (channel_id TEXT NOT NULL, auction_id TEXT NOT NULL, id TEXT NOT NULL, ts BIGINT NOT NULL,
+		amount BIGINT, data TEXT NOT NULL%SEQ%, PRIMARY KEY (channel_id, auction_id, id))`,
+	`CREATE TABLE IF NOT EXISTS seen (channel_id TEXT NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL%SEQ%, PRIMARY KEY (channel_id, kind, id))`,
 }
 
 type cached struct{ scope, sig string } // scope — стрім/аукціон рядка; sig — що записано
@@ -56,6 +56,7 @@ type cached struct{ scope, sig string } // scope — стрім/аукціон �
 type Store struct {
 	db *sql.DB
 	ch string
+	pg bool // PostgreSQL (інакше SQLite)
 
 	// що вже записано (для порівняння в Sync); торкатися лише під a.mu
 	live     string
@@ -74,17 +75,35 @@ func openStore(file, channel string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1) // один запис за раз — без блокувань
+	return initStore(db, false, channel)
+}
+
+// openDB — база за рядком підключення: postgres://… або postgresql://… відкриває PostgreSQL
+// (лише у збірці з тегом server), усе інше — шлях до файлу SQLite.
+func openDB(target, channel string) (*Store, error) {
+	if isPostgresURL(target) {
+		return openPostgres(target, channel)
+	}
+	return openStore(target, channel)
+}
+
+func isPostgresURL(s string) bool {
+	return strings.HasPrefix(s, "postgres://") || strings.HasPrefix(s, "postgresql://")
+}
+
+// initStore — схема й службові записи; єдине місце, де діалекти розходяться в DDL.
+func initStore(db *sql.DB, pg bool, channel string) (*Store, error) {
+	s := &Store{db: db, ch: channel, pg: pg}
 	for _, q := range schema {
-		if _, err := db.Exec(q); err != nil {
+		if _, err := db.Exec(s.ddl(q)); err != nil {
 			db.Close()
 			return nil, fmt.Errorf("схема БД: %w", err)
 		}
 	}
-	if _, err := db.Exec(`INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', ?)`, strconv.Itoa(schemaVersion)); err != nil {
+	if _, err := db.Exec(s.rb(`INSERT INTO meta (key, value) VALUES ('schema_version', ?) ON CONFLICT (key) DO NOTHING`), strconv.Itoa(schemaVersion)); err != nil {
 		db.Close()
 		return nil, err
 	}
-	s := &Store{db: db, ch: channel}
 	s.resetCache()
 	return s, nil
 }
@@ -109,12 +128,12 @@ func (s *Store) resetCache() {
 
 func (s *Store) meta(key string) string {
 	var v string
-	_ = s.db.QueryRow(`SELECT value FROM meta WHERE key = ?`, key).Scan(&v)
+	_ = s.db.QueryRow(s.rb(`SELECT value FROM meta WHERE key = ?`), key).Scan(&v)
 	return v
 }
 
 func (s *Store) setMeta(key, v string) error {
-	_, err := s.db.Exec(`INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value`, key, v)
+	_, err := s.db.Exec(s.rb(`INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value`), key, v)
 	return err
 }
 
@@ -143,7 +162,7 @@ func (s *Store) Sync(st *State) error {
 	defer tx.Rollback()
 	ex := func(q string, args ...any) {
 		if err == nil {
-			_, err = tx.Exec(q, args...)
+			_, err = tx.Exec(s.rb(q), args...)
 		}
 	}
 	now := time.Now().UnixMilli()
@@ -160,7 +179,7 @@ func (s *Store) Sync(st *State) error {
 	// стрім і завершені збори
 	sid := st.Stream.ID
 	if sid != "" && !s.streams[sid] {
-		ex(`INSERT OR IGNORE INTO streams (channel_id, id, started_at) VALUES (?, ?, ?)`, s.ch, sid, st.Stream.StartedAt)
+		ex(`INSERT INTO streams (channel_id, id, started_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`, s.ch, sid, st.Stream.StartedAt)
 		s.streams[sid] = true
 	}
 	wantC := map[string]cached{}
@@ -267,7 +286,7 @@ func (s *Store) Sync(st *State) error {
 		for _, id := range list {
 			want[id] = true
 			if !have[id] {
-				ex(`INSERT OR IGNORE INTO seen (channel_id, kind, id) VALUES (?, ?, ?)`, s.ch, kind, id)
+				ex(`INSERT INTO seen (channel_id, kind, id) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`, s.ch, kind, id)
 			}
 		}
 		for id := range have {
@@ -300,7 +319,7 @@ func (s *Store) newAuctionID(tx *sql.Tx, start int64) string {
 	id := base
 	for i := 2; ; i++ {
 		var n int
-		_ = tx.QueryRow(`SELECT COUNT(*) FROM auctions WHERE channel_id = ? AND id = ?`, s.ch, id).Scan(&n)
+		_ = tx.QueryRow(s.rb(`SELECT COUNT(*) FROM auctions WHERE channel_id = ? AND id = ?`), s.ch, id).Scan(&n)
 		if n == 0 {
 			return id
 		}
@@ -313,7 +332,7 @@ func (s *Store) newAuctionID(tx *sql.Tx, start int64) string {
 // Load — останній стан каналу. ok=false — у БД ще нічого немає.
 func (s *Store) Load() (st State, ok bool, err error) {
 	var live string
-	switch err = s.db.QueryRow(`SELECT live FROM channels WHERE id = ?`, s.ch).Scan(&live); {
+	switch err = s.db.QueryRow(s.rb(`SELECT live FROM channels WHERE id = ?`), s.ch).Scan(&live); {
 	case errors.Is(err, sql.ErrNoRows):
 		return defaultState(), false, nil
 	case err != nil:
@@ -380,7 +399,7 @@ func (s *Store) prime(st *State) {
 
 func (s *Store) seenList(kind string) []string {
 	out := []string{}
-	rows, err := s.db.Query(`SELECT id FROM seen WHERE channel_id = ? AND kind = ? ORDER BY rowid`, s.ch, kind)
+	rows, err := s.db.Query(s.rb(`SELECT id FROM seen WHERE channel_id = ? AND kind = ? ORDER BY `)+s.seq(), s.ch, kind)
 	if err != nil {
 		return out
 	}
@@ -396,7 +415,7 @@ func (s *Store) seenList(kind string) []string {
 
 func (s *Store) entriesOf(stream string, n int) ([]Entry, error) {
 	out := []Entry{}
-	rows, err := s.db.Query(`SELECT data FROM entries WHERE channel_id = ? AND stream_id = ? AND coll_n = ? ORDER BY rowid`, s.ch, stream, n)
+	rows, err := s.db.Query(s.rb(`SELECT data FROM entries WHERE channel_id = ? AND stream_id = ? AND coll_n = ? ORDER BY `)+s.seq(), s.ch, stream, n)
 	if err != nil {
 		return out, err
 	}
@@ -414,10 +433,10 @@ func (s *Store) entriesOf(stream string, n int) ([]Entry, error) {
 // streamFile — завершені збори стріму з замовленнями (поточний збір не входить).
 func (s *Store) streamFile(id string) (StreamFile, error) {
 	f := StreamFile{ID: id, Collections: []Collection{}}
-	if err := s.db.QueryRow(`SELECT started_at FROM streams WHERE channel_id = ? AND id = ?`, s.ch, id).Scan(&f.StartedAt); err != nil {
+	if err := s.db.QueryRow(s.rb(`SELECT started_at FROM streams WHERE channel_id = ? AND id = ?`), s.ch, id).Scan(&f.StartedAt); err != nil {
 		return f, err
 	}
-	rows, err := s.db.Query(`SELECT n, started_at, finished_at, winner, settings FROM collections WHERE channel_id = ? AND stream_id = ? ORDER BY n`, s.ch, id)
+	rows, err := s.db.Query(s.rb(`SELECT n, started_at, finished_at, winner, settings FROM collections WHERE channel_id = ? AND stream_id = ? ORDER BY n`), s.ch, id)
 	if err != nil {
 		return f, err
 	}
@@ -444,17 +463,17 @@ func (s *Store) streamFile(id string) (StreamFile, error) {
 // streamExists — чи є вже стрім з таким id (новий стрім ніколи не перезаписує старий)
 func (s *Store) streamExists(id string) bool {
 	var n int
-	_ = s.db.QueryRow(`SELECT COUNT(*) FROM streams WHERE channel_id = ? AND id = ?`, s.ch, id).Scan(&n)
+	_ = s.db.QueryRow(s.rb(`SELECT COUNT(*) FROM streams WHERE channel_id = ? AND id = ?`), s.ch, id).Scan(&n)
 	return n > 0
 }
 
 // streamMetas — усі стріми з кількістю завершених зборів і замовлень у них
 func (s *Store) streamMetas() []StreamMeta {
 	out := []StreamMeta{}
-	rows, err := s.db.Query(`SELECT s.id, s.started_at,
+	rows, err := s.db.Query(s.rb(`SELECT s.id, s.started_at,
 		(SELECT COUNT(*) FROM collections c WHERE c.channel_id = s.channel_id AND c.stream_id = s.id),
 		(SELECT COUNT(*) FROM entries e WHERE e.channel_id = s.channel_id AND e.stream_id = s.id AND e.coll_n > 0)
-		FROM streams s WHERE s.channel_id = ?`, s.ch)
+		FROM streams s WHERE s.channel_id = ?`), s.ch)
 	if err != nil {
 		return out
 	}
@@ -471,7 +490,7 @@ func (s *Store) streamMetas() []StreamMeta {
 // auctionLots — лоти аукціону за порядком і останні limit ставок (найновіші першими; limit 0 — усі)
 func (s *Store) auctionLots(id string, limit int) ([]Lot, []Bid, error) {
 	lots, feed := []Lot{}, []Bid{}
-	rows, err := s.db.Query(`SELECT data FROM lots WHERE channel_id = ? AND auction_id = ? ORDER BY ord`, s.ch, id)
+	rows, err := s.db.Query(s.rb(`SELECT data FROM lots WHERE channel_id = ? AND auction_id = ? ORDER BY ord`), s.ch, id)
 	if err != nil {
 		return lots, feed, err
 	}
@@ -483,13 +502,13 @@ func (s *Store) auctionLots(id string, limit int) ([]Lot, []Bid, error) {
 		}
 	}
 	rows.Close()
-	q := `SELECT data FROM bids WHERE channel_id = ? AND auction_id = ? ORDER BY ts DESC, rowid DESC`
+	q := `SELECT data FROM bids WHERE channel_id = ? AND auction_id = ? ORDER BY ts DESC, ` + s.seq() + ` DESC`
 	args := []any{s.ch, id}
 	if limit > 0 {
 		q += ` LIMIT ?`
 		args = append(args, limit)
 	}
-	rows, err = s.db.Query(q, args...)
+	rows, err = s.db.Query(s.rb(q), args...)
 	if err != nil {
 		return lots, feed, err
 	}
@@ -507,7 +526,7 @@ func (s *Store) auctionLots(id string, limit int) ([]Lot, []Bid, error) {
 // allAuctions — усі аукціони з лотами й усіма ставками (для експорту)
 func (s *Store) allAuctions() []auctionRec {
 	var out []auctionRec
-	rows, err := s.db.Query(`SELECT id, COALESCE(winner, '') FROM auctions WHERE channel_id = ? ORDER BY id`, s.ch)
+	rows, err := s.db.Query(s.rb(`SELECT id, COALESCE(winner, '') FROM auctions WHERE channel_id = ? ORDER BY id`), s.ch)
 	if err != nil {
 		return out
 	}
@@ -565,11 +584,11 @@ func (s *Store) migrateFiles(baseDir string) (State, bool, error) {
 	defer tx.Rollback()
 	ex := func(q string, args ...any) {
 		if err == nil {
-			_, err = tx.Exec(q, args...)
+			_, err = tx.Exec(s.rb(q), args...)
 		}
 	}
 	addStream := func(id string, started int64, colls []Collection) {
-		ex(`INSERT OR IGNORE INTO streams (channel_id, id, started_at) VALUES (?, ?, ?)`, s.ch, id, started)
+		ex(`INSERT INTO streams (channel_id, id, started_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`, s.ch, id, started)
 		used, maxN := map[int]bool{}, 0
 		for _, c := range colls {
 			if c.N > maxN {
@@ -582,10 +601,14 @@ func (s *Store) migrateFiles(baseDir string) (State, bool, error) {
 				c.N = maxN
 			}
 			used[c.N] = true
-			ex(`INSERT OR REPLACE INTO collections (channel_id, stream_id, n, started_at, finished_at, winner, settings) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			ex(`INSERT INTO collections (channel_id, stream_id, n, started_at, finished_at, winner, settings) VALUES (?, ?, ?, ?, ?, ?, ?)
+					ON CONFLICT (channel_id, stream_id, n) DO UPDATE SET started_at = excluded.started_at, finished_at = excluded.finished_at,
+					winner = excluded.winner, settings = excluded.settings`,
 				s.ch, id, c.N, c.StartedAt, c.FinishedAt, c.Winner, mustJSON(c.Settings))
 			for _, e := range c.Entries {
-				ex(`INSERT OR REPLACE INTO entries (channel_id, id, stream_id, coll_n, ts, login, text, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				ex(`INSERT INTO entries (channel_id, id, stream_id, coll_n, ts, login, text, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+						ON CONFLICT (channel_id, id) DO UPDATE SET stream_id = excluded.stream_id, coll_n = excluded.coll_n, ts = excluded.ts,
+						login = excluded.login, text = excluded.text, data = excluded.data`,
 					s.ch, e.ID, id, c.N, e.Ts, e.Login, e.Text, mustJSON(e))
 			}
 		}
@@ -636,15 +659,18 @@ func (s *Store) migrateFiles(baseDir string) (State, bool, error) {
 		if t, e := time.ParseInLocation("2006-01-02_15-04-05", id, time.Local); e == nil {
 			started = t.UnixMilli()
 		}
-		ex(`INSERT OR REPLACE INTO auctions (channel_id, id, started_at, finished_at, winner) VALUES (?, ?, ?, ?, ?)`, s.ch, id, started, 0, f.Winner)
+		ex(`INSERT INTO auctions (channel_id, id, started_at, finished_at, winner) VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT (channel_id, id) DO UPDATE SET started_at = excluded.started_at, finished_at = excluded.finished_at, winner = excluded.winner`, s.ch, id, started, 0, f.Winner)
 		for i, l := range f.Lots {
-			ex(`INSERT OR REPLACE INTO lots (channel_id, auction_id, id, ord, name, amount, data) VALUES (?, ?, ?, ?, ?, ?, ?)`, s.ch, id, l.ID, i, l.Name, l.Amount, mustJSON(l))
+			ex(`INSERT INTO lots (channel_id, auction_id, id, ord, name, amount, data) VALUES (?, ?, ?, ?, ?, ?, ?)
+				ON CONFLICT (channel_id, auction_id, id) DO UPDATE SET ord = excluded.ord, name = excluded.name, amount = excluded.amount, data = excluded.data`, s.ch, id, l.ID, i, l.Name, l.Amount, mustJSON(l))
 		}
 		for _, b := range f.Feed {
-			ex(`INSERT OR REPLACE INTO bids (channel_id, auction_id, id, ts, amount, data) VALUES (?, ?, ?, ?, ?, ?)`, s.ch, id, b.ID, b.Ts, b.Amount, mustJSON(b))
+			ex(`INSERT INTO bids (channel_id, auction_id, id, ts, amount, data) VALUES (?, ?, ?, ?, ?, ?)
+				ON CONFLICT (channel_id, auction_id, id) DO UPDATE SET ts = excluded.ts, amount = excluded.amount, data = excluded.data`, s.ch, id, b.ID, b.Ts, b.Amount, mustJSON(b))
 		}
 	}
-	ex(`INSERT OR REPLACE INTO meta (key, value) VALUES ('migrated_from_files', ?)`, time.Now().Format(time.RFC3339))
+	ex(`INSERT INTO meta (key, value) VALUES ('migrated_from_files', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value`, time.Now().Format(time.RFC3339))
 	if err != nil {
 		return State{}, false, err
 	}

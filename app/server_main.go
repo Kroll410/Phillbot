@@ -6,7 +6,8 @@
 // Налаштування — змінні оточення:
 //
 //	PHILLBOT_ADDR          адреса сервера (за замовчуванням 127.0.0.1:8080)
-//	PHILLBOT_DATA          тека з базою даних (за замовчуванням ./data)
+//	PHILLBOT_DATA          тека з базою SQLite (за замовчуванням ./data)
+//	PHILLBOT_DATABASE_URL  postgres://… або postgresql://… — використати PostgreSQL замість SQLite
 //	PHILLBOT_PUBLIC_URL    адреса, за якою сервер видно ззовні: https://домен (для входу через Twitch і віджетів)
 //	TWITCH_CLIENT_ID       застосунок Twitch типу Confidential, OAuth Redirect URL: <PUBLIC_URL>/auth/callback
 //	TWITCH_CLIENT_SECRET   його секрет
@@ -69,10 +70,16 @@ func main() {
 	if cfg.Dev && !isLoopback(addr) {
 		log.Fatal("PHILLBOT_DEV=1 дозволено лише на 127.0.0.1 / localhost")
 	}
-	if err := os.MkdirAll(dataDir, 0700); err != nil {
-		log.Fatal(err)
+	db := strings.TrimSpace(os.Getenv("PHILLBOT_DATABASE_URL"))
+	if !isPostgresURL(db) {
+		db = filepath.Join(dataDir, "phillbot.db")
+		if err := os.MkdirAll(dataDir, 0700); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		log.Print("база даних: PostgreSQL")
 	}
-	ws, err := newWebServer(cfg, filepath.Join(dataDir, "phillbot.db"))
+	ws, err := newWebServer(cfg, db)
 	if err != nil {
 		log.Fatal(err)
 	}

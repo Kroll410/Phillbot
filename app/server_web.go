@@ -141,7 +141,7 @@ func newWebServer(cfg serverConfig, dbFile string) (*webServer, error) {
 			return nil, errors.New("потрібен PHILLBOT_ADMIN — логін Twitch адміністратора")
 		}
 	}
-	base, err := openStore(dbFile, "")
+	base, err := openDB(dbFile, "")
 	if err != nil {
 		return nil, err
 	}

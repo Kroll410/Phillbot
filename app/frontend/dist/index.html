@@ -24,7 +24,8 @@
 </header>
 
 <!-- загальні налаштування -->
-<div class="modal" id="generalModal"><div class="box settings">
+<div class="modal" id="generalModal"><div class="mpair">
+<div class="box settings">
   <h2>Загальні налаштування</h2>
   <h3>Віджет для OBS</h3>
   <div id="obsWidget" class="owidget"></div>
@@ -32,7 +33,16 @@
   <label>Порт локального сервера (127.0.0.1)</label>
   <input type="number" id="obsPort" min="1024" max="65000" step="1" style="max-width:160px">
   <div class="hint">Працює лише на цьому комп'ютері. Після зміни порту оновіть URL у джерелі OBS.</div>
-  <h3>Донати Donatello</h3>
+  <h3>Файли</h3>
+  <div class="row"><button id="openBase">Папка програми</button></div>
+  <div class="row actions" style="margin-top:16px">
+    <button data-close="generalModal">Скасувати</button>
+    <button id="generalSave" class="primary">Зберегти</button>
+  </div>
+</div>
+<div class="box settings donbox">
+  <h2>Донати Donatello</h2>
+  <h3>Тунель ngrok</h3>
   <div class="hint" style="margin:-2px 0 6px">Donatello миттєво надсилає кожен донат у PhillBot. Публічну адресу для цього дає вбудований ngrok. Під час збору СабДею донат стає замовленням, під час аукціону — ставкою.</div>
   <label>Токен ngrok (authtoken)</label>
   <input type="password" id="ngrokToken" autocomplete="off" spellcheck="false" placeholder="dashboard.ngrok.com → Your Authtoken">
@@ -43,15 +53,7 @@
   <input type="password" id="donKey" autocomplete="off" spellcheck="false" placeholder="ключ з Donatello → API → Колбеки">
   <div class="donlink" id="donLink"></div>
   <div class="hint">Donatello → Панель → API → Колбеки: метод <b>POST</b>, вставте посилання вище, а ключ звідти — у поле «Ключ колбека». Перевірте кнопкою «Тестове повідомлення».</div>
-  <h3>Акаунт Twitch</h3>
-  <div id="accountInfo" class="hint"></div>
-  <div class="row" style="margin-top:8px"><button id="logoutBtn2">Вийти з акаунта</button><button id="changeClient2">Змінити Client ID</button></div>
-  <h3>Файли</h3>
-  <div class="row"><button id="openBase">Папка програми</button></div>
-  <div class="row actions" style="margin-top:16px">
-    <button data-close="generalModal">Скасувати</button>
-    <button id="generalSave" class="primary">Зберегти</button>
-  </div>
+</div>
 </div></div>
 
 <!-- налаштування СабДею -->

@@ -581,11 +581,9 @@ document.addEventListener("keydown", e => {
 });
 document.querySelectorAll(".modal").forEach(m => m.addEventListener("mousedown", e => { if(e.target === m) dismissModal(m); }));
 
-// Загальні: акаунт, порт OBS
+// Загальні: віджет і порт OBS, файли; праворуч — Donatello через ngrok
 $("generalBtn").onclick = () => {
   $("ngrokToken").value = S.settings.ngrokToken || ""; $("ngrokDomain").value = S.settings.ngrokDomain || ""; $("donKey").value = S.settings.donKey || ""; $("donLink")._k = "";
-  const u = S.auth && S.auth.user;
-  $("accountInfo").innerHTML = u ? `Канал: <b>${esc(u.display_name)}</b> <span class="muted">(${esc(u.login)})</span>` : "Не увійшли";
   $("obsPort").value = S.settings.obsPort; renderObs(); openModal("generalModal"); renderDon();
 };
 $("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round(n("obsPort",17841)), ngrokToken: $("ngrokToken").value.trim(), ngrokDomain: $("ngrokDomain").value.trim(), donKey: $("donKey").value.trim()}); closeModal("generalModal"); toast("Збережено"); };
@@ -608,8 +606,6 @@ $("donLink").addEventListener("click", async e => {
   const b = e.target.closest("#donCopy"); b.textContent = ok ? "Скопійовано" : "Не вдалося"; setTimeout(() => b.textContent = "Копіювати", 1500);
 });
 const fmtUAH = v => { const x = Number(v) || 0; return x % 1 ? x.toFixed(2).replace(".", ",") : String(x); };
-$("logoutBtn2").onclick = async () => { if(await confirmBox("Вийти з акаунта Twitch?")){ closeModal("generalModal"); call("Logout"); } };
-$("changeClient2").onclick = async () => { if(await confirmBox("Змінити Client ID? Потрібно буде увійти знову.")){ closeModal("generalModal"); call("ChangeClientID"); } };
 $("openBase").onclick = () => call("OpenFolder", "");
 $("openCsv").onclick = () => call("OpenFolder", "exports");
 

@@ -47,6 +47,13 @@
       location.href = "/";
     },
     Login: async () => { location.href = "/auth/login"; },
+    // експорт за весь час — звичайне завантаження файлу браузером
+    ExportAll: async kind => {
+      const a = document.createElement("a");
+      a.href = "api/export/" + encodeURIComponent(kind); a.download = "";
+      document.body.appendChild(a); a.click(); a.remove();
+      return "";
+    },
   };
 
   window.go = {main: {App: new Proxy({}, {get: (_, name) => local[name] || ((...args) => invoke(String(name), args))})}};

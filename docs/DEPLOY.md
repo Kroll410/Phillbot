@@ -72,9 +72,13 @@ fly deploy -c ../fly.toml --dockerfile Dockerfile --build-arg VERSION=$(git desc
 `PHILLBOT_PUBLIC_URL` задається в `[env]` у `fly.toml` і має збігатися з реальною https-адресою
 та з Redirect URL у застосунку Twitch.
 
+## Donatello
+
+У вебверсії ngrok не потрібен: «Загальні налаштування → Донати Donatello» показують посилання
+`https://<домен>/donatello/<секрет каналу>`. Його й ключ колбека вставте в Donatello → API → Колбеки.
+
 ## Що ще не перенесено у вебверсію
 
-- Донати Donatello (колбек на `/donatello/<секрет>` замість ngrok) — наступний етап.
 - Картинка в центрі колеса з власного файлу (емодзі каналу працюють).
 
 ## База даних

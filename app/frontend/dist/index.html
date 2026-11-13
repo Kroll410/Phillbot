@@ -29,10 +29,10 @@
   <h2>Загальні налаштування</h2>
   <h3>Віджет для OBS</h3>
   <div id="obsWidget" class="owidget"></div>
-  <label>Порт локального сервера (127.0.0.1)</label>
-  <input type="number" id="obsPort" min="1024" max="65000" step="1" style="max-width:160px">
-  <h3>Файли</h3>
-  <div class="row"><button id="openBase">Папка програми</button></div>
+  <div class="desktoponly"><label>Порт локального сервера (127.0.0.1)</label>
+  <input type="number" id="obsPort" min="1024" max="65000" step="1" style="max-width:160px"></div>
+  <div class="desktoponly"><h3>Файли</h3>
+  <div class="row"><button id="openBase">Папка програми</button></div></div>
   <h3>Експорт за весь час</h3>
   <div class="row exportrow"><button data-export="subday">СабДей .csv</button><button data-export="auction">Аукціон .csv</button><button data-export="zip">Усе .zip</button></div>
   <div class="row actions" style="margin-top:16px">
@@ -42,9 +42,9 @@
 </div>
 <div class="box settings donbox">
   <h2>Донати Donatello</h2>
-  <label>Токен ngrok</label>
+  <div class="desktoponly"><label>Токен ngrok</label>
   <input type="password" id="ngrokToken" autocomplete="off" spellcheck="false">
-  <div class="hint"><a href="#" data-url="https://dashboard.ngrok.com/get-started/your-authtoken">dashboard.ngrok.com/get-started/your-authtoken</a></div>
+  <div class="hint"><a href="#" data-url="https://dashboard.ngrok.com/get-started/your-authtoken">dashboard.ngrok.com/get-started/your-authtoken</a></div></div>
   <label>Ключ колбека Donatello</label>
   <input type="password" id="donKey" autocomplete="off" spellcheck="false">
   <div class="hint"><a href="#" data-url="https://donatello.to/panel/doc-api?tab=callbacks">donatello.to/panel/doc-api?tab=callbacks</a></div>

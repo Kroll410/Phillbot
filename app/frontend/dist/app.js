@@ -604,7 +604,7 @@ $("generalBtn").onclick = () => {
   $("obsPort").value = S.settings.obsPort; renderObs(); openModal("generalModal"); renderDon();
 };
 $("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round(n("obsPort",17841)), ngrokToken: $("ngrokToken").value.trim(), donKey: $("donKey").value.trim()}); closeModal("generalModal"); toast("Збережено"); };
-// Donatello через ngrok: статус тунелю і посилання для колбеків
+// Donatello: статус і посилання для колбеків (десктоп — через ngrok, вебверсія — адреса сервера)
 function renderDon(){
   const d = S.don || {state: "off"}, pill = $("donPill");
   if(!(S.auth && S.auth.status === "ok")){ pill.classList.add("hidden"); return; } // без входу в Twitch індикатора немає
@@ -619,6 +619,7 @@ function renderDon(){
   const html = d.state === "on" ? `<div class="donurl"><code>${esc(d.url)}</code><button class="small" id="donCopy">Копіювати</button></div><span class="ok">Готово: донати приходитимуть миттєво.</span>`
     : d.state === "starting" ? (d.error ? `<span class="muted">${esc(d.error)}</span>` : "")
     : d.state === "error" ? `<span class="err">${esc(d.error || "Помилка ngrok")}</span>`
+    : d.url ? `<div class="donurl"><code>${esc(d.url)}</code><button class="small" id="donCopy">Копіювати</button></div><span class="muted">Вставте ключ колбека з Donatello і натисніть «Зберегти».</span>` // вебверсія: посилання є завжди
     : `<span class="muted">Вставте токен ngrok і натисніть «Зберегти» — тут з'явиться посилання для Donatello.</span>`;
   if(box._k !== html){ box._k = html; box.innerHTML = html; }
 }

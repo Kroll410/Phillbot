@@ -397,3 +397,90 @@ func TestServerAdminAndIsolation(t *testing.T) {
 		t.Fatal("channel data lost on revoke")
 	}
 }
+
+// Donatello у вебверсії: колбек на /donatello/<секрет каналу> з X-Key із налаштувань — донат іде в канал;
+// чужий секрет, секрет віджета, неправильний ключ і GET — відхилено.
+func TestServerDonatello(t *testing.T) {
+	ws, srv := devServer(t)
+	rt, _ := ws.channel("local")
+	_, b := callAPI(t, srv, "GetState")
+	var snap Snapshot
+	_ = json.Unmarshal(b, &snap)
+	if snap.Don.State != "off" || !strings.HasSuffix(snap.Don.URL, "/donatello/"+rt.donSecret) || rt.donSecret == rt.secret {
+		t.Fatalf("don status without key: %+v", snap.Don)
+	}
+	callAPI(t, srv, "SaveSettings", Settings{DonKey: "kkk"})
+	_, b = callAPI(t, srv, "GetState")
+	_ = json.Unmarshal(b, &snap)
+	if snap.Don.State != "on" {
+		t.Fatalf("don status with key: %+v", snap.Don)
+	}
+	callAPI(t, srv, "StartTimer")
+	send := func(path, key, method string) int {
+		req, _ := http.NewRequest(method, srv.URL+path, strings.NewReader(`{"pubId":"p1","clientName":"Olena","message":"Hades II","amount":"120","currency":"UAH"}`))
+		req.Header.Set("X-Key", key)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if c := send("/donatello/"+rt.secret, "kkk", "POST"); c != 404 {
+		t.Fatal("widget secret accepted for donations", c)
+	}
+	if c := send("/donatello/00000000000000000000000000000000", "kkk", "POST"); c != 404 {
+		t.Fatal("unknown secret", c)
+	}
+	if c := send("/donatello/"+rt.donSecret, "wrong", "POST"); c != 403 {
+		t.Fatal("wrong key", c)
+	}
+	if c := send("/donatello/"+rt.donSecret, "kkk", "GET"); c != 405 {
+		t.Fatal("GET", c)
+	}
+	if c := send("/donatello/"+rt.donSecret, "kkk", "POST"); c != 200 {
+		t.Fatal("donation", c)
+	}
+	send("/donatello/"+rt.donSecret, "kkk", "POST") // повтор того самого донату
+	rt.ch.mu.Lock()
+	n := len(rt.ch.st.Entries)
+	var e Entry
+	if n > 0 {
+		e = rt.ch.st.Entries[0]
+	}
+	rt.ch.mu.Unlock()
+	if n != 1 || !e.Donation || e.Text != "Hades II" || e.DonPoints != 4 {
+		t.Fatalf("donation not recorded once: n=%d %+v", n, e)
+	}
+}
+
+// Експорт за весь час у вебверсії — завантаження файлу свого каналу; без входу — 401.
+func TestServerExport(t *testing.T) {
+	_, srv := devServer(t)
+	callAPI(t, srv, "StartTimer")
+	callAPI(t, srv, "AddManual", "Phill", 1, 2, "Hades")
+	for kind, ct := range map[string]string{"subday": "text/csv", "auction": "text/csv", "zip": "application/zip"} {
+		resp, err := http.Get(srv.URL + "/api/export/" + kind)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 200 || !strings.HasPrefix(resp.Header.Get("Content-Type"), ct) || !strings.Contains(resp.Header.Get("Content-Disposition"), "attachment") {
+			t.Fatal(kind, resp.StatusCode, resp.Header)
+		}
+		if kind == "subday" && !strings.Contains(string(b), "Hades") {
+			t.Fatal("subday csv without the order")
+		}
+	}
+	if resp, _ := http.Get(srv.URL + "/api/export/nope"); resp.StatusCode != 404 {
+		t.Fatal("unknown export", resp.StatusCode)
+	}
+}
+
+func TestServerExportNeedsLogin(t *testing.T) {
+	_, srv := authServer(t)
+	if resp, _ := http.Get(srv.URL + "/api/export/zip"); resp.StatusCode != 401 {
+		t.Fatal("export without login", resp.StatusCode)
+	}
+}

@@ -189,7 +189,7 @@ func TestPostgresAuth(t *testing.T) {
 	if err := s.setMeta("widget_secret:42", "sec"); err != nil {
 		t.Fatal(err)
 	}
-	if a.channelBySecret("sec") != "42" || a.channelBySecret("x") != "" {
+	if a.channelBySecret("widget_secret", "sec") != "42" || a.channelBySecret("widget_secret", "x") != "" {
 		t.Fatal("channelBySecret")
 	}
 	if us, err := a.users(); err != nil || len(us) != 1 {

@@ -6,6 +6,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -254,4 +255,19 @@ func exportZip(colls []subdayColl, recs []auctionRec) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// exportFile — файл «за весь час»: kind = "subday" (.csv), "auction" (.csv), "zip". Спільне для десктопу й вебверсії.
+func (a *Channel) exportFile(kind string) (name string, data []byte, err error) {
+	stamp := time.Now().Format("2006-01-02")
+	switch kind {
+	case "subday":
+		return "PhillBot_СабДей_" + stamp + ".csv", subdayAllCSV(a.loadAllSubday()), nil
+	case "auction":
+		return "PhillBot_Аукціон_" + stamp + ".csv", auctionAllCSV(a.loadAllAuctions()), nil
+	case "zip":
+		data, err = exportZip(a.loadAllSubday(), a.loadAllAuctions())
+		return "PhillBot_" + stamp + ".zip", data, err
+	}
+	return "", nil, errors.New("невідомий експорт")
 }

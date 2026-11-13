@@ -8,6 +8,7 @@ package main
 //   /api/call/<Метод>      виклик методу свого каналу; /api/events — події свого каналу (SSE)
 //   /admin                 «Доступ»: білий список (лише адмін)
 //   /w/<секрет>/overlay/…  віджети OBS каналу за секретним посиланням
+//   /donatello/<секрет>    колбеки донатів Donatello для каналу (плюс X-Key із налаштувань каналу)
 
 import (
 	"context"
@@ -53,6 +54,7 @@ type webHost struct {
 	ui, ov   *sseHub // браузери стрімера / віджети OBS
 	notifyCh chan struct{}
 	obsURL   string // https://домен/w/<секрет>
+	donURL   string // https://домен/donatello/<секрет> — вставити в Donatello → API → Колбеки
 }
 
 func newHub() *sseHub { return &sseHub{clients: map[chan []byte]struct{}{}} }
@@ -68,7 +70,15 @@ func (h *webHost) Notify() {
 	default:
 	}
 }
-func (h *webHost) Decorate(s *Snapshot) { s.Obs = OverlayInfo{Running: true, URL: h.obsURL} }
+
+// викликається під c.mu; Donatello «on», коли в налаштуваннях є ключ колбека
+func (h *webHost) Decorate(s *Snapshot) {
+	s.Obs = OverlayInfo{Running: true, URL: h.obsURL}
+	s.Don = DonStatus{State: "off", URL: h.donURL}
+	if strings.TrimSpace(s.Settings.DonKey) != "" {
+		s.Don.State = "on"
+	}
+}
 func (h *webHost) SaveTokens(t *Tokens) {
 	if h.auth != nil {
 		if err := h.auth.saveTokens(h.chID, t); err != nil {
@@ -103,9 +113,10 @@ func (h *webHost) overlayLoop(ctx context.Context) {
 // ---------- сервер і реєстр каналів ----------
 
 type chanRT struct {
-	ch     *Channel
-	host   *webHost
-	secret string
+	ch        *Channel
+	host      *webHost
+	secret    string // віджети
+	donSecret string // колбеки Donatello
 }
 
 type webServer struct {
@@ -119,6 +130,7 @@ type webServer struct {
 	mu       sync.Mutex
 	chans    map[string]*chanRT
 	bySecret map[string]string
+	byDon    map[string]string
 }
 
 func randomHex(n int) string {
@@ -162,7 +174,7 @@ func newWebServer(cfg serverConfig, dbFile string) (*webServer, error) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &webServer{cfg: cfg, base: base, auth: auth, ctx: ctx, cancel: cancel, connect: !cfg.Dev,
-		chans: map[string]*chanRT{}, bySecret: map[string]string{}}, nil
+		chans: map[string]*chanRT{}, bySecret: map[string]string{}, byDon: map[string]string{}}, nil
 }
 
 // start — підняти канали, що вже входили (таймери й EventSub працюють і без відкритого браузера)
@@ -201,14 +213,16 @@ func (s *webServer) channel(id string) (*chanRT, error) {
 		return rt, nil
 	}
 	store := s.base.forChannel(id)
-	secret := store.meta("widget_secret:" + id)
-	if len(secret) < 32 {
-		secret = randomHex(16)
-		if err := store.setMeta("widget_secret:"+id, secret); err != nil {
-			return nil, err
-		}
+	secret, err := channelSecret(store, "widget_secret:"+id)
+	if err != nil {
+		return nil, err
 	}
-	h := &webHost{chID: id, auth: s.auth, ui: newHub(), ov: newHub(), notifyCh: make(chan struct{}, 1), obsURL: s.cfg.Public + "/w/" + secret}
+	donSecret, err := channelSecret(store, "don_secret:"+id)
+	if err != nil {
+		return nil, err
+	}
+	h := &webHost{chID: id, auth: s.auth, ui: newHub(), ov: newHub(), notifyCh: make(chan struct{}, 1),
+		obsURL: s.cfg.Public + "/w/" + secret, donURL: s.cfg.Public + "/donatello/" + donSecret}
 	ch := newChannel(h)
 	h.ch = ch
 	ch.store = store
@@ -224,8 +238,8 @@ func (s *webServer) channel(id string) (*chanRT, error) {
 	ch.auth = AuthInfo{Status: "need_login"}
 	go ch.ticker(s.ctx)
 	go h.overlayLoop(s.ctx)
-	rt := &chanRT{ch: ch, host: h, secret: secret}
-	s.chans[id], s.bySecret[secret] = rt, id
+	rt := &chanRT{ch: ch, host: h, secret: secret, donSecret: donSecret}
+	s.chans[id], s.bySecret[secret], s.byDon[donSecret] = rt, id, id
 	if s.connect {
 		if tok := s.auth.loadTokens(id); tok != nil {
 			ch.auth = AuthInfo{Status: "checking"}
@@ -233,6 +247,16 @@ func (s *webServer) channel(id string) (*chanRT, error) {
 		}
 	}
 	return rt, nil
+}
+
+// channelSecret — випадковий секрет посилання каналу (створюється один раз і зберігається в meta)
+func channelSecret(store *Store, key string) (string, error) {
+	v := store.meta(key)
+	if len(v) == 32 {
+		return v, nil
+	}
+	v = randomHex(16)
+	return v, store.setMeta(key, v)
 }
 
 func (s *webServer) connectChannel(rt *chanRT, tok *Tokens) {
@@ -286,9 +310,11 @@ func (s *webServer) handler() http.Handler {
 	mux.HandleFunc("/api/events", s.withChannel(func(w http.ResponseWriter, r *http.Request, rt *chanRT, _ *WebUser) {
 		serveSSE(w, r, rt.host.ui, sseFrame("state", rt.ch.GetState()))
 	}))
+	mux.HandleFunc("/api/export/", s.withChannel(s.serveExport))
 	mux.HandleFunc("/admin", s.serveAdminPage)
 	mux.HandleFunc("/admin/api/", s.serveAdminAPI)
 	mux.HandleFunc("/w/", s.serveWidget)
+	mux.HandleFunc("/donatello/", s.serveDonatello)
 	mux.HandleFunc("/", s.serveUI)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -522,6 +548,27 @@ func (s *webServer) serveCall(w http.ResponseWriter, r *http.Request, rt *chanRT
 	_ = json.NewEncoder(w).Encode(res)
 }
 
+// GET /api/export/<subday|auction|zip> — експорт за весь час своїм каналом, як завантаження файлу
+func (s *webServer) serveExport(w http.ResponseWriter, r *http.Request, rt *chanRT, _ *WebUser) {
+	if r.Method != http.MethodGet {
+		writeErr(w, http.StatusMethodNotAllowed, "лише GET")
+		return
+	}
+	name, data, err := rt.ch.exportFile(strings.TrimPrefix(r.URL.Path, "/api/export/"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, err.Error())
+		return
+	}
+	ct := "text/csv; charset=utf-8"
+	if strings.HasSuffix(name, ".zip") {
+		ct = "application/zip"
+	}
+	w.Header().Set("Content-Type", ct)
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Disposition", `attachment; filename="PhillBot`+path.Ext(name)+`"; filename*=UTF-8''`+url.PathEscape(name))
+	_, _ = w.Write(data)
+}
+
 // ---------- «Доступ»: білий список ----------
 
 func (s *webServer) admin(r *http.Request) *WebUser {
@@ -626,29 +673,53 @@ func serveSSE(w http.ResponseWriter, r *http.Request, hub *sseHub, first []byte)
 
 // ---------- віджети OBS: /w/<секрет>/overlay/<сторінка>, /w/<секрет>/api/… ----------
 
-func (s *webServer) widgetChannel(secret string) *chanRT {
+// secretChannel — канал за секретом посилання (віджет або Donatello); канал піднімається з БД, якщо ще не в пам'яті
+func (s *webServer) secretChannel(kind, secret string) *chanRT {
 	if len(secret) != 32 {
 		return nil
 	}
 	s.mu.Lock()
-	id, ok := s.bySecret[secret]
+	m := s.bySecret
+	if kind == "don_secret" {
+		m = s.byDon
+	}
+	id, ok := m[secret]
 	s.mu.Unlock()
 	if !ok {
-		if id = s.auth.channelBySecret(secret); id == "" {
+		if id = s.auth.channelBySecret(kind, secret); id == "" {
 			return nil
 		}
 	}
 	rt, err := s.channel(id)
-	if err != nil || subtle.ConstantTimeCompare([]byte(rt.secret), []byte(secret)) != 1 {
+	if err != nil {
+		return nil
+	}
+	want := rt.secret
+	if kind == "don_secret" {
+		want = rt.donSecret
+	}
+	if subtle.ConstantTimeCompare([]byte(want), []byte(secret)) != 1 {
 		return nil
 	}
 	return rt
 }
 
+// POST /donatello/<секрет> — колбек Donatello для каналу; ключ X-Key перевіряє сам канал (його налаштування)
+func (s *webServer) serveDonatello(w http.ResponseWriter, r *http.Request) {
+	rt := s.secretChannel("don_secret", strings.Trim(strings.TrimPrefix(r.URL.Path, "/donatello/"), "/"))
+	if rt == nil {
+		http.NotFound(w, r)
+		return
+	}
+	r2 := r.Clone(r.Context())
+	r2.URL.Path = "/donatello"
+	rt.ch.donatelloHandler().ServeHTTP(w, r2)
+}
+
 func (s *webServer) serveWidget(w http.ResponseWriter, r *http.Request) {
 	rest := strings.TrimPrefix(r.URL.Path, "/w/")
 	sec, sub, _ := strings.Cut(rest, "/")
-	rt := s.widgetChannel(sec)
+	rt := s.secretChannel("widget_secret", sec)
 	if rt == nil {
 		http.NotFound(w, r)
 		return

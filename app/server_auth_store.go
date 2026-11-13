@@ -288,12 +288,12 @@ func (a *authStore) channelsWithTokens() []string {
 	return out
 }
 
-// channelBySecret — канал за секретом посилання на віджети
-func (a *authStore) channelBySecret(secret string) string {
+// channelBySecret — канал за секретом посилання (kind: widget_secret | don_secret)
+func (a *authStore) channelBySecret(kind, secret string) string {
 	var key string
-	err := a.s.db.QueryRow(a.s.rb(`SELECT key FROM meta WHERE key LIKE 'widget_secret:%' AND value = ?`), secret).Scan(&key)
+	err := a.s.db.QueryRow(a.s.rb(`SELECT key FROM meta WHERE key LIKE ? AND value = ?`), kind+":%", secret).Scan(&key)
 	if errors.Is(err, sql.ErrNoRows) || err != nil {
 		return ""
 	}
-	return strings.TrimPrefix(key, "widget_secret:")
+	return strings.TrimPrefix(key, kind+":")
 }

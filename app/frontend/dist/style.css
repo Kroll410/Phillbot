@@ -1018,3 +1018,6 @@ td > .donchip{margin-left:0}
 /* бали: частка за подаровані сабки окремо перед сумою */
 .ptgift{display:inline-flex;align-items:center;gap:3px;margin-right:8px;font:600 12px/1 var(--font-display);color:#c9a6ff;vertical-align:1px}
 .ptgift svg{width:12px;height:12px}
+
+/* вебверсія: без локального сервера віджетів і ngrok — сервер і так публічний */
+html.web .desktoponly{display:none}

@@ -628,11 +628,11 @@ function renderDon(){
   if(d.state === "starting"){ clearTimeout(panel._offT); if(!panel._t0){ panel._t0 = performance.now(); loadOn(panel); } }
   else if(panel._t0){ const left = 1400 - (performance.now() - panel._t0); panel._t0 = 0; clearTimeout(panel._offT); panel._offT = setTimeout(() => loadOff(panel), Math.max(0, left)); }
   const box = $("donLink");
-  const html = d.state === "on" ? `<div class="donurl"><code>${esc(d.url)}</code><button class="small" id="donCopy">Копіювати</button></div><span class="ok">Готово: донати приходитимуть миттєво.</span>`
+  const html = d.state === "on" ? `<div class="donurl"><code>${esc(d.url)}</code><button class="small" id="donCopy">Копіювати</button></div><span class="ok">Підключено</span>`
     : d.state === "starting" ? (d.error ? `<span class="muted">${esc(d.error)}</span>` : "")
     : d.state === "error" ? `<span class="err">${esc(d.error || "Помилка ngrok")}</span>`
-    : d.url ? `<div class="donurl"><code>${esc(d.url)}</code><button class="small" id="donCopy">Копіювати</button></div><span class="muted">Вставте ключ колбека з Donatello і натисніть «Зберегти».</span>` // вебверсія: посилання є завжди
-    : `<span class="muted">Вставте токен ngrok і натисніть «Зберегти» — тут з'явиться посилання для Donatello.</span>`;
+    : d.url ? `<div class="donurl"><code>${esc(d.url)}</code><button class="small" id="donCopy">Копіювати</button></div><span class="muted">Це посилання вставте в Donatello.</span>` // вебверсія: посилання є завжди
+    : `<span class="muted">Після збереження тут з'явиться посилання для Donatello.</span>`;
   if(box._k !== html){ box._k = html; box.innerHTML = html; }
 }
 $("donLink").addEventListener("click", async e => {

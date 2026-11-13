@@ -90,27 +90,23 @@
   document.documentElement.classList.add("web");
   connect();
 
-  // загальні налаштування: «Дані каналу» (видалити все — затисканням, червоним) і документи
+  // загальні налаштування → «Дані за весь час»: червона кнопка «Видалити дані каналу» (затискання, як «Вийти»)
   window.webHold = async (action, btn) => {
     if (action !== "deletechannel") return;
     const r = await fetch("api/account/delete", {method: "POST", headers: {"X-PhillBot": "1"}, credentials: "same-origin"}).catch(() => null);
     if (r && r.ok) { location.href = "/"; return; }
-    const hint = document.getElementById("delChannelHint");
-    if (hint) { hint.textContent = "Не вдалося видалити дані — спробуйте ще раз."; hint.classList.add("err"); }
+    const lbl = btn && btn.querySelector(".wl");
+    if (lbl) { lbl.textContent = "Не вдалося — ще раз"; setTimeout(() => lbl.textContent = "Видалити дані каналу", 2500); }
   };
   const addDataBox = () => {
-    const box = document.querySelector("#generalModal .box.settings");
+    const after = document.querySelector("#generalModal .exportrow");
     const ink = document.querySelector("#logoutBtn .liquid"); // та сама «червона фарба», що в кнопці «Вийти»
-    if (!box || !ink) { setTimeout(addDataBox, 300); return; }
+    if (!after || !ink) { setTimeout(addDataBox, 300); return; }
     if (document.getElementById("webDataBox")) return;
     const d = document.createElement("div");
-    d.id = "webDataBox";
-    d.innerHTML = `<h3>Дані каналу</h3>
-      <div class="hint" id="delChannelHint">Видалити всю історію, налаштування й вхід цього каналу з PhillBot. Скасувати не можна — спершу можна зробити «Усе .zip».</div>
-      <div class="row"><button class="winbtn holdend" data-hold="web:deletechannel" title="Затисніть і тримайте">${ink.outerHTML}<span class="wl">Видалити дані каналу</span></button><span class="holdhint">Затисніть і тримайте</span></div>
-      <div class="hint legallinks"><a href="/privacy" target="_blank" rel="noopener">Політика конфіденційності</a> · <a href="/terms" target="_blank" rel="noopener">Умови користування</a></div>`;
-    const actions = box.querySelector(".row.actions");
-    box.insertBefore(d, actions);
+    d.id = "webDataBox"; d.className = "row";
+    d.innerHTML = `<button class="winbtn holdend" data-hold="web:deletechannel">${ink.outerHTML}<span class="wl">Видалити дані каналу</span></button>`;
+    after.after(d);
   };
   addEventListener("load", addDataBox);
 

@@ -1322,8 +1322,8 @@ function wheelDraw(secs){
   if(wheelCv.width !== size * dpr){ wheelCv.width = wheelCv.height = size * dpr; wheelCv.style.width = wheelCv.style.height = size + "px"; }
   const c = wctx, R = size / 2 - 6, cx = size / 2, big = auSwapped;
   c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, size, size);
-  // зовнішнє кільце — фірмовий градієнт
-  const ring = c.createLinearGradient(0, 0, size, 0); ring.addColorStop(0, "#00c853"); ring.addColorStop(1, "#9147ff");
+  // зовнішнє кільце — фірмовий фіолетовий
+  const ring = "#9147ff";
   c.beginPath(); c.arc(cx, cx, R + 4, 0, Math.PI * 2); c.fillStyle = ring; c.fill();
   if(!secs.length){
     c.beginPath(); c.arc(cx, cx, R, 0, Math.PI * 2); c.fillStyle = "#1f1f23"; c.fill();

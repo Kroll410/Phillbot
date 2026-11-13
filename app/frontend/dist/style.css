@@ -17,9 +17,11 @@
   --font-mono:"Cascadia Mono","Cascadia Code",Consolas,monospace;
   /* шрифти Twitch: Roobert (комерційний, лише якщо встановлений), Inter — відкрита заміна, яку використовує сам Twitch */
   --font-twitch:"Roobert","Inter","Helvetica Neue",Helvetica,Arial,sans-serif;
-  /* фірмовий градієнт PhillBot: зелений → фіолетовий */
-  --grad:linear-gradient(90deg,#00c853,#9147ff);
-  --grad-soft:linear-gradient(90deg,rgba(0,200,83,.22),rgba(145,71,255,.22));
+  /* фірмовий колір PhillBot: фіолетовий — для дій і виділення; зелений (--ok) — лише для того, що іде зараз.
+     --grad лишився «зображенням» суцільного кольору, бо ним малюються рамки через padding-box/border-box */
+  --brand:#9147ff; --brand-text:#bf94ff;
+  --grad:linear-gradient(var(--brand),var(--brand));
+  --grad-soft:linear-gradient(rgba(145,71,255,.22),rgba(145,71,255,.22));
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -350,9 +352,8 @@ tr.gdetail:hover{background:transparent}
 .welcome.play .wbox{transform:scale(1)}
 .whi{font:600 22px/1.2 var(--font-display);color:var(--muted);opacity:0;animation:wfade .5s .1s forwards}
 .wname{font:700 60px/1.1 var(--font-brand);letter-spacing:.5px;margin:6px 0 10px;
-  background:linear-gradient(90deg,#bf94ff,#9147ff 30%,#ffffff 50%,#9147ff 70%,#bf94ff);background-size:250% 100%;
-  -webkit-background-clip:text;background-clip:text;color:transparent;
-  opacity:0;animation:wpop .7s .2s cubic-bezier(.2,1.5,.4,1) forwards,wshine 2.2s .5s ease-in-out}
+  color:var(--brand-text);
+  opacity:0;animation:wpop .7s .2s cubic-bezier(.2,1.5,.4,1) forwards}
 .wsub{font-size:14px;color:var(--muted);opacity:0;animation:wfade .5s .55s forwards}
 @keyframes wpop{0%{opacity:0;transform:translateY(16px) scale(.8)}100%{opacity:1;transform:none}}
 @keyframes wfade{to{opacity:1}}
@@ -406,7 +407,7 @@ tr.gdetail:hover{background:transparent}
 .gamepane{display:flex;align-items:center;justify-content:center;padding:24px}
 .gamecard{width:min(720px,100%);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:32px 36px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
 .glabel{font:600 12px/1.3 var(--font-ui);text-transform:uppercase;letter-spacing:1.4px;color:var(--muted)}
-.gname{font:700 36px/1.15 var(--font-brand);margin:10px 0 12px;overflow-wrap:anywhere;background:linear-gradient(90deg,#fff,#c9a6ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.gname{font:700 36px/1.15 var(--font-brand);margin:10px 0 12px;overflow-wrap:anywhere;color:var(--text)}
 .gusers{font-size:13.5px;line-height:2;color:var(--muted);min-height:1em}
 .gtimerbox{display:grid;grid-template-columns:56px 1fr 56px;align-items:center;gap:12px;margin:22px 0 6px}
 .gtimer{font:600 120px/1 var(--font-display);font-variant-numeric:tabular-nums;color:var(--text)}
@@ -450,7 +451,7 @@ td.wincell{white-space:nowrap;padding-left:0;padding-right:6px}
 @property --load-angle{syntax:"<angle>";inherits:false;initial-value:0deg}
 .is-loading{position:relative}
 .is-loading::after{content:"";position:absolute;inset:0;border-radius:inherit;padding:2px;pointer-events:none;z-index:5;
-  background:conic-gradient(from var(--load-angle),#00c853,#4fd27a 18%,#9147ff 48%,rgba(145,71,255,0) 62%,rgba(0,200,83,0) 82%,#00c853);
+  background:conic-gradient(from var(--load-angle),#bf94ff,#9147ff 30%,rgba(145,71,255,0) 60%,rgba(145,71,255,0) 85%,#bf94ff);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
   animation:load-spin 1.1s linear infinite}
 @keyframes load-spin{to{--load-angle:360deg}}
@@ -511,7 +512,7 @@ h1,h2,h3,h4{font-family:var(--font-brand)}
 .gsec.on{display:block;animation:enter2 .4s cubic-bezier(.2,1.2,.4,1)}
 @keyframes enter2{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .gover{font:700 26px/1.2 var(--font-brand);margin:22px 0 6px}
-.vstart{height:48px;min-width:280px;font-size:16px;border-radius:12px;margin:8px 0 14px;background:linear-gradient(135deg,#00c853,#9147ff);border:0}
+.vstart{height:48px;min-width:280px;font-size:16px;border-radius:12px;margin:8px 0 14px;background:var(--brand);border:0}
 .vstart:hover{filter:brightness(1.1)}
 .gctl.small2 button{min-width:0;height:36px;font-size:13px;font-weight:600}
 .vtimer{font:600 84px/1 var(--font-display);font-variant-numeric:tabular-nums;margin:8px 0 14px}
@@ -530,8 +531,7 @@ h1,h2,h3,h4{font-family:var(--font-brand)}
 .owidget .obsrow code{font-size:12.5px;color:#c9a6ff}
 
 /* ---------- фірмовий градієнт: логотип, шнурочок зборів, hover кнопок ---------- */
-header h1{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:.3px}
-header h1 span{color:transparent}
+header h1{color:var(--text);letter-spacing:.3px} header h1 span{color:var(--brand-text)}
 
 /* збори стріму: однакова ширина, з'єднані градієнтним шнурочком */
 .cchips{gap:0;align-items:center;padding:4px 2px}
@@ -570,14 +570,14 @@ button.icon:not(:disabled):hover{color:var(--text)}
 /* вміст вкладки прослизає слідом */
 .slidein{animation:slidein .38s cubic-bezier(.2,.9,.3,1)}
 @keyframes slidein{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
-.cchips{scrollbar-width:thin}.cchips::-webkit-scrollbar{height:4px}.cchips::-webkit-scrollbar-thumb{background:linear-gradient(90deg,#00c853,#9147ff);border-radius:4px}
+.cchips{scrollbar-width:thin}.cchips::-webkit-scrollbar{height:4px}.cchips::-webkit-scrollbar-thumb{background:var(--brand);border-radius:4px}
 
 /* статус збору — плашка (замість дрібного тексту) */
 .status{margin:6px 0 16px;display:flex;justify-content:center}
 .spill{display:inline-flex;align-items:center;gap:8px;padding:5px 14px 5px 12px;border-radius:999px;
   font:600 12px/1.2 var(--font-ui);letter-spacing:.9px;text-transform:uppercase;color:var(--muted);background:var(--panel2);border:1px solid var(--line)}
 .spill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.8}
-.spill.running{color:#5cf29a;background:linear-gradient(var(--panel2),var(--panel2)) padding-box,var(--grad) border-box;border-color:transparent}
+.spill.running{color:#5cf29a;background:var(--panel2);border-color:rgba(0,200,83,.55)}
 .spill.running::before{background:#00e676;box-shadow:0 0 0 0 rgba(0,230,118,.6);animation:live 1.6s infinite}
 @keyframes live{0%{box-shadow:0 0 0 0 rgba(0,230,118,.55)}70%{box-shadow:0 0 0 7px rgba(0,230,118,0)}100%{box-shadow:0 0 0 0 rgba(0,230,118,0)}}
 .spill.paused{color:var(--warn)}
@@ -607,7 +607,7 @@ button.primary:not(:disabled):hover{background:var(--grad) border-box no-repeat;
 .seg-ind.deny{animation:denyshake .5s cubic-bezier(.36,.07,.19,.97)}
 @keyframes denyshake{10%,90%{translate:-1px 0}20%,80%{translate:3px 0}30%,50%,70%{translate:-5px 0}40%,60%{translate:5px 0}}
 .mode-tab.denied{color:#ff9a95!important}
-.gblink,.timer.gblink,.gtimer.gblink,.vtimer.gblink{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:gblink .42s ease-in-out 4}
+.gblink,.timer.gblink,.gtimer.gblink,.vtimer.gblink{color:var(--brand-text)!important;animation:gblink .42s ease-in-out 4}
 @keyframes gblink{0%,100%{filter:brightness(1);opacity:1}50%{filter:brightness(1.6) drop-shadow(0 0 12px rgba(145,71,255,.7));opacity:.55}}
 
 /* етап 2: назва гри, збір і замовники — над карткою; керування — під нею */
@@ -639,7 +639,7 @@ button.primary:not(:disabled):hover{background:var(--grad) border-box no-repeat;
 .gover-block.open{max-height:340px;opacity:1;pointer-events:auto;margin-top:0}
 .gover-block .gover{margin-top:4px}
 /* «Почати голосування» — свій градієнт; при наведенні лише світлішає, без підміни фону (не «блимає») */
-button.vstart,button.vstart:not(:disabled):hover{background:linear-gradient(135deg,#00c853,#9147ff) border-box no-repeat;border-color:transparent}
+button.vstart,button.vstart:not(:disabled):hover{background:var(--brand);border-color:transparent}
 button.vstart{transition:filter .2s ease,box-shadow .2s ease,transform .15s ease}
 button.vstart:not(:disabled):hover{filter:brightness(1.1);box-shadow:0 6px 18px rgba(145,71,255,.35);transform:translateY(-1px)}
 /* «Завершити гру»: у градієнті рідини спершу червоний — червоний → зелений → фіолетовий */
@@ -673,7 +673,7 @@ button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--gr
 .ms{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border-radius:10px;background:var(--panel2)}
 .ms b{font:600 24px/1 var(--font-display);font-variant-numeric:tabular-nums}
 .ms span{font-size:12px;color:var(--muted)}
-.ms.pts b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.ms.pts b{color:var(--brand-text)}
 /* стиснуті (старші) збори — кружечки з номером */
 .cchip.mini{width:38px;flex:0 0 38px;height:38px;padding:0;border-radius:50%;align-items:center;justify-content:center}
 .cchip.mini b{font:700 13px/1 var(--font-display)}
@@ -691,7 +691,7 @@ button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--gr
 #modeViewing .card{margin-bottom:0}
 .aubar{display:grid;grid-template-columns:auto minmax(260px,330px) minmax(220px,300px) 1fr auto;align-items:center;gap:18px;padding:10px 14px}
 .aubar-l{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
-.autitle{font:700 20px/1 var(--font-brand);background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.autitle{font:700 20px/1 var(--font-brand);color:var(--text)}
 .autimer{margin:0}
 .autimer .timer{font-size:46px;padding:0}
 .auctl{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:8px}
@@ -742,7 +742,7 @@ button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--gr
 .autable tr.win{background:linear-gradient(90deg,rgba(0,200,83,.14),rgba(145,71,255,.14))}
 .autable tr.win td{background:transparent}
 .autable td.act{width:36px}
-.lwin{font-weight:700;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lwin{font-weight:700;color:var(--brand-text)}
 .lout{font-size:12px;color:#ff9a95}
 /* лоти — стисло (топ-3 + інформація), коли колесо у великому вікні */
 .autop{display:flex;flex-direction:column;gap:8px}
@@ -790,7 +790,7 @@ button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--gr
 .auwrap{grid-template-columns:minmax(0,1fr) 460px}
 .austats{display:flex;align-items:baseline;gap:14px;margin-left:auto;max-width:none;width:auto;justify-self:auto;font-size:12px;color:var(--muted);white-space:nowrap}
 .austats .ast b{font:600 16px/1 var(--font-display);font-variant-numeric:tabular-nums;color:var(--text);margin-right:2px}
-.austats .ast.pts b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.austats .ast.pts b{color:var(--brand-text)}
 .austats + .auswap{margin-left:6px}
 .auinfo{justify-content:center}
 /* у вузькій колонці (список праворуч) — лише цифри, без зайвого */
@@ -803,7 +803,7 @@ button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--gr
 .autable .mtag{margin-left:10px;font-size:12px;color:#d9c7ff;white-space:nowrap}
 .autable .mtag:empty{display:none}
 .autable .mtag i{font-style:normal;color:#5cf29a;font-weight:700;margin-right:2px}
-.autable .mtag b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;margin-left:4px}
+.autable .mtag b{color:var(--brand-text);margin-left:4px}
 .autable tr.drop .mtag{padding:2px 8px;border-radius:999px;background:rgba(145,71,255,.22)}
 .autable tr.dragging{opacity:.55}
 .autable tr.dragging .mtag{color:var(--muted)}
@@ -891,17 +891,17 @@ tr[draggable="true"] input{cursor:text}
 .autop-i.out{opacity:.45}
 .autop-i.wglow{border-left-color:transparent}
 .autop-i.wglow::after{content:"";position:absolute;inset:-2px;border-radius:12px;padding:2px;pointer-events:none;z-index:5;
-  background:conic-gradient(from var(--load-angle),#00c853,#4fd27a 18%,#9147ff 48%,rgba(145,71,255,0) 62%,rgba(0,200,83,0) 82%,#00c853);
+  background:conic-gradient(from var(--load-angle),#bf94ff,#9147ff 30%,rgba(145,71,255,0) 60%,rgba(145,71,255,0) 85%,#bf94ff);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
   animation:load-spin 3.2s linear infinite,win-pulse 1.8s ease-in-out infinite}
 @keyframes win-pulse{0%,100%{opacity:1}50%{opacity:.35}}
-.autop-i.wglow .nm{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.autop-i.wglow .nm{color:var(--brand-text)}
 .autop-i.wglow{background:var(--panel2);border:0;border-left:4px solid var(--c)}
 .autop-i.wglow::after{inset:0;border-radius:10px}
 /* велика таблиця: рядок переможця — дві лінії, зверху і знизу; градієнт повільно пливе й пульсує */
 .autable tr.win{position:relative}
 .autable tr.win::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:5;
-  background:linear-gradient(90deg,#00c853,#9147ff,#00c853,#9147ff) 0 0/200% 100%;
+  background:var(--brand);
   -webkit-mask:linear-gradient(#000 0 0) top/100% 2px no-repeat,linear-gradient(#000 0 0) bottom/100% 2px no-repeat;
   mask:linear-gradient(#000 0 0) top/100% 2px no-repeat,linear-gradient(#000 0 0) bottom/100% 2px no-repeat;
   animation:win-flow 4s linear infinite,win-pulse 1.8s ease-in-out infinite}

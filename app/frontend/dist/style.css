@@ -1040,7 +1040,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px soli
 .modenote.show{opacity:1;transform:none}
 /* «Доступ» окремо від індикатора з'єднання */
 .conn .adminlink{margin-right:4px;padding-right:12px;border-right:1px solid var(--line)}
-/* «Видалити дані каналу» — небезпечна дія видно одразу, а не лише під час затискання */
+/* «Видалити мої дані» — небезпечна дія видно одразу, а не лише під час затискання */
 #webDataBox{margin-top:8px}
 #webDataBox .winbtn.holdend{border-color:rgba(235,64,52,.6);color:#ff9a95}
 #webDataBox .winbtn.holdend:not(:disabled):hover{border-color:#ff6b61}

@@ -595,7 +595,9 @@ function renderDon(){
   if(!$("generalModal").classList.contains("show")) return;
   // підключення до ngrok — рамка завантаження навколо правої панелі
   const panel = document.querySelector("#generalModal .donbox");
-  if(d.state === "starting") loadOn(panel); else loadOff(panel);
+  // рамка тримається щонайменше 1.4 с — швидке підключення не дає короткого «блимання»
+  if(d.state === "starting"){ clearTimeout(panel._offT); if(!panel._t0){ panel._t0 = performance.now(); loadOn(panel); } }
+  else if(panel._t0){ const left = 1400 - (performance.now() - panel._t0); panel._t0 = 0; clearTimeout(panel._offT); panel._offT = setTimeout(() => loadOff(panel), Math.max(0, left)); }
   const box = $("donLink");
   const html = d.state === "on" ? `<div class="donurl"><code>${esc(d.url)}</code><button class="small" id="donCopy">Копіювати</button></div><span class="ok">Готово: донати приходитимуть миттєво.</span>`
     : d.state === "starting" ? (d.error ? `<span class="muted">${esc(d.error)}</span>` : "")

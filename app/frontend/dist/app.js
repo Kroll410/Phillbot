@@ -436,7 +436,7 @@ function renderTable(){
       rows.map(e=>`<tr data-id="${e.id}"${DRAG()} class="${e.excluded?"off":!e.counted?"replaced":""} ${freshIds.has(e.id)?"fresh":""}" title="${esc(e.excluded?"Приховано — не рахується":!e.counted?"Не рахується: від цього чатерса враховано інше замовлення":(e.source||""))}">
         <td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${fmtClock(e.ts)}</td>
         <td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
-        ${e.donation ? `<td><span class="donchip">₴${fmtUAH(e.uah)}</span></td><td class="num"><span class="muted">Donatello</span></td>` : editMode ? `<td><select data-f="tier"><option value="0" ${!e.tier?"selected":""}>—</option>${[1,2,3].map(t=>`<option value="${t}" ${e.tier===t?"selected":""}>T${t}</option>`).join("")}</select></td>
+        ${e.donation ? `<td>${donChip(e.uah)}</td><td class="num"><span class="muted">Donatello</span></td>` : editMode ? `<td><select data-f="tier"><option value="0" ${!e.tier?"selected":""}>—</option>${[1,2,3].map(t=>`<option value="${t}" ${e.tier===t?"selected":""}>T${t}</option>`).join("")}</select></td>
         <td class="num"><span class="subcell">${subBadgeFor(e)}<input class="mo" type="number" min="1" data-f="months" value="${e.months||""}" ${!e.tier?"disabled":""}></span></td>`
         : `<td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td><td class="num">${e.tier?`<span class="subcell">${subBadgeFor(e)}${e.months} міс.</span>`:'<span class="muted">—</span>'}</td>`}
         <td class="num pts">${e.points}</td>
@@ -610,6 +610,9 @@ $("donLink").addEventListener("click", async e => {
   const ok = await call("CopyText", (S.don || {}).url || "");
   const b = e.target.closest("#donCopy"); b.textContent = ok ? "Скопійовано" : "Не вдалося"; setTimeout(() => b.textContent = "Копіювати", 1500);
 });
+// бейдж донату Donatello: серце + сума в гривнях
+const DON_HEART = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.5 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 4.3 2.4.7-1.3 2.2-2.4 4.3-2.4 3.8 0 5.8 4 4.3 7.3C19.5 16.4 12 21 12 21z" fill="currentColor"/></svg>`;
+const donChip = uah => `<span class="donchip">${DON_HEART}<i>₴</i><b>${fmtUAH(uah)}</b></span>`;
 const fmtUAH = v => { const x = Number(v) || 0; return x % 1 ? x.toFixed(2).replace(".", ",") : String(x); };
 $("openBase").onclick = () => call("OpenFolder", "");
 $("openCsv").onclick = () => call("OpenFolder", "exports");
@@ -1225,7 +1228,7 @@ function renderAuFeed(){
     else if(b.status === "added") st = `<div class="fst">до лота <b>«${esc(lot ? lot.name : b.text)}»</b></div>`;
     else st = `<div class="fst">${b.status === "rejected" ? "окремий лот" : "новий лот"}</div>`;
     return `<div class="fbid ${b.status}${auFresh.has(b.id) ? " fresh" : ""}" style="--c:${lotColor(b.lotId || b.suggestId)}">
-      <div class="frow">${userTag(b)}${b.donation ? `<span class="donchip">₴${fmtUAH(b.uah)}</span>` : ""}<span class="famt">${POINTS_ICON}${fmtN(b.amount)}</span><span class="ftime">${fmtHM(b.ts)}</span></div>
+      <div class="frow">${userTag(b)}${b.donation ? donChip(b.uah) : ""}<span class="famt">${POINTS_ICON}${fmtN(b.amount)}</span><span class="ftime">${fmtHM(b.ts)}</span></div>
       <div class="ftext">${esc(b.text)}</div>${st}</div>`;
   }).join("");
 }

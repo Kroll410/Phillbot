@@ -33,13 +33,16 @@
   <input type="number" id="obsPort" min="1024" max="65000" step="1" style="max-width:160px">
   <div class="hint">Працює лише на цьому комп'ютері. Після зміни порту оновіть URL у джерелі OBS.</div>
   <h3>Донати Donatello</h3>
-  <label>Токен API (Donatello → Налаштування → API)</label>
-  <div class="row" style="align-items:center">
-    <input type="password" id="donToken" autocomplete="off" spellcheck="false" placeholder="вставте токен">
-    <button id="donTest" style="flex:0 0 auto">Перевірити</button>
-  </div>
-  <div class="hint" id="donStatus"></div>
-  <div class="hint">Донат під час збору СабДею стає замовленням, під час аукціону — ставкою. Текст донату — назва, сума в гривнях перераховується в бали (налаштовується у СабДеї та аукціоні).</div>
+  <div class="hint" style="margin:-2px 0 6px">Donatello миттєво надсилає кожен донат у PhillBot. Публічну адресу для цього дає вбудований ngrok. Під час збору СабДею донат стає замовленням, під час аукціону — ставкою.</div>
+  <label>Токен ngrok (authtoken)</label>
+  <input type="password" id="ngrokToken" autocomplete="off" spellcheck="false" placeholder="dashboard.ngrok.com → Your Authtoken">
+  <label>Постійний домен ngrok (необов'язково)</label>
+  <input id="ngrokDomain" autocomplete="off" spellcheck="false" placeholder="наприклад, phillbot.ngrok-free.app">
+  <div class="hint">dashboard.ngrok.com → Domains: один домен безкоштовний. З ним посилання не змінюється після перезапуску програми.</div>
+  <label>Ключ колбека Donatello (API Key)</label>
+  <input type="password" id="donKey" autocomplete="off" spellcheck="false" placeholder="ключ з Donatello → API → Колбеки">
+  <div class="donlink" id="donLink"></div>
+  <div class="hint">Donatello → Панель → API → Колбеки: метод <b>POST</b>, вставте посилання вище, а ключ звідти — у поле «Ключ колбека». Перевірте кнопкою «Тестове повідомлення».</div>
   <h3>Акаунт Twitch</h3>
   <div id="accountInfo" class="hint"></div>
   <div class="row" style="margin-top:8px"><button id="logoutBtn2">Вийти з акаунта</button><button id="changeClient2">Змінити Client ID</button></div>

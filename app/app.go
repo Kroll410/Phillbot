@@ -62,7 +62,7 @@ type App struct {
 	tokMu    sync.Mutex
 	token    *Tokens
 
-	donCancel  context.CancelFunc // опитування Donatello
+	tunStop    context.CancelFunc // тунель ngrok для колбеків Donatello
 	don        DonStatus
 	badgeMu    sync.Mutex
 	badgeCache map[string]subInfo
@@ -123,7 +123,7 @@ func (a *App) startup(ctx context.Context) {
 	port := a.st.Settings.ObsPort
 	a.mu.Unlock()
 	a.overlay.start(port)
-	a.restartDonatello()
+	a.restartTunnel()
 	if low := strings.ToLower(a.baseDir); strings.Contains(low, `\temp\`) || strings.Contains(low, `\tmp\`) {
 		a.logf("⚠ Програму запущено з тимчасової папки (архіву) — налаштування й токени зникнуть. Розпакуйте PhillBot.exe у звичайну папку.")
 	}
@@ -131,8 +131,8 @@ func (a *App) startup(ctx context.Context) {
 
 func (a *App) shutdown(ctx context.Context) {
 	a.mu.Lock()
-	if a.donCancel != nil {
-		a.donCancel()
+	if a.tunStop != nil {
+		a.tunStop()
 	}
 	a.mu.Unlock()
 	if a.overlay != nil {
@@ -450,9 +450,9 @@ func (a *App) SelectReward(id, title string) Snapshot {
 
 func (a *App) SaveSettings(s Settings) Snapshot {
 	var oldPort int
-	var oldTok string
+	var oldTok, oldDom string
 	snap := a.mutate(func(st *State) {
-		oldPort, oldTok = st.Settings.ObsPort, st.Settings.DonToken
+		oldPort, oldTok, oldDom = st.Settings.ObsPort, st.Settings.NgrokToken, st.Settings.NgrokDomain
 		s.RewardID, s.RewardTitle = st.Settings.RewardID, st.Settings.RewardTitle
 		s.normalize()
 		st.Settings = s
@@ -460,11 +460,8 @@ func (a *App) SaveSettings(s Settings) Snapshot {
 			st.Session.RemainingMs = int64(s.DurationMin) * 60000
 		}
 	})
-	if strings.TrimSpace(s.DonToken) != oldTok {
-		a.mu.Lock()
-		a.st.DonInit, a.st.DonSeen = false, nil // новий токен — історію донатів знову лише запам'ятати
-		a.mu.Unlock()
-		a.restartDonatello()
+	if s.NgrokToken != oldTok || s.NgrokDomain != oldDom { // інший токен чи домен ngrok — новий тунель
+		a.restartTunnel()
 	}
 	if a.overlay != nil && s.ObsPort != oldPort {
 		a.overlay.stop()

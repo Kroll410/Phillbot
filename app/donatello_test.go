@@ -1,11 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
-	"time"
 )
 
 func TestDonPointsMath(t *testing.T) {
@@ -27,43 +26,87 @@ func TestDonPointsMath(t *testing.T) {
 			t.Errorf("auction %.2f/%d = %d, want %d", c.uah, c.per, got, c.want)
 		}
 	}
-	if donAmount("100") != 100 || donAmount("12,5") != 12.5 || donAmount("x") != 0 {
-		t.Fatal("amount parse")
+	// сума в гривнях: actualAmount у UAH має перевагу; донат у валюті без конвертації — не в гривнях
+	if v, ok := (Donate{Amount: "5", Currency: "USD", ActualAmount: "205.5", ActualCurrency: "UAH"}).uah(); !ok || v != 205.5 {
+		t.Fatal("actual amount", v, ok)
+	}
+	if v, ok := (Donate{Amount: "100", Currency: "UAH"}).uah(); !ok || v != 100 {
+		t.Fatal("uah", v)
+	}
+	if _, ok := (Donate{Amount: "5", Currency: "EUR"}).uah(); ok {
+		t.Fatal("eur accepted")
+	}
+	for in, want := range map[string]string{" https://abc.ngrok-free.app/ ": "abc.ngrok-free.app", "abc.ngrok.app": "abc.ngrok.app", "": ""} {
+		if got := ngrokDomain(in); got != want {
+			t.Errorf("domain %q → %q", in, got)
+		}
 	}
 }
 
-func don(id, name, msg, amount string) Donate {
-	return Donate{PubID: id, ClientName: name, Message: msg, Amount: amount, Currency: "UAH"}
+func postDon(h http.Handler, key, body string) int {
+	r := httptest.NewRequest("POST", "/donatello", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	if key != "" {
+		r.Header.Set("X-Key", key)
+	}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	return w.Code
 }
 
-func TestDonatesToSubdayAndAuction(t *testing.T) {
+func donJSON(id, name, msg, amount string) string {
+	return `{"pubId":"` + id + `","clientName":"` + name + `","message":"` + msg + `","amount":"` + amount + `","currency":"UAH","actualAmount":"` + amount + `","actualCurrency":"UAH","source":"donatello","createdAt":"1794518423"}`
+}
+
+func TestDonatelloCallback(t *testing.T) {
 	a := newTestApp(t)
-	// перше підключення: історія лише запам'ятовується
-	a.StartTimer()
-	a.handleDonates([]Donate{don("old2", "A", "Hades", "300"), don("old1", "B", "Doom", "300")})
-	if len(a.st.Entries) != 0 || !a.st.DonInit || len(a.st.DonSeen) != 2 {
-		t.Fatalf("baseline: entries=%d init=%v seen=%v", len(a.st.Entries), a.st.DonInit, a.st.DonSeen)
+	h := a.donatelloHandler()
+	// ключ не вказано — нічого не приймається
+	if c := postDon(h, "k", donJSON("x0", "A", "Hades", "300")); c != http.StatusForbidden {
+		t.Fatalf("no key configured: %d", c)
 	}
-	// СабДей: збір іде — донат стає замовленням з балами ⌊грн/30⌋, той самий донат удруге не рахується
-	a.AddManual("Phill", 1, 2, "Hades") // підписник T1 × 2 міс. = 2 бали
-	list := []Donate{don("d2", "Богдан", "hades", "120"), don("d1", "Богдан", "Hades", "59"), don("old2", "A", "Hades", "300")}
-	a.handleDonates(list)
-	a.handleDonates(list)
+	a.st.Settings.DonKey = "15165cf7"
+	if c := postDon(h, "wrong", donJSON("x0", "A", "Hades", "300")); c != http.StatusForbidden {
+		t.Fatalf("wrong key: %d", c)
+	}
+	// лише POST /donatello
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/donatello", nil))
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatal("GET allowed")
+	}
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("POST", "/api/state", nil))
+	if w.Code != http.StatusNotFound {
+		t.Fatal("other paths must be closed")
+	}
+	if c := postDon(h, "15165cf7", "{bad"); c != http.StatusBadRequest {
+		t.Fatalf("bad json: %d", c)
+	}
+
+	// СабДей: збір іде — донат стає замовленням ⌊грн/30⌋; повторний колбек того самого донату не рахується
+	a.StartTimer()
+	a.AddManual("Phill", 1, 2, "Hades") // T1 × 2 міс. = 2 бали
+	for _, b := range []string{donJSON("d1", "Богдан", "Hades", "59"), donJSON("d2", "Богдан", "hades", "120"), donJSON("d2", "Богдан", "hades", "120")} {
+		if c := postDon(h, "15165cf7", b); c != http.StatusOK {
+			t.Fatalf("callback: %d", c)
+		}
+	}
 	var donE []Entry
 	for _, e := range a.st.Entries {
 		if e.Donation {
 			donE = append(donE, e)
 		}
 	}
-	if len(donE) != 2 || donE[0].DonPoints != 1 || donE[1].DonPoints != 4 || donE[0].UAH != 59 {
+	if len(donE) != 2 || donE[0].DonPoints != 1 || donE[1].DonPoints != 4 || donE[1].UAH != 120 {
 		t.Fatalf("subday donations %+v", donE)
 	}
-	g := aggregate(a.st.Settings, a.st.Entries)
-	if len(g) != 1 || g[0].Points != 2+1+4 { // донати від одного донатера не «з'їдають» одне одного
+	if g := aggregate(a.st.Settings, a.st.Entries); len(g) != 1 || g[0].Points != 2+1+4 {
 		t.Fatalf("group %+v", g)
 	}
-	// не гривні, без тексту — не враховуються
-	a.handleDonates([]Donate{{PubID: "usd", ClientName: "X", Message: "Doom", Amount: "5", Currency: "USD"}, don("empty", "Y", "  ", "90")})
+	// без тексту чи не в гривнях — не враховуються
+	postDon(h, "15165cf7", `{"pubId":"e1","clientName":"Y","message":"  ","amount":"90","currency":"UAH"}`)
+	postDon(h, "15165cf7", `{"pubId":"e2","clientName":"X","message":"Doom","amount":"5","currency":"USD"}`)
 	if n := len(a.st.Entries); n != 3 {
 		t.Fatalf("entries %d", n)
 	}
@@ -72,7 +115,8 @@ func TestDonatesToSubdayAndAuction(t *testing.T) {
 	a.AuctionSaveSettings(AuctionSettings{RewardIDs: []string{"q"}})
 	a.AuctionStart()
 	a.onRedemption(bid("r1", "q", "Квиток", "u1", "Elden Ring", 1000), User{})
-	a.handleDonates([]Donate{don("a1", "Ira", "elden ring", "100"), don("a2", "Max", "Celeste", "5")})
+	postDon(h, "15165cf7", donJSON("a1", "Ira", "elden ring", "100"))
+	postDon(h, "15165cf7", donJSON("a2", "Max", "Celeste", "5")) // замало для ставки
 	au := &a.st.Auction
 	if len(au.Lots) != 1 || au.Lots[0].Amount != 11000 || au.Feed[0].Status != "added" || !au.Feed[0].Donation || au.Feed[0].UAH != 100 {
 		t.Fatalf("auction %+v feed %+v", au.Lots, au.Feed)
@@ -80,50 +124,23 @@ func TestDonatesToSubdayAndAuction(t *testing.T) {
 	// нічого не йде — донат лише в журнал
 	a.AuctionFinish()
 	before := len(a.st.Entries)
-	a.handleDonates([]Donate{don("late", "Z", "Doom", "300")})
+	postDon(h, "15165cf7", donJSON("late", "Z", "Doom", "300"))
 	if len(a.st.Entries) != before || len(au.Lots) != 1 {
 		t.Fatal("donation applied while nothing runs")
 	}
 }
 
-// опитування живого API підміняється тестовим сервером: статус «on», нікнейм, донати зчитуються
-func TestDonatelloLoop(t *testing.T) {
-	calls := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("X-Token") != "good" {
-			w.WriteHeader(401)
-			return
-		}
-		calls++
-		switch r.URL.Path {
-		case "/me":
-			json.NewEncoder(w).Encode(map[string]any{"nickname": "PhillHess"})
-		case "/donates":
-			json.NewEncoder(w).Encode(map[string]any{"content": []Donate{don("x1", "A", "Hades", "60")}})
-		}
-	}))
-	defer srv.Close()
-	old := donatelloBase
-	donatelloBase = srv.URL + "/"
-	defer func() { donatelloBase = old }()
-
+func TestTunnelOffWithoutToken(t *testing.T) {
 	a := newTestApp(t)
-	a.st.Settings.DonToken = "good"
-	a.restartDonatello()
-	for i := 0; i < 50 && !(a.don.State == "on" && a.st.DonInit); i++ {
-		time.Sleep(20 * time.Millisecond)
+	a.restartTunnel()
+	if a.don.State != "off" || a.tunStop != nil {
+		t.Fatalf("tunnel without token: %+v", a.don)
 	}
-	a.mu.Lock()
-	st, nick, init := a.don.State, a.don.Nickname, a.st.DonInit
-	a.donCancel()
-	a.mu.Unlock()
-	if st != "on" || nick != "PhillHess" || !init || calls < 2 {
-		t.Fatalf("loop: %s %s init=%v calls=%d", st, nick, init, calls)
-	}
-	if _, err := a.TestDonatello("bad"); err == nil {
-		t.Fatal("bad token accepted")
-	}
-	if n, err := a.TestDonatello("good"); err != nil || n != "PhillHess" {
-		t.Fatal(n, err)
+	if !strings.Contains(ngrokErrText(errString("failed: ERR_NGROK_105 authtoken invalid")), "токен") {
+		t.Fatal("authtoken error text")
 	}
 }
+
+type errString string
+
+func (e errString) Error() string { return string(e) }

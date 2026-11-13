@@ -583,29 +583,30 @@ document.querySelectorAll(".modal").forEach(m => m.addEventListener("mousedown",
 
 // Загальні: акаунт, порт OBS
 $("generalBtn").onclick = () => {
-  $("donToken").value = S.settings.donToken || ""; delete $("donStatus").dataset.lock;
+  $("ngrokToken").value = S.settings.ngrokToken || ""; $("ngrokDomain").value = S.settings.ngrokDomain || ""; $("donKey").value = S.settings.donKey || ""; $("donLink")._k = "";
   const u = S.auth && S.auth.user;
   $("accountInfo").innerHTML = u ? `Канал: <b>${esc(u.display_name)}</b> <span class="muted">(${esc(u.login)})</span>` : "Не увійшли";
   $("obsPort").value = S.settings.obsPort; renderObs(); openModal("generalModal"); renderDon();
 };
-$("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round(n("obsPort",17841)), donToken: $("donToken").value.trim()}); closeModal("generalModal"); toast("Збережено"); };
-// Donatello: перевірка токена і статус підключення
+$("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round(n("obsPort",17841)), ngrokToken: $("ngrokToken").value.trim(), ngrokDomain: $("ngrokDomain").value.trim(), donKey: $("donKey").value.trim()}); closeModal("generalModal"); toast("Збережено"); };
+// Donatello через ngrok: статус тунелю і посилання для колбеків
 function renderDon(){
   const d = S.don || {state: "off"}, pill = $("donPill");
   if(!(S.auth && S.auth.status === "ok")){ pill.classList.add("hidden"); return; } // без входу в Twitch індикатора немає
-  pill.classList.toggle("hidden", d.state === "off");
-  pill.className = "donpill " + (d.state === "on" ? "on" : d.state === "error" ? "err" : "") + (d.state === "off" ? " hidden" : "");
-  if($("generalModal").classList.contains("show") && !$("donStatus").dataset.lock)
-    $("donStatus").innerHTML = d.state === "on" ? `<span class="ok">Підключено: <b>${esc(d.nickname || "")}</b>. Нові донати перевіряються кожні 5 с.</span>`
-      : d.state === "error" ? `<span class="err">${esc(d.error || "Помилка Donatello")}</span>` : "Не підключено.";
+  pill.className = "donpill " + ({on: "on", error: "err", starting: ""}[d.state] ?? "") + (d.state === "off" ? " hidden" : "");
+  if(!$("generalModal").classList.contains("show")) return;
+  const box = $("donLink");
+  const html = d.state === "on" ? `<div class="donurl"><code>${esc(d.url)}</code><button class="small" id="donCopy">Копіювати</button></div><span class="ok">Готово: донати приходитимуть миттєво.</span>`
+    : d.state === "starting" ? `<span class="muted">Підключення до ngrok…</span>${d.error ? ` <span class="muted">(${esc(d.error)})</span>` : ""}`
+    : d.state === "error" ? `<span class="err">${esc(d.error || "Помилка ngrok")}</span>`
+    : `<span class="muted">Вставте токен ngrok і натисніть «Зберегти» — тут з'явиться посилання для Donatello.</span>`;
+  if(box._k !== html){ box._k = html; box.innerHTML = html; }
 }
-$("donTest").onclick = async () => {
-  const st = $("donStatus"); st.dataset.lock = "1";
-  try{
-    const nick = await withLoading($("donTest"), () => api().TestDonatello($("donToken").value.trim()));
-    st.innerHTML = `<span class="ok">Токен правильний: <b>${esc(nick)}</b>. Натисніть «Зберегти», щоб підключити.</span>`;
-  }catch(e){ st.innerHTML = `<span class="err">${esc(e && e.message || e)}</span>`; }
-};
+$("donLink").addEventListener("click", async e => {
+  if(!e.target.closest("#donCopy")) return;
+  const ok = await call("CopyText", (S.don || {}).url || "");
+  const b = e.target.closest("#donCopy"); b.textContent = ok ? "Скопійовано" : "Не вдалося"; setTimeout(() => b.textContent = "Копіювати", 1500);
+});
 const fmtUAH = v => { const x = Number(v) || 0; return x % 1 ? x.toFixed(2).replace(".", ",") : String(x); };
 $("logoutBtn2").onclick = async () => { if(await confirmBox("Вийти з акаунта Twitch?")){ closeModal("generalModal"); call("Logout"); } };
 $("changeClient2").onclick = async () => { if(await confirmBox("Змінити Client ID? Потрібно буде увійти знову.")){ closeModal("generalModal"); call("ChangeClientID"); } };
@@ -1103,7 +1104,7 @@ function renderAuList(){
           const an = el.animate([{transform: "none", opacity: 1, height: h}, {transform: "translateX(70px)", opacity: 0, height: h, offset: .55},
             {transform: "translateX(70px)", opacity: 0, height: "0px", paddingTop: "0px", paddingBottom: "0px", marginTop: "-8px"}],
             {duration: 700, easing: "ease-in", fill: "forwards"}); return animDone(an, 900); }))
-          .then(() => { auLeaving = false; renderAuList(); });
+          .then(() => { leaving.forEach(el => el.remove()); auLeaving = false; renderAuList(); }); // прибрати рядки, що виїхали, — інакше вони «виїжджали» б знову й знову
         return;
       }
     }

@@ -1,16 +1,17 @@
 package main
 
-// Donatello (donatello.to) — донати як замовлення СабДею і ставки аукціону.
-// Програма раз на кілька секунд питає GET https://donatello.to/api/v1/donates (заголовок X-Token).
-//   СабДей (поки йде збір):        текст донату = назва замовлення, бали = ⌊грн / DonUAHPerPoint⌋ (за замовчуванням 30).
+// Donatello (donatello.to) — донати як замовлення СабДею і ставки аукціону, через колбеки.
+// Donatello сам надсилає кожен донат: POST JSON на публічну адресу з заголовком X-Key (ключ з панелі Donatello → API → Колбеки).
+// PhillBot працює на ПК, тому публічну адресу дає вбудований ngrok (ngrok.go): https://<домен ngrok>/donatello.
+//   СабДей (поки йде збір):            текст донату = назва замовлення, бали = ⌊грн / DonUAHPerPoint⌋ (за замовчуванням 30).
 //   Аукціон (поки приймаються ставки): текст = назва лота, ставка = ⌊грн / DonUAHPer1000⌋ × 1000 (за замовчуванням 10 грн = 1000).
-// При першому підключенні вже наявні донати позначаються як бачені — історія не зараховується.
+// Donatello не опитується зовсім.
 
 import (
-	"context"
+	"crypto/subtle"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"strconv"
@@ -18,42 +19,25 @@ import (
 	"time"
 )
 
+// Donate — тіло колбека Donatello.
 type Donate struct {
-	PubID      string `json:"pubId"`
-	ClientName string `json:"clientName"`
-	Message    string `json:"message"`
-	Amount     string `json:"amount"`
-	Currency   string `json:"currency"`
-	Goal       string `json:"goal"`
-	CreatedAt  string `json:"createdAt"`
+	PubID          string `json:"pubId"`
+	ClientName     string `json:"clientName"`
+	Message        string `json:"message"`
+	Amount         string `json:"amount"`
+	Currency       string `json:"currency"`
+	ActualAmount   string `json:"actualAmount"`   // сума після конвертації (зазвичай у гривнях)
+	ActualCurrency string `json:"actualCurrency"` // валюта actualAmount
+	Source         string `json:"source"`
+	Goal           string `json:"goal"`
+	CreatedAt      string `json:"createdAt"`
 }
 
-// Стан підключення до Donatello — для інтерфейсу (у Snapshot).
+// Стан приймача донатів — для інтерфейсу (у Snapshot).
 type DonStatus struct {
-	State    string `json:"state"` // off | on | error
-	Nickname string `json:"nickname,omitempty"`
-	Error    string `json:"error,omitempty"`
-}
-
-var donatelloBase = "https://donatello.to/api/v1/"
-
-func donatelloGet(token, path string, out any) error {
-	c := &http.Client{Timeout: 10 * time.Second}
-	req, _ := http.NewRequest("GET", donatelloBase+path, nil)
-	req.Header.Set("X-Token", token)
-	req.Header.Set("Accept", "application/json")
-	resp, err := c.Do(req)
-	if err != nil {
-		return errors.New("немає зв'язку з Donatello")
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		return errors.New("Donatello не прийняв токен — перевірте його на сторінці API в Donatello")
-	}
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("Donatello відповів %d", resp.StatusCode)
-	}
-	return json.NewDecoder(resp.Body).Decode(out)
+	State string `json:"state"`         // off | starting | on | error
+	URL   string `json:"url,omitempty"` // посилання для Donatello → Колбеки
+	Error string `json:"error,omitempty"`
 }
 
 // парсинг суми донату: "100", "100.50", "100,5"
@@ -63,6 +47,17 @@ func donAmount(s string) float64 {
 		return 0
 	}
 	return f
+}
+
+// сума в гривнях: спершу actualAmount у гривнях (після конвертації), інакше amount, якщо донат у гривнях
+func (d Donate) uah() (float64, bool) {
+	if strings.EqualFold(strings.TrimSpace(d.ActualCurrency), "UAH") && strings.TrimSpace(d.ActualAmount) != "" {
+		return donAmount(d.ActualAmount), true
+	}
+	if c := strings.TrimSpace(d.Currency); c == "" || strings.EqualFold(c, "UAH") {
+		return donAmount(d.Amount), true
+	}
+	return 0, false
 }
 
 // бали СабДею з гривень: ⌊грн / ставка⌋
@@ -81,102 +76,65 @@ func auctionDonPoints(uah float64, per1000 int) int {
 	return int(math.Floor(uah/float64(per1000)+1e-9)) * 1000
 }
 
-// ---------- опитування ----------
-
-// restartDonatello — (пере)запустити опитування з поточним токеном (при старті й після збереження налаштувань).
-func (a *App) restartDonatello() {
-	a.mu.Lock()
-	if a.donCancel != nil {
-		a.donCancel()
-		a.donCancel = nil
-	}
-	token := strings.TrimSpace(a.st.Settings.DonToken)
-	if token == "" {
-		a.don = DonStatus{State: "off"}
-		a.emitLocked()
-		a.mu.Unlock()
-		return
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	a.donCancel = cancel
-	a.mu.Unlock()
-	go a.donatelloLoop(ctx, token)
-}
-
-func (a *App) donatelloLoop(ctx context.Context, token string) {
-	var me struct {
-		Nickname string `json:"nickname"`
-	}
-	setStatus := func(s DonStatus) {
-		a.mu.Lock()
-		changed := a.don != s
-		a.don = s
-		if changed {
-			a.emitLocked()
-		}
-		a.mu.Unlock()
-	}
-	if err := donatelloGet(token, "me", &me); err != nil {
-		setStatus(DonStatus{State: "error", Error: err.Error()})
-	} else {
-		setStatus(DonStatus{State: "on", Nickname: me.Nickname})
-	}
-	t := time.NewTicker(5 * time.Second)
-	defer t.Stop()
-	for {
-		var page struct {
-			Content []Donate `json:"content"`
-		}
-		if err := donatelloGet(token, "donates?page=0&size=50", &page); err != nil {
-			setStatus(DonStatus{State: "error", Nickname: me.Nickname, Error: err.Error()})
-		} else {
-			setStatus(DonStatus{State: "on", Nickname: me.Nickname})
-			a.handleDonates(page.Content)
-		}
-		select {
-		case <-ctx.Done():
+// donatelloHandler — приймач колбеків: лише POST /donatello з правильним X-Key.
+func (a *App) donatelloHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/donatello" {
+			http.NotFound(w, r)
 			return
-		case <-t.C:
 		}
-	}
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			http.Error(w, "use POST", http.StatusMethodNotAllowed)
+			return
+		}
+		a.mu.Lock()
+		key := strings.TrimSpace(a.st.Settings.DonKey)
+		a.mu.Unlock()
+		got := strings.TrimSpace(r.Header.Get("X-Key"))
+		if key == "" || subtle.ConstantTimeCompare([]byte(got), []byte(key)) != 1 {
+			if key == "" {
+				a.logf("Donatello: прийшов донат, але ключ колбека не вказано в налаштуваннях — не враховано")
+			} else {
+				a.logf("Donatello: запит з неправильним ключем X-Key — відхилено")
+			}
+			http.Error(w, "bad key", http.StatusForbidden)
+			return
+		}
+		var d Donate
+		if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&d); err != nil {
+			http.Error(w, "bad json", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+		a.receiveDonate(d)
+	})
 }
 
-// handleDonates — нові донати (Donatello віддає найновіші першими) обробляються від старших до новіших.
-func (a *App) handleDonates(list []Donate) {
-	a.mu.Lock()
-	seen := map[string]bool{}
-	for _, id := range a.st.DonSeen {
-		seen[id] = true
-	}
-	baseline := !a.st.DonInit // перше підключення: історію лише запам'ятовуємо
-	var fresh []Donate
-	for i := len(list) - 1; i >= 0; i-- {
-		d := list[i]
-		if d.PubID == "" || seen[d.PubID] {
-			continue
+// receiveDonate — повтор того самого донату (Donatello може надіслати ще раз) рахується один раз.
+func (a *App) receiveDonate(d Donate) {
+	if id := strings.TrimSpace(d.PubID); id != "" {
+		a.mu.Lock()
+		for _, s := range a.st.DonSeen {
+			if s == id {
+				a.mu.Unlock()
+				return
+			}
 		}
-		a.st.DonSeen = append(a.st.DonSeen, d.PubID)
-		if !baseline {
-			fresh = append(fresh, d)
+		a.st.DonSeen = append(a.st.DonSeen, id)
+		if len(a.st.DonSeen) > 2000 {
+			a.st.DonSeen = a.st.DonSeen[len(a.st.DonSeen)-1000:]
 		}
-	}
-	if len(a.st.DonSeen) > 2000 {
-		a.st.DonSeen = a.st.DonSeen[len(a.st.DonSeen)-1000:]
-	}
-	changed := baseline || len(fresh) > 0
-	a.st.DonInit = true
-	if changed {
 		a.saveLocked()
+		a.mu.Unlock()
 	}
-	a.mu.Unlock()
-	for _, d := range fresh {
-		a.onDonate(d)
-	}
+	a.onDonate(d)
 }
 
 // onDonate — куди йде донат: аукціон (якщо приймає ставки), інакше СабДей (якщо йде збір), інакше — лише в журнал.
 func (a *App) onDonate(d Donate) {
-	uah := donAmount(d.Amount)
+	uah, isUAH := d.uah()
 	text := strings.TrimSpace(d.Message)
 	name := strings.TrimSpace(d.ClientName)
 	if name == "" {
@@ -187,10 +145,9 @@ func (a *App) onDonate(d Donate) {
 	subdayOn := a.st.Session.Status == "running"
 	per1000, perPoint := a.st.Auction.Cfg.DonUAHPer1000, a.st.Settings.DonUAHPerPoint
 	a.mu.Unlock()
-	cur := strings.ToUpper(strings.TrimSpace(d.Currency))
-	label := fmt.Sprintf("Донат %s %s «%s»", strings.TrimSpace(d.Amount), cur, text)
+	label := fmt.Sprintf("Донат %s %s «%s»", strings.TrimSpace(d.Amount), strings.ToUpper(strings.TrimSpace(d.Currency)), text)
 	switch {
-	case cur != "" && cur != "UAH":
+	case !isUAH:
 		a.addLog(LogLine{Text: label + " — не в гривнях, не враховано", User: name})
 	case !auctionOn && !subdayOn:
 		a.addLog(LogLine{Text: label + " — збір і аукціон не йдуть, не враховано", User: name})
@@ -222,18 +179,4 @@ func (a *App) onDonate(d Donate) {
 		a.emitEvent("redeem", map[string]any{"id": e.ID})
 		a.addLog(LogLine{Text: fmt.Sprintf("%s → %d бал.", label, pts), User: name})
 	}
-}
-
-// TestDonatello — перевірити токен (кнопка в налаштуваннях): повертає нікнейм у Donatello.
-func (a *App) TestDonatello(token string) (string, error) {
-	var me struct {
-		Nickname string `json:"nickname"`
-	}
-	if strings.TrimSpace(token) == "" {
-		return "", errors.New("вставте токен API з Donatello")
-	}
-	if err := donatelloGet(strings.TrimSpace(token), "me", &me); err != nil {
-		return "", err
-	}
-	return me.Nickname, nil
 }

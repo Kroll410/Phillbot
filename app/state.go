@@ -24,8 +24,11 @@ type Settings struct {
 	Chat         ChatSettings   `json:"chat"`
 	GameMin      int            `json:"gameMin"` // хвилин на гру переможця (етап 2)
 	VoteMin      int            `json:"voteMin"` // хвилин на голосування за продовження
-	// Donatello: токен API (лише на цьому ПК) і скільки гривень дає 1 бал замовлення СабДею
-	DonToken       string `json:"donToken"`
+	// Донати Donatello через колбеки: тунель ngrok (authtoken, необов'язковий постійний домен) і ключ X-Key з Donatello.
+	// Усе це — лише на цьому ПК (subday_state.json не передається).
+	NgrokToken     string `json:"ngrokToken"`
+	NgrokDomain    string `json:"ngrokDomain"`
+	DonKey         string `json:"donKey"`
 	DonUAHPerPoint int    `json:"donUahPerPoint"` // за замовчуванням 30: 120 грн = 4 бали
 }
 
@@ -94,9 +97,8 @@ type State struct {
 	Vote     VoteState `json:"vote"`
 	// «Переглядовий» — аукціон
 	Auction AuctionState `json:"auction"`
-	// Donatello: уже бачені донати (щоб не зарахувати двічі) і чи запам'ятали історію при першому підключенні
+	// Donatello: уже отримані донати (повторний колбек того самого донату не рахується)
 	DonSeen []string `json:"donSeen"`
-	DonInit bool     `json:"donInit"`
 }
 
 func defaultSettings() Settings {
@@ -149,7 +151,8 @@ func (s *Settings) normalize() {
 	if s.DonUAHPerPoint < 1 || s.DonUAHPerPoint > 100000 {
 		s.DonUAHPerPoint = 30
 	}
-	s.DonToken = strings.TrimSpace(s.DonToken)
+	s.NgrokToken, s.DonKey = strings.TrimSpace(s.NgrokToken), strings.TrimSpace(s.DonKey)
+	s.NgrokDomain = ngrokDomain(s.NgrokDomain)
 }
 
 func loadState(file string) State {

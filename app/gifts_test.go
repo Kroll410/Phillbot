@@ -1,0 +1,88 @@
+package main
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+)
+
+func TestGiftSubsPoints(t *testing.T) {
+	a := newTestApp(t)
+	a.SelectReward("r1", "СабДей")
+	a.StartTimer()
+	order := func(id, user, text string) {
+		ev := Redemption{ID: id, UserID: user, UserName: user, UserLogin: user, UserInput: text}
+		ev.Reward.ID = "r1"
+		a.onRedemption(ev, User{})
+	}
+	// список активних підписок: mira подарувала 3, ira — 1
+	a.applyGiftSnapshot(map[string]int{"mira": 3, "ira": 1})
+	order("1", "mira", "Hades") // не-підписник (без Helix) — 0 балів + 3 за подарунки
+	if e := a.st.Entries[0]; e.Gifts != 3 || pointsOf(a.st.Settings, e) != 3 {
+		t.Fatalf("snapshot gifts: %+v", e)
+	}
+	// живий журнал більший за список — береться він; старі (>30 днів) не рахуються; анонімні — теж
+	a.mu.Lock()
+	a.st.Gifts = append(a.st.Gifts, GiftEvent{Ts: time.Now().Add(-40 * 24 * time.Hour).UnixMilli(), GifterID: "mira", Count: 50})
+	a.mu.Unlock()
+	a.onGift(giftEvent{UserID: "mira", UserLogin: "mira", UserName: "Mira", Total: 5})
+	a.onGift(giftEvent{UserID: "anon", Total: 10, IsAnonymous: true})
+	if g := a.st.Entries[0].Gifts; g != 5 {
+		t.Fatalf("live gifts in last 30 days: %d, want 5", g)
+	}
+	if len(a.st.Gifts) != 1 {
+		t.Fatalf("old gifts not pruned: %+v", a.st.Gifts)
+	}
+	// підписник T2 × 3 міс. = 6 + 1 подарунок = 7
+	a.mu.Lock()
+	a.st.Entries = append(a.st.Entries, Entry{ID: "x", Ts: time.Now().UnixMilli(), User: "ira", Login: "ira", UserID: "ira", Tier: 2, Months: 3, Text: "Doom"})
+	a.refreshEntryGiftsLocked()
+	a.mu.Unlock()
+	if p := pointsOf(a.st.Settings, a.st.Entries[1]); p != 7 {
+		t.Fatalf("sub + gift = %d, want 7", p)
+	}
+	// «ділити»: бали разом із подарунками діляться між замовленнями глядача
+	s := a.st.Settings
+	s.DupMode = "split"
+	es := []Entry{
+		{ID: "a", Ts: 1, UserID: "u", Login: "u", Tier: 1, Months: 2, Gifts: 4, Text: "A"},
+		{ID: "b", Ts: 2, UserID: "u", Login: "u", Tier: 1, Months: 2, Gifts: 4, Text: "B"},
+	}
+	if p := entryPoints(s, es); p["a"] != 3 || p["b"] != 3 { // (1×2 + 4) / 2
+		t.Fatalf("split with gifts %v", p)
+	}
+	// донати й ручні замовлення подарунків не мають
+	a.mu.Lock()
+	a.st.Entries = append(a.st.Entries, Entry{ID: "d", Donation: true, DonPoints: 2, UserID: "don:1"})
+	a.refreshEntryGiftsLocked()
+	a.mu.Unlock()
+	if a.st.Entries[2].Gifts != 0 {
+		t.Fatal("donation got gifts")
+	}
+}
+
+func TestGiftSnapshotPaging(t *testing.T) {
+	// Helix /subscriptions з двома сторінками: рахуються лише подарунки з відомим дарувальником, без підписки самого стрімера
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer tok" || r.URL.Query().Get("broadcaster_id") != "bc" {
+			w.WriteHeader(401)
+			return
+		}
+		if r.URL.Query().Get("after") == "" {
+			w.Write([]byte(`{"data":[{"user_id":"v1","gifter_id":"mira","is_gift":true},{"user_id":"v2","gifter_id":"mira","is_gift":true},{"user_id":"v3","is_gift":false}],"pagination":{"cursor":"p2"}}`))
+			return
+		}
+		w.Write([]byte(`{"data":[{"user_id":"bc","is_gift":false},{"user_id":"v4","gifter_id":"ira","is_gift":true},{"user_id":"v5","gifter_id":"","is_gift":true}],"pagination":{}}`))
+	}))
+	defer srv.Close()
+	old := helixBase
+	helixBase = srv.URL + "/"
+	defer func() { helixBase = old }()
+	a := newTestApp(t)
+	a.token = &Tokens{AccessToken: "tok"}
+	snap, err := a.fetchGiftSnapshot("bc")
+	if err != nil || snap["mira"] != 2 || snap["ira"] != 1 || len(snap) != 2 {
+		t.Fatalf("snapshot %v %v", snap, err)
+	}
+}

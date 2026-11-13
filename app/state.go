@@ -64,9 +64,11 @@ type Entry struct {
 	Color  string      `json:"color,omitempty"`
 	Badges []ChatBadge `json:"badges,omitempty"`
 	// донат Donatello: бали вже пораховано з гривень (тір/стаж не застосовуються)
-	Donation  bool    `json:"donation,omitempty"`
-	DonPoints int     `json:"donPoints,omitempty"`
-	UAH       float64 `json:"uah,omitempty"`
+	Donation  bool `json:"donation,omitempty"`
+	DonPoints int  `json:"donPoints,omitempty"`
+	// скільки сабок глядач подарував за 30 днів на момент замовлення: +1 бал за кожну
+	Gifts int     `json:"gifts,omitempty"`
+	UAH   float64 `json:"uah,omitempty"`
 }
 
 type SeenReward struct {
@@ -99,6 +101,8 @@ type State struct {
 	Auction AuctionState `json:"auction"`
 	// Donatello: уже отримані донати (повторний колбек того самого донату не рахується)
 	DonSeen []string `json:"donSeen"`
+	// подаровані сабки, отримані наживо (журнал за 30 днів)
+	Gifts []GiftEvent `json:"gifts"`
 }
 
 func defaultSettings() Settings {

@@ -34,13 +34,13 @@ func pointsOf(s Settings, e Entry) int {
 		return e.DonPoints
 	}
 	if e.Tier == 0 {
-		return s.NonSubPoints
+		return s.NonSubPoints + e.Gifts // +1 за кожну подаровану сабку за 30 днів
 	}
 	m := e.Months
 	if m < 1 {
 		m = 1
 	}
-	return s.Mult[strconv.Itoa(e.Tier)] * m
+	return s.Mult[strconv.Itoa(e.Tier)]*m + e.Gifts
 }
 
 func userKey(e Entry) string {

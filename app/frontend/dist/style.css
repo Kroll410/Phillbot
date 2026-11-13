@@ -1008,3 +1008,8 @@ td > .donchip{margin-left:0}
 
 /* обмін вікон аукціону: вікно, що стає великим, летить з тінню (тінь статична — без перемальовування в кадрах) */
 .auwin.flying{box-shadow:0 26px 60px rgba(0,0,0,.55),0 0 0 1px rgba(145,71,255,.35)}
+/* подаровані сабки: +N балів */
+.giftchip{display:inline-flex;align-items:center;gap:3px;height:19px;padding:0 7px 0 5px;margin-left:8px;border-radius:999px;vertical-align:middle;white-space:nowrap;
+  font:700 11.5px/1 var(--font-ui);font-variant-numeric:tabular-nums;color:#e9dcff;
+  background:linear-gradient(135deg,rgba(145,71,255,.28),rgba(0,200,83,.14));border:2px solid rgba(169,112,255,.5)}
+.giftchip svg{width:12px;height:12px;color:#c9a6ff}

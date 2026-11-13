@@ -64,6 +64,7 @@ type App struct {
 	token    *Tokens
 
 	tunStop    context.CancelFunc // тунель ngrok для колбеків Donatello
+	giftSnap   map[string]int     // активні подаровані підписки: дарувальник → кількість (Helix)
 	don        DonStatus
 	badgeMu    sync.Mutex
 	badgeCache map[string]subInfo
@@ -613,7 +614,10 @@ func (a *App) onRedemption(ev Redemption, bc User) {
 	if e.Color == "" {
 		defer func() { go a.fillColors() }()
 	}
-	a.mutate(func(st *State) { st.Entries = append(st.Entries, e) })
+	a.mutate(func(st *State) {
+		e.Gifts = a.giftsForLocked(e.UserID) // подаровані сабки за 30 днів — +1 бал за кожну
+		st.Entries = append(st.Entries, e)
+	})
 	sub := "не підписник"
 	if tier > 0 {
 		sub = fmt.Sprintf("T%d, %d міс.", tier, months)

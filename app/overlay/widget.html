@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <!-- Віджет PhillBot для OBS: лише таймер. Сам перемикається між таймером збору, гри, голосування й аукціону —
      зі зміною таймера старий відлітає вгору, новий виринає знизу з зелено-фіолетовим відблиском.
+     Під час голосування таймер зменшується, а під ним — «перетягування канату»: «1 · Продовжити» (зелений, зліва)
+     проти «Дроп · 2» (фіолетовий, справа); межа рухається за часткою голосів і вібрує в точці зіткнення.
      Розмір у OBS: 640×200. Параметри: ?scale=1.2&theme=shadow|box|plain&align=center -->
 <html lang="uk"><head><meta charset="utf-8"><title>PhillBot — таймер</title>
 <link rel="stylesheet" href="overlay.css">
@@ -28,9 +30,46 @@
      background:linear-gradient(100deg,transparent 30%,rgba(0,230,118,.45) 45%,rgba(145,71,255,.55) 55%,transparent 70%);background-size:250% 100%}
   .sweep.go{animation:sweep .9s ease-out}
   @keyframes sweep{0%{opacity:1;background-position:120% 0}100%{opacity:0;background-position:-40% 0}}
+
+  /* ---------- голосування: таймер менший, під ним перетягування канату ---------- */
+  #w.voting{min-width:calc(440px * var(--scale))}
+  .t{transition:scale .7s cubic-bezier(.2,.9,.25,1),translate .7s cubic-bezier(.2,.9,.25,1)}
+  #w.voting .t{scale:.52;translate:0 -30%}
+  .tug{position:absolute;left:0;right:0;bottom:calc(8px * var(--scale));height:calc(34px * var(--scale));border-radius:999px;overflow:visible;
+    opacity:0;translate:0 40%;transition:opacity .5s ease,translate .7s cubic-bezier(.2,1.2,.35,1);pointer-events:none}
+  #w.voting .tug{opacity:1;translate:0 0}
+  .tug .track{position:absolute;inset:0;border-radius:999px;overflow:hidden;
+    background:linear-gradient(90deg,#7c3cff,#9147ff);box-shadow:0 0 0 2px rgba(255,255,255,.08) inset,0 6px 18px rgba(0,0,0,.45)}
+  .tug .yes{position:absolute;left:0;top:0;bottom:0;width:50%;background:linear-gradient(90deg,#00a844,#00c853 60%,#3fe08a);
+    transition:width .9s cubic-bezier(.25,1.4,.4,1);box-shadow:4px 0 14px rgba(0,230,118,.55)}
+  .tug .lbl{position:absolute;top:0;bottom:0;display:flex;align-items:center;gap:calc(7px * var(--scale));
+    font:700 calc(15px * var(--scale))/1 var(--font-display);color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.55);white-space:nowrap;z-index:2}
+  .tug .lbl.l{left:calc(12px * var(--scale))} .tug .lbl.r{right:calc(12px * var(--scale))}
+  .tug .lbl b{display:inline-grid;place-items:center;width:calc(20px * var(--scale));height:calc(20px * var(--scale));border-radius:50%;
+    background:rgba(0,0,0,.28);font-size:calc(13px * var(--scale))}
+  .tug .lbl em{font-style:normal;font-variant-numeric:tabular-nums;opacity:.9}
+  /* точка зіткнення: світиться й вібрує, сильніше, коли рахунок близький */
+  .tug .clash{position:absolute;top:50%;left:50%;width:calc(16px * var(--scale));height:calc(46px * var(--scale));z-index:3;
+    translate:-50% -50%;transition:left .9s cubic-bezier(.25,1.4,.4,1)}
+  .tug .clash::before{content:"";position:absolute;inset:0;border-radius:999px;
+    background:radial-gradient(closest-side,#fff,rgba(255,255,255,.75) 35%,rgba(201,166,255,.35) 70%,transparent);
+    filter:drop-shadow(0 0 calc(10px * var(--scale)) rgba(255,255,255,.9));animation:jit .09s steps(2) infinite}
+  .tug.close .clash::before{animation-duration:.06s;filter:drop-shadow(0 0 calc(16px * var(--scale)) #fff)}
+  .tug.close .track{animation:shake .14s linear infinite}
+  @keyframes jit{0%{transform:translate(-1.6px,1px) scaleY(.92)}50%{transform:translate(1.6px,-1px) scaleY(1.08)}100%{transform:translate(-.8px,0)}}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-.8px)}75%{transform:translateX(.8px)}}
+  /* хтось проголосував — його сторона «штовхає» */
+  .tug .yes.push{animation:pushL .45s ease-out} .tug .track.pushR{animation:pushR .45s ease-out}
+  @keyframes pushL{30%{filter:brightness(1.45)}}
+  @keyframes pushR{30%{filter:brightness(1.35)}}
 </style></head>
 <body class="align-center">
-<div id="w" class="idle"><div class="t" id="t">00:00</div><div class="sweep" id="sweep"></div></div>
+<div id="w" class="idle"><div class="t" id="t">00:00</div><div class="sweep" id="sweep"></div>
+  <div class="tug" id="tug"><div class="track" id="tugTrack"><div class="yes" id="tugYes"></div></div>
+    <div class="lbl l"><b>1</b><span>Продовжити</span><em id="tugY">0</em></div>
+    <div class="lbl r"><em id="tugN">0</em><span>Дроп</span><b>2</b></div>
+    <div class="clash" id="tugClash"></div></div>
+</div>
 <script src="overlay.js"></script>
 <script>
 (() => {
@@ -54,7 +93,7 @@
     nu.className = "t " + newKind + " in"; nu.removeAttribute("id");
     old.classList.add("out"); old.addEventListener("animationend", () => old.remove(), {once: true});
     setTimeout(() => old.remove(), 800);
-    w.insertBefore(nu, sweep); cur = nu;
+    w.insertBefore(nu, sweep); cur = nu; // таймер — перед блиском і канатом
     sweep.classList.remove("go"); void sweep.offsetWidth; sweep.classList.add("go");
     settle(nu);
   }
@@ -69,7 +108,23 @@
     cur.textContent = OV.fmtTime(r);
     cur.classList.toggle("paused", a.t.status === "paused");
     cur.classList.toggle("low", a.t.status === "running" && r <= a.low);
+    w.classList.toggle("voting", a.kind === "vote");
+    if(a.kind === "vote") tug(a.t);
   }
+  // перетягування канату: частка «1» — ширина зеленої сторони, межа вібрує
+  let lastY = -1, lastN = -1;
+  function tug(v){
+    const y = v.yes || 0, n = v.no || 0, tot = y + n;
+    const share = tot ? Math.min(94, Math.max(6, y / tot * 100)) : 50;
+    $("tugYes").style.width = share + "%"; $("tugClash").style.left = share + "%";
+    $("tugY").textContent = y; $("tugN").textContent = n;
+    $("tug").classList.toggle("close", Math.abs(share - 50) < 12);
+    if(lastY >= 0 && y > lastY) bump($("tugYes"), "push");
+    if(lastN >= 0 && n > lastN) bump($("tugTrack"), "pushR");
+    lastY = y; lastN = n;
+  }
+  function bump(el, cls){ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 500); }
+  function $(id){ return document.getElementById(id); }
   OV.connect({ state: s => { S = s; tick(); } });
   setInterval(tick, 200);
 })();

@@ -201,6 +201,8 @@ func (a *App) deviceLogin(ctx context.Context) (*Tokens, error) {
 
 // ---------- Helix ----------
 
+var helixBase = "https://api.twitch.tv/helix/" // у тестах підміняється тестовим сервером
+
 func (a *App) helix(method, pathq string, body any, out any) error {
 	for attempt := 0; attempt < 2; attempt++ {
 		a.tokMu.Lock()
@@ -214,7 +216,7 @@ func (a *App) helix(method, pathq string, body any, out any) error {
 			b, _ := json.Marshal(body)
 			rdr = strings.NewReader(string(b))
 		}
-		req, _ := http.NewRequest(method, "https://api.twitch.tv/helix/"+pathq, rdr)
+		req, _ := http.NewRequest(method, helixBase+pathq, rdr)
 		req.Header.Set("Client-Id", a.clientID)
 		req.Header.Set("Authorization", "Bearer "+tok.AccessToken)
 		if body != nil {
@@ -421,6 +423,11 @@ func (a *App) runSession(ctx context.Context, u string, subscribe bool, bc User)
 			default:
 				a.setConn("on", "Слухаю канал "+bc.DisplayName)
 			}
+			// подаровані сабки наживо (скоуп channel:read:subscriptions уже є)
+			if err := a.helix("POST", "eventsub/subscriptions", map[string]any{"type": "channel.subscription.gift", "version": "1",
+				"condition": map[string]string{"broadcaster_user_id": bc.ID}, "transport": transport}, nil); err != nil {
+				a.logf("Підписка на подаровані сабки: %v", err)
+			}
 			if err2 == nil { // видалення повідомлень / очищення чату (той самий скоуп user:read:chat)
 				for _, t := range []string{"channel.chat.message_delete", "channel.chat.clear_user_messages", "channel.chat.clear"} {
 					if err := a.helix("POST", "eventsub/subscriptions", map[string]any{"type": t, "version": "1",
@@ -444,12 +451,18 @@ func (a *App) runSession(ctx context.Context, u string, subscribe bool, bc User)
 				if json.Unmarshal(m.Payload.Event, &ev) == nil {
 					go a.onRedemption(ev, bc)
 				}
+			case "channel.subscription.gift":
+				var ev giftEvent
+				if json.Unmarshal(m.Payload.Event, &ev) == nil {
+					go a.onGift(ev)
+				}
 			}
 		}
 	}
 }
 
 func (a *App) listen(ctx context.Context, bc User) {
+	go a.giftLoop(ctx, bc.ID) // подаровані сабки: список одразу і раз на 10 хв
 	next, subscribe := eventsubURL, true
 	for ctx.Err() == nil {
 		a.setConn("wait", "Підключення до Twitch…")

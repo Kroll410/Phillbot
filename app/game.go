@@ -4,7 +4,7 @@ package main
 //   1 «collect» — збір замовлень. Після першого експорту в Marbles стрімер вибирає переможця (затисканням кнопки).
 //   2 «play»    — гра переможного замовлення: таймер гри (за замовчуванням 40 хв).
 //                 Коли час вийшов — етап 2 НЕ закінчується сам: чекаємо стрімера, який запускає голосування.
-//                 Голосування (3 хв): чатерси пишуть «1» — продовжити гру, «2» — наступний збір; від кожного — останній голос.
+//                 Голосування (3 хв): чатерси пишуть «1» — продовжити гру, «2» — дроп (наступний збір); від кожного — останній голос.
 //                 Більше «1» — новий раунд гри з тим самим переможцем; більше «2» — назад до етапу 1; нічия — вирішує стрімер.
 
 import (
@@ -25,7 +25,7 @@ type VoteState struct {
 	EndsAt     int64          `json:"endsAt"`
 	FinishedAt int64          `json:"finishedAt"`
 	Yes        int            `json:"yes"`    // «1» — продовжити гру
-	No         int            `json:"no"`     // «2» — наступний збір
+	No         int            `json:"no"`     // «2» — дроп (наступний збір)
 	Result     string         `json:"result"` // continue | next | tie
 	Votes      map[string]int `json:"votes"`  // userID → 1 | 2
 }
@@ -112,7 +112,7 @@ func (a *App) gameTimeUpLocked() {
 	a.persistCollectionLocked()
 }
 
-// StartVote — почати голосування в чаті: «1» продовжити гру, «2» наступний збір.
+// StartVote — почати голосування в чаті: «1» продовжити гру, «2» дроп (наступний збір).
 func (a *App) StartVote() (Snapshot, error) {
 	a.mu.Lock()
 	ok := a.st.Phase == phasePlay && a.st.Game.Status == "finished" && a.st.Vote.Status != "running"
@@ -124,7 +124,7 @@ func (a *App) StartVote() (Snapshot, error) {
 		now := time.Now().UnixMilli()
 		st.Vote = VoteState{Status: "running", StartedAt: now, EndsAt: now + int64(st.Settings.VoteMin)*60000, Votes: map[string]int{}}
 	})
-	a.logf("Голосування: «1» — продовжити, «2» — наступний збір (%d хв)", snap.Settings.VoteMin)
+	a.logf("Голосування: «1» — продовжити, «2» — дроп (%d хв)", snap.Settings.VoteMin)
 	return snap, nil
 }
 
@@ -242,7 +242,7 @@ func (a *App) tickGameLocked(now int64) string {
 		case "continue":
 			return "Голосування: продовжуємо гру"
 		case "next":
-			return "Голосування: наступний збір"
+			return "Голосування: дроп"
 		default:
 			return "Голосування: нічия — вирішує стрімер"
 		}

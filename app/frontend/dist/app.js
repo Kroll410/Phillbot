@@ -433,7 +433,7 @@ function renderTable(){
         if(!open) return main;
         const list = D().entries.filter(e=>counted.has(e.id) && norm(e.text)===g.key).sort((a,b)=>(pm.get(b.id)||0)-(pm.get(a.id)||0) || a.ts-b.ts);
         return main + `<tr class="gdetail"><td colspan="8"><table class="subtable"><thead><tr><th>Час</th><th>Чатерс</th><th>Тір сабки</th><th class="num">Має сабку</th><th class="num">Бали</th></tr></thead><tbody>${
-          list.map(e=>`<tr><td class="muted">${fmtClock(e.ts)}</td><td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
+          list.map(e=>`<tr><td class="muted">${fmtClock(e.ts)}</td><td>${userTag(e)}${giftChip(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
             <td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td>
             <td class="num">${e.tier?`<span class="subcell">${subBadgeFor(e)}${e.months} міс.</span>`:'<span class="muted">—</span>'}</td>
             <td class="num pts">${pm.get(e.id) || 0}</td></tr>`).join("")
@@ -451,7 +451,7 @@ function renderTable(){
     wrap.innerHTML = `<table class="dnd"><thead><tr><th class="gripcol"></th>${th("Час","ts")}${th("Чатерс","user")}${th("Тір сабки","tier")}${th("Має сабку","months","num")}${th("Бали","points","num")}${th("Замовлення","text")}<th class="acts">${D().live?`<button class="small editbtn${editMode?" on":""}" data-act="editmode">${editMode?"Готово":"Редагувати"}</button>`:""}</th></tr></thead><tbody>${
       rows.map(e=>`<tr data-id="${e.id}"${DRAG()} class="${e.excluded?"off":!e.counted?"replaced":""} ${freshIds.has(e.id)?"fresh":""}" title="${esc(e.excluded?"Приховано — не рахується":!e.counted?"Не рахується: від цього чатерса враховано інше замовлення":(e.source||""))}">
         <td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${fmtClock(e.ts)}</td>
-        <td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
+        <td>${userTag(e)}${giftChip(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
         ${e.donation ? `<td>${donChip(e.uah)}</td><td class="num"><span class="muted">Donatello</span></td>` : editMode ? `<td><select data-f="tier"><option value="0" ${!e.tier?"selected":""}>—</option>${[1,2,3].map(t=>`<option value="${t}" ${e.tier===t?"selected":""}>T${t}</option>`).join("")}</select></td>
         <td class="num"><span class="subcell">${subBadgeFor(e)}<input class="mo" type="number" min="1" data-f="months" value="${e.months||""}" ${!e.tier?"disabled":""}></span></td>`
         : `<td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td><td class="num">${e.tier?`<span class="subcell">${subBadgeFor(e)}${e.months} міс.</span>`:'<span class="muted">—</span>'}</td>`}
@@ -626,6 +626,9 @@ $("donLink").addEventListener("click", async e => {
   const ok = await call("CopyText", (S.don || {}).url || "");
   const b = e.target.closest("#donCopy"); b.textContent = ok ? "Скопійовано" : "Не вдалося"; setTimeout(() => b.textContent = "Копіювати", 1500);
 });
+// подаровані сабки глядача за 30 днів: +1 бал за кожну
+const GIFT_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11h16v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM3 7h18v4H3zM12 7v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 7c-1.5-3-5-3.6-5.5-1.5S9.5 7 12 7zm0 0c1.5-3 5-3.6 5.5-1.5S14.5 7 12 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`;
+const giftChip = e => e.gifts > 0 ? `<span class="giftchip" title="Подарував(ла) сабок за 30 днів: ${e.gifts} — +${e.gifts} бал.">${GIFT_ICON}+${e.gifts}</span>` : "";
 // бейдж донату Donatello: серце + сума в гривнях
 const DON_HEART = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.5 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 4.3 2.4.7-1.3 2.2-2.4 4.3-2.4 3.8 0 5.8 4 4.3 7.3C19.5 16.4 12 21 12 21z" fill="currentColor"/></svg>`;
 const donChip = uah => `<span class="donchip">${DON_HEART}<i>₴</i><b>${fmtUAH(uah)}</b></span>`;
@@ -902,7 +905,7 @@ function renderSteps(){
   const step = play ? 2 : 1;
   if(step !== shownStep){
     $("stepTrack").classList.toggle("at2", play);
-    if(shownStep && !play) toast(S.vote && S.vote.result === "next" ? "Чат вирішив: наступний збір" : "Етап 1: збір замовлень");
+    if(shownStep && !play) toast(S.vote && S.vote.result === "next" ? "Чат вирішив: дроп" : "Етап 1: збір замовлень");
     shownStep = step;
   }
   if(!play) return;

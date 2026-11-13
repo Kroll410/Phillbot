@@ -183,3 +183,57 @@ func TestChattersGroups(t *testing.T) {
 		t.Fatal("banned chatter not removed")
 	}
 }
+
+// Віджети OBS отримують лише свій стан (overlayState): без налаштувань, токенів і ключів — і завжди з serverNow.
+func TestOverlayGetsOnlyOverlayState(t *testing.T) {
+	a := newTestApp(t)
+	a.overlay = newOverlayServer(a)
+	a.overlay.start(28413)
+	defer a.overlay.stop()
+	a.mu.Lock()
+	a.st.Settings.NgrokToken, a.st.Settings.DonKey = "secret-ngrok-token", "secret-don-key"
+	a.mu.Unlock()
+	resp, err := http.Get(a.overlay.info().URL + "/api/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	lines := make(chan string, 64)
+	go func() {
+		br := bufio.NewReader(resp.Body)
+		for {
+			l, err := br.ReadString('\n')
+			if err != nil {
+				close(lines)
+				return
+			}
+			lines <- l
+		}
+	}()
+	time.Sleep(150 * time.Millisecond)
+	a.StartTimer()
+	a.AddManual("Phill", 1, 2, "Hades")
+	deadline, states, ev := time.After(1500*time.Millisecond), 0, ""
+	for {
+		select {
+		case l, ok := <-lines:
+			if !ok {
+				t.Fatal("stream closed")
+			}
+			if strings.HasPrefix(l, "event: ") {
+				ev = strings.TrimSpace(l[7:])
+			}
+			if strings.HasPrefix(l, "data: ") && ev == "state" {
+				states++
+				if strings.Contains(l, "secret-") || !strings.Contains(l, `"serverNow"`) {
+					t.Fatalf("widget got a non-widget state: %.200s", l)
+				}
+			}
+		case <-deadline:
+			if states < 2 {
+				t.Fatalf("expected initial + updated widget state, got %d", states)
+			}
+			return
+		}
+	}
+}

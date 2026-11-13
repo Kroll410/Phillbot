@@ -1,3 +1,5 @@
+//go:build !server
+
 // PhillBot — програма для збору замовлень через нагороду за бали каналу Twitch (Wails: Go + WebView2).
 package main
 

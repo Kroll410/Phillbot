@@ -1,3 +1,5 @@
+//go:build !server
+
 package main
 
 // Вбудований ngrok: публічна HTTPS-адреса для колбеків Donatello (без окремого ngrok.exe).

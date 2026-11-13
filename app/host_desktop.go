@@ -1,3 +1,5 @@
+//go:build !server
+
 package main
 
 // desktopHost — Host для десктопної версії: події у вікно Wails і віджети OBS, токени у tokens.json.
@@ -16,6 +18,12 @@ func (h desktopHost) Emit(name string, data any) {
 	}
 	if h.a.overlay != nil {
 		h.a.overlay.hub.broadcast(name, data)
+	}
+}
+
+func (h desktopHost) EmitState(s Snapshot) {
+	if h.a.ctx != nil {
+		wruntime.EventsEmit(h.a.ctx, "state", s)
 	}
 }
 

@@ -53,12 +53,11 @@ func userKey(e Entry) string {
 	return strings.ToLower(e.User)
 }
 
-// Які замовлення враховуються з урахуванням правила дублікатів (last | first | all).
-// Яке замовлення кожного чатерса «діє» (last — останнє, first — перше, all — усі), враховуючи й приховані.
-// Старіші замовлення того ж чатерса не показуються в таблиці й не рахуються.
+// Яке замовлення кожного чатерса «діє» (last — останнє, first — перше, split — усі), враховуючи й приховані.
+// Старіші замовлення того ж чатерса (у last/first) не показуються в таблиці й не рахуються.
 func effectiveIDs(s Settings, entries []Entry) map[string]bool {
 	out := map[string]bool{}
-	if s.DupMode == "all" {
+	if s.DupMode == "split" {
 		for _, e := range entries {
 			out[e.ID] = true
 		}
@@ -93,9 +92,54 @@ func countedIDs(s Settings, entries []Entry) map[string]bool {
 	return out
 }
 
+// Бали кожного врахованого замовлення.
+// last/first — бали за тіром і стажем; split — бали глядача діляться між усіма його врахованими замовленнями:
+// 10 балів на 3 замовлення = 3, 3, 4 (залишок дістається найсвіжішим).
+func entryPoints(s Settings, entries []Entry) map[string]int {
+	counted := countedIDs(s, entries)
+	out := map[string]int{}
+	if s.DupMode != "split" {
+		for _, e := range entries {
+			if counted[e.ID] {
+				out[e.ID] = pointsOf(s, e)
+			}
+		}
+		return out
+	}
+	sorted := append([]Entry(nil), entries...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Ts < sorted[j].Ts })
+	byUser := map[string][]Entry{}
+	var users []string
+	for _, e := range sorted {
+		if !counted[e.ID] {
+			continue
+		}
+		k := userKey(e)
+		if _, ok := byUser[k]; !ok {
+			users = append(users, k)
+		}
+		byUser[k] = append(byUser[k], e)
+	}
+	for _, k := range users {
+		list := byUser[k]
+		total := pointsOf(s, list[len(list)-1]) // бали глядача — за його найсвіжішим замовленням (тір і стаж)
+		n := len(list)
+		base, rem := total/n, total%n
+		for i, e := range list {
+			p := base
+			if i >= n-rem {
+				p++
+			}
+			out[e.ID] = p
+		}
+	}
+	return out
+}
+
 // Групи замовлень, відсортовані за балами (спадання).
 func aggregate(s Settings, entries []Entry) []Group {
 	counted := countedIDs(s, entries)
+	pts := entryPoints(s, entries)
 	type acc struct {
 		g        Group
 		variants map[string]int
@@ -117,7 +161,7 @@ func aggregate(s Settings, entries []Entry) []Group {
 			byKey[k] = a
 			keys = append(keys, k)
 		}
-		p := pointsOf(s, e)
+		p := pts[e.ID]
 		a.g.Points += p
 		a.g.Count++
 		a.g.Users = append(a.g.Users, UserPts{e.User, p})

@@ -192,3 +192,55 @@ func sqrt(x float64) float64 {
 	}
 	return z
 }
+
+// Кілька замовлень від одного глядача: перше / останнє / ділити бали (10 → 5+5, 10 → 3+3+4).
+func TestDupModes(t *testing.T) {
+	s := defaultSettings()
+	mk := func(id string, ts int64, user, text string, tier, months int) Entry {
+		return Entry{ID: id, Ts: ts, User: user, Login: user, UserID: user, Tier: tier, Months: months, Text: text}
+	}
+	// Mira: T2 × 5 міс. = 10 балів; три замовлення
+	es := []Entry{mk("a", 1, "mira", "Hades", 2, 5), mk("b", 2, "mira", "Celeste", 2, 5), mk("c", 3, "mira", "Doom", 2, 5), mk("d", 4, "ira", "Hades", 1, 2)}
+	pts := func(mode string, list []Entry) map[string]int { s.DupMode = mode; return entryPoints(s, list) }
+
+	if p := pts("last", es); len(p) != 2 || p["c"] != 10 || p["d"] != 2 {
+		t.Fatalf("last %v", p)
+	}
+	if p := pts("first", es); len(p) != 2 || p["a"] != 10 || p["d"] != 2 {
+		t.Fatalf("first %v", p)
+	}
+	if p := pts("split", es); p["a"] != 3 || p["b"] != 3 || p["c"] != 4 || p["d"] != 2 {
+		t.Fatalf("split 3 orders %v", p)
+	}
+	if p := pts("split", es[1:]); p["b"] != 5 || p["c"] != 5 { // два замовлення — по 5
+		t.Fatalf("split 2 orders %v", p)
+	}
+	// приховане замовлення в split не бере частки — бали діляться між рештою
+	hid := append([]Entry(nil), es...)
+	hid[1].Excluded = true
+	if p := pts("split", hid); p["a"] != 5 || p["c"] != 5 || p["b"] != 0 {
+		t.Fatalf("split with hidden %v", p)
+	}
+	// підсумок і Marbles рахують частки: Hades = 3 (Mira) + 2 (Ira)
+	s.DupMode = "split"
+	g := aggregate(s, es)
+	sum := 0
+	for _, x := range g {
+		sum += x.Points
+		if x.Name == "Hades" && x.Points != 5 {
+			t.Fatalf("Hades %d", x.Points)
+		}
+	}
+	if sum != 12 {
+		t.Fatalf("total %d, want 12 (10 Mira + 2 Ira)", sum)
+	}
+	// налаштування зберігає вибір; невідоме значення → «останнє»
+	for in, want := range map[string]string{"split": "split", "first": "first", "last": "last", "all": "last", "": "last"} {
+		x := defaultSettings()
+		x.DupMode = in
+		x.normalize()
+		if x.DupMode != want {
+			t.Errorf("normalize %q → %q, want %q", in, x.DupMode, want)
+		}
+	}
+}

@@ -69,10 +69,10 @@ function pointsOf(e, st = D().settings){
   if(!e.tier) return Number(st.nonSubPoints)||0;
   return (Number(st.mult[String(e.tier)])||0) * Math.max(1, Number(e.months)||1);
 }
-// «діюче» замовлення кожного чатерса (останнє / перше / усі), включно з прихованими — лише вони є в таблиці
+// «діюче» замовлення кожного чатерса (останнє / перше / у «ділити» — усі), включно з прихованими — лише вони є в таблиці
 function effectiveSet(d = D()){
   const mode = d.settings.dupMode;
-  if(mode==="all") return new Set(d.entries.map(e=>e.id));
+  if(mode==="split") return new Set(d.entries.map(e=>e.id));
   const byUser = new Map();
   for(const e of [...d.entries].sort((a,b)=>a.ts-b.ts)){
     const k = (e.userId || e.login || e.user).toLowerCase();
@@ -82,13 +82,30 @@ function effectiveSet(d = D()){
 }
 // рахується «діюче» замовлення, якщо воно не приховане
 function countedSet(d = D()){ const eff = effectiveSet(d); return new Set(d.entries.filter(e=>eff.has(e.id) && !e.excluded).map(e=>e.id)); }
+// бали кожного врахованого замовлення (як entryPoints у Go): у «ділити» бали глядача діляться між його замовленнями,
+// 10 на 3 = 3, 3, 4 — залишок найсвіжішим
+function pointsMap(d = D()){
+  const counted = countedSet(d), out = new Map();
+  if(d.settings.dupMode !== "split"){ d.entries.forEach(e => { if(counted.has(e.id)) out.set(e.id, pointsOf(e, d.settings)); }); return out; }
+  const byUser = new Map();
+  for(const e of [...d.entries].sort((a, b) => a.ts - b.ts)){
+    if(!counted.has(e.id)) continue;
+    const k = (e.userId || e.login || e.user).toLowerCase();
+    if(!byUser.has(k)) byUser.set(k, []); byUser.get(k).push(e);
+  }
+  for(const list of byUser.values()){
+    const total = pointsOf(list[list.length - 1], d.settings), n = list.length, base = Math.floor(total / n), rem = total % n;
+    list.forEach((e, i) => out.set(e.id, base + (i >= n - rem ? 1 : 0)));
+  }
+  return out;
+}
 function aggregate(d = D()){
-  const counted = countedSet(d), groups = new Map();
+  const counted = countedSet(d), groups = new Map(), pm = pointsMap(d);
   for(const e of d.entries){
     if(!counted.has(e.id)) continue;
     const k = norm(e.text); if(!k) continue;
     if(!groups.has(k)) groups.set(k,{key:k, variants:new Map(), points:0, count:0, users:[]});
-    const g = groups.get(k), p = pointsOf(e, d.settings);
+    const g = groups.get(k), p = pm.get(e.id) || 0;
     g.points += p; g.count++; g.users.push({name:e.user, p, login:e.login, color:e.color, badges:e.badges});
     g.variants.set(e.text.trim(), (g.variants.get(e.text.trim())||0)+1);
   }
@@ -406,7 +423,7 @@ function renderTable(){
     rows = sortRows(rows, sortKey.summary);
     const max = Math.max(1,...rows.map(r=>r.points)), total = rows.reduce((a,r)=>a+r.points,0)||1;
     if(!rows.length){ wrap.innerHTML = `<div class="empty">${D().entries.length?"Нічого не знайдено":"Замовлень поки немає. Виберіть нагороду і натисніть «Почати збір»."}</div>`; return; }
-    const counted = countedSet();
+    const counted = countedSet(), pm = pointsMap();
     wrap.innerHTML = `<table class="dnd summary"><thead><tr><th class="gripcol"></th><th style="width:44px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:220px">Частка</th>${th("Людей","count","num")}<th style="width:1%"></th><th style="width:44px"></th></tr></thead><tbody>${
       rows.map((g,i)=>{
         const open = openGroups.has(g.key);
@@ -414,19 +431,20 @@ function renderTable(){
         <td class="num pts">${g.points}</td><td><div class="share"><div class="track"><div class="bar" style="width:${Math.round(g.points/max*100)}%"></div></div><span>${(g.points/total*100).toFixed(0)}%</span></div></td>
         <td class="num">${g.count}</td><td class="wincell">${canPickWinner() && g.points>0 ? `<button class="winbtn" data-win="${esc(g.name)}" title="Затисніть і тримайте, щоб вибрати переможцем">${LIQUID}<span class="wl">Переможець</span></button>` : ""}</td><td class="chev" title="${open?"Згорнути":"Показати замовлення"}"><span></span></td></tr>`;
         if(!open) return main;
-        const list = D().entries.filter(e=>counted.has(e.id) && norm(e.text)===g.key).sort((a,b)=>pointsOf(b)-pointsOf(a) || a.ts-b.ts);
+        const list = D().entries.filter(e=>counted.has(e.id) && norm(e.text)===g.key).sort((a,b)=>(pm.get(b.id)||0)-(pm.get(a.id)||0) || a.ts-b.ts);
         return main + `<tr class="gdetail"><td colspan="8"><table class="subtable"><thead><tr><th>Час</th><th>Чатерс</th><th>Тір сабки</th><th class="num">Має сабку</th><th class="num">Бали</th></tr></thead><tbody>${
           list.map(e=>`<tr><td class="muted">${fmtClock(e.ts)}</td><td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
             <td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td>
             <td class="num">${e.tier?`<span class="subcell">${subBadgeFor(e)}${e.months} міс.</span>`:'<span class="muted">—</span>'}</td>
-            <td class="num pts">${pointsOf(e)}</td></tr>`).join("")
+            <td class="num pts">${pm.get(e.id) || 0}</td></tr>`).join("")
         }</tbody></table></td></tr>`;
       }).join("")
     }</tbody></table>`;
   } else {
     const counted = countedSet();
     const eff = effectiveSet();
-    let rows = D().entries.filter(e=>eff.has(e.id)).map(e=>({...e, points:pointsOf(e), counted:counted.has(e.id)}))
+    const pm = pointsMap();
+    let rows = D().entries.filter(e=>eff.has(e.id)).map(e=>({...e, points: counted.has(e.id) ? (pm.get(e.id)||0) : pointsOf(e), counted:counted.has(e.id)}))
       .filter(e=>!q || e.text.toLowerCase().includes(q) || e.user.toLowerCase().includes(q));
     rows = sortRows(rows, sortKey.entries);
     if(!rows.length){ wrap.innerHTML = `<div class="empty">${D().entries.length?"Нічого не знайдено":"Замовлень поки немає."}</div>`; return; }
@@ -618,8 +636,9 @@ $("openCsv").onclick = () => call("OpenFolder", "exports");
 // СабДей: нагорода + правила балів
 $("subdaySettingsBtn").onclick = () => {
   pendingReward = null; showAllRewards = false;
+  dupPending = null; renderDupSeg();
   $("gameMin").value = S.settings.gameMin || 40; $("voteMin").value = S.settings.voteMin || 3; $("donPerPoint").value = S.settings.donUahPerPoint || 30;
-  renderRewardGrid(); openModal("subdayModal");
+  renderRewardGrid(); openModal("subdayModal"); requestAnimationFrame(renderDupSeg);
   if(!(S.rewards||[]).length) withLoading([$("subdayModal").querySelector(".box"), $("rewardRefresh")], () => call("RefreshRewards")).then(() => renderRewardGrid());
 };
 $("subdaySave").onclick = async () => {
@@ -628,11 +647,22 @@ $("subdaySave").onclick = async () => {
     setState(await call("SelectReward", pendingReward, r ? r.title : ""));
     if(r && r.is_user_input_required === false) toast("Увага: ця нагорода не вимагає тексту — замовлення без тексту ігноруються", 4500);
   }
-  await saveSettings({ gameMin: Math.min(600, Math.max(1, Math.round(n("gameMin",40)))), voteMin: Math.min(60, Math.max(1, Math.round(n("voteMin",3)))),
+  await saveSettings({ dupMode: dupPending || S.settings.dupMode || "last", gameMin: Math.min(600, Math.max(1, Math.round(n("gameMin",40)))), voteMin: Math.min(60, Math.max(1, Math.round(n("voteMin",3)))),
     donUahPerPoint: Math.min(100000, Math.max(1, Math.round(n("donPerPoint",30)))) });
   pendingReward = null; closeModal("subdayModal"); toast("Налаштування СабДею збережено");
 };
 
+// кілька замовлень від одного глядача: перше / останнє / ділити бали
+let dupPending = null;
+const DUP_HINT = {first: "Рахується перше замовлення глядача, наступні ігноруються.",
+  last: "Рахується останнє замовлення глядача — він може передумати.",
+  split: "Бали глядача діляться між усіма його замовленнями: 10 балів на 2 замовлення — по 5, на 3 — 3, 3 і 4."};
+function renderDupSeg(){
+  const m = dupPending || S.settings.dupMode || "last";
+  document.querySelectorAll("#dupSeg .tab").forEach(b => b.classList.toggle("active", b.dataset.dup === m));
+  slideSeg($("dupSeg")); $("dupHint").textContent = DUP_HINT[m] || "";
+}
+document.querySelectorAll("#dupSeg .tab").forEach(b => b.onclick = () => { dupPending = b.dataset.dup; renderDupSeg(); });
 // Чат: вигляд + URL для OBS
 $("chatSettingsBtn").onclick = () => {
   const c = S.settings.chat;

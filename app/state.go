@@ -19,7 +19,7 @@ type Settings struct {
 	DurationMin  int            `json:"durationMin"`
 	NonSubPoints int            `json:"nonSubPoints"`
 	Mult         map[string]int `json:"mult"`
-	DupMode      string         `json:"dupMode"` // last | first | all
+	DupMode      string         `json:"dupMode"` // кілька замовлень від глядача: last — останнє, first — перше, split — бали діляться між усіма
 	ObsPort      int            `json:"obsPort"` // локальний сервер для OBS (127.0.0.1)
 	Chat         ChatSettings   `json:"chat"`
 	GameMin      int            `json:"gameMin"` // хвилин на гру переможця (етап 2)
@@ -118,7 +118,7 @@ func (s *Settings) normalize() {
 	d := defaultSettings()
 	s.DurationMin = 10 // збір замовлень завжди 10 хв (±1 хв кнопками); налаштування прибрано
 	// правила балів фіксовані: T1×1, T2×2, T3×3, не-підписник 0, від чатерса — останнє замовлення
-	s.Mult, s.NonSubPoints, s.DupMode = map[string]int{"1": 1, "2": 2, "3": 3}, 0, "last"
+	s.Mult, s.NonSubPoints = map[string]int{"1": 1, "2": 2, "3": 3}, 0
 	if s.Mult == nil {
 		s.Mult = d.Mult
 	}
@@ -133,7 +133,7 @@ func (s *Settings) normalize() {
 	if s.NonSubPoints < 0 {
 		s.NonSubPoints = 0
 	}
-	if s.DupMode != "first" && s.DupMode != "all" {
+	if s.DupMode != "first" && s.DupMode != "split" {
 		s.DupMode = "last"
 	}
 	if s.Chat.FontSize < 11 || s.Chat.FontSize > 28 {

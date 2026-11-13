@@ -104,7 +104,7 @@ func collectionCSV(s Settings, entries []Entry) string {
 		b.WriteString("\r\n")
 	}
 	b.WriteString("sep=;\r\n")
-	counted := countedIDs(s, entries)
+	counted, pts := countedIDs(s, entries), entryPoints(s, entries)
 	line("Час", "Чатерс", "Логін", "Тір", "Місяці", "Бали", "Замовлення", "Рахується")
 	for _, e := range entries {
 		tier, months := "—", ""
@@ -117,7 +117,7 @@ func collectionCSV(s Settings, entries []Entry) string {
 		} else if !counted[e.ID] {
 			status = "ні (дубль)"
 		}
-		line(time.UnixMilli(e.Ts).Format("2006-01-02 15:04:05"), e.User, e.Login, tier, months, strconv.Itoa(pointsOf(s, e)), e.Text, status)
+		line(time.UnixMilli(e.Ts).Format("2006-01-02 15:04:05"), e.User, e.Login, tier, months, strconv.Itoa(csvPoints(s, e, counted, pts)), e.Text, status)
 	}
 	b.WriteString("\r\nПідсумок\r\n")
 	line("Замовлення", "Бали", "Людей", "Хто")
@@ -308,3 +308,11 @@ func (a *App) GetStream(id string) (StreamFile, error) {
 }
 
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+// бали в CSV: враховане замовлення — за правилом (у split — частка), неврахованe — скільки дало б саме
+func csvPoints(s Settings, e Entry, counted map[string]bool, pts map[string]int) int {
+	if counted[e.ID] {
+		return pts[e.ID]
+	}
+	return pointsOf(s, e)
+}

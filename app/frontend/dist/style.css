@@ -989,3 +989,19 @@ td > .donchip{margin-left:0}
 /* поле «Порт» — без стрілок угору/вниз */
 #obsPort{-moz-appearance:textfield;appearance:textfield}
 #obsPort::-webkit-inner-spin-button,#obsPort::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+
+/* кнопки таймера: іконки; «Завершити» — затисканням з червоною «фарбою» */
+.ctlbtn,.winbtn.ctlhold{display:inline-flex;align-items:center;justify-content:center;padding:0}
+.ctlbtn .ci,.winbtn.ctlhold .ci{width:20px;height:20px;display:block}
+.winbtn.ctlhold{min-width:0;width:100%;border-radius:10px}
+.winbtn.ctlhold .wl{display:inline-flex}
+.winbtn.ctlhold:disabled,.ctlbtn:disabled{opacity:.45;cursor:default}
+/* СабДей: Старт — широкий у першому рядку, під ним Пауза і Завершити */
+.tctl{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.tctl #startBtn{grid-column:1 / -1;height:44px}
+.tctl #startBtn .ci{width:22px;height:22px}
+.tctl #pauseBtn,.tctl #stopBtn{grid-column:auto;height:38px}
+/* аукціон: три кнопки в рядку */
+.auctl{grid-template-columns:96px 56px 56px}
+.auctl button{height:32px}
+.donchip{border-width:2px;border-color:rgba(255,206,110,.55)}

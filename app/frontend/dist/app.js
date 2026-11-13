@@ -217,7 +217,6 @@ function renderTimer(){
   $("statusText").className = "spill " + (s.status || "idle");
   $("statusText").title = {running:"Замовлення записуються", paused:"Замовлення не записуються, поки пауза"}[s.status] || "";
   $("startBtn").disabled = s.status==="running";
-  $("startBtn").textContent = s.status==="paused" ? "Продовжити" : "Старт";
   $("pauseBtn").disabled = s.status!=="running";
   $("stopBtn").disabled = !(s.status==="running"||s.status==="paused");
   const going = s.status==="running" || s.status==="paused"; // ±1 хв — лише коли збір іде або на паузі
@@ -746,6 +745,12 @@ async function holdDone(){
   setLevel(btn, 1); btn.classList.remove("pressed","near"); btn.classList.add("full");
   await new Promise(r => setTimeout(r, 380)); // «вистрибнула» і спалахнула
   const action = btn.dataset.hold;
+  if(action === "stopcollect" || action === "stopauction"){ // завершити збір / прийом ставок
+    holding = null;
+    try{ setState(await call(action === "stopcollect" ? "FinishTimer" : "AuctionFinish")); } catch(e){}
+    finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); }, 500); }
+    return;
+  }
   if(action === "newauction"){
     holding = null;
     try{
@@ -962,7 +967,7 @@ $("startBtn").onclick = async () => {
   else if(S.conn.status!=="on") toast("Увага: немає з'єднання з Twitch", 4000);
 };
 $("pauseBtn").onclick = async () => setState(await call("PauseTimer"));
-$("stopBtn").onclick = async () => { setState(await call("FinishTimer")); toast("Збір завершено"); };
+$("stopBtn").insertAdjacentHTML("afterbegin", LIQUID_RED); // «Завершити» збір — затисканням
 $("plusBtn").onclick = async () => setState(await call("AddTime", 60000));
 $("minusBtn").onclick = async () => setState(await call("AddTime", -60000));
 
@@ -1058,7 +1063,6 @@ function renderAuTimer(){
   $("auStatus").textContent = {idle:"Очікування старту", running:"Ставки приймаються", paused:"Пауза", finished:"Ставки закрито"}[t.status] || "";
   $("auStatus").className = "spill " + (t.status || "idle");
   $("auStart").disabled = t.status === "running";
-  $("auStart").textContent = t.status === "paused" ? "Продовжити" : "Старт";
   $("auPause").disabled = t.status !== "running";
   $("auStop").disabled = !(t.status === "running" || t.status === "paused");
   const going = t.status === "running" || t.status === "paused";
@@ -1582,7 +1586,7 @@ $("auStart").onclick = async () => {
   else if(S.conn.status !== "on") toast("Увага: немає з'єднання з Twitch", 4000);
 };
 $("auPause").onclick = async () => setState(await call("AuctionPause"));
-$("auStop").onclick = async () => { setState(await call("AuctionFinish")); toast("Прийом ставок завершено — можна крутити колесо"); };
+$("auStop").insertAdjacentHTML("afterbegin", LIQUID_RED); // «Завершити» прийом ставок — затисканням
 $("auPlus").onclick = async () => setState(await call("AuctionAddTime", 60000));
 $("auMinus").onclick = async () => setState(await call("AuctionAddTime", -60000));
 // «Новий стрім» і «Новий аукціон» — затисканням з червоною «фарбою» (попередні зберігаються)

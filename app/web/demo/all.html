@@ -11,25 +11,28 @@
   header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;max-width:1680px;margin:0 auto 24px}
   h1{font:700 22px/1.2 "Unbounded","Segoe UI",sans-serif;margin:0}
   header p{margin:0;color:var(--muted)}
-  header a{color:#bf94ff}
-  h2{font:600 12px/1.3 "Segoe UI Variable Text","Segoe UI",sans-serif;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:28px 0 12px}
-  section{max-width:1680px;margin:0 auto}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(520px,1fr));gap:20px}
-  figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  figcaption{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line)}
-  figcaption b{font-weight:600}
-  figcaption a{color:var(--muted);font-size:12.5px;text-decoration:none}
-  figcaption a:hover,figcaption a:focus-visible{color:#bf94ff}
+  header a{color:#bf94ff;display:inline-block;padding:10px 4px;margin:-10px 0}
+  main{max-width:1680px;margin:0 auto}
+  /* одна рівна сітка: 8 екранів — 4×2, 2×4 або 1 стовпчик, без порожніх клітинок */
+  .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+  @media (max-width:1500px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  a.card{display:block;color:inherit;text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;transition:border-color .15s}
+  a.card:hover{border-color:#6b4fb0}
+  .cap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px 10px 14px;border-bottom:1px solid var(--line);min-height:56px}
+  .cap small{display:block;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+  .cap b{font-weight:600}
+  .open{flex:0 0 auto;display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border:1px solid #3a3a42;border-radius:8px;font-size:13px;color:var(--text)}
+  a.card:hover .open{border-color:#9147ff;background:#9147ff}
   .shot{position:relative;aspect-ratio:1440/900;overflow:hidden;background:#0e0e10}
   .shot iframe{position:absolute;left:0;top:0;width:1440px;height:900px;border:0;transform-origin:0 0;pointer-events:none}
   .shot .wait{position:absolute;left:14px;bottom:12px;color:var(--muted);font-size:12px}
-  a:focus-visible{outline:2px solid #bf94ff;outline-offset:2px}
-  @media (max-width:600px){body{padding:20px 16px}.grid{grid-template-columns:1fr}}
+  a:focus-visible{outline:2px solid #bf94ff;outline-offset:3px}
+  @media (max-width:760px){body{padding:20px 16px}.grid{grid-template-columns:1fr}}
 </style></head>
 <body>
 <header>
   <h1>PhillBot — усі екрани</h1>
-  <p>Живе демо на вигаданих даних. Натисніть «Відкрити», щоб покерувати екраном. · <a href="/">Увійти</a></p>
+  <p>Живе демо на вигаданих даних. · <a href="/">Увійти</a></p>
 </header>
 <main id="board"></main>
 <script>
@@ -40,19 +43,16 @@
     ["Переглядовий", [["auction", "Аукціон: прийом ставок"], ["wheel", "Колесо на вибування"]]],
     ["Налаштування", [["settings", "Загальні налаштування"], ["subdaysettings", "Налаштування СабДею"], ["ausettings", "Налаштування аукціону"]]],
   ];
-  const board = document.getElementById("board"), frames = [];
-  groups.forEach(([title, items]) => {
-    const sec = document.createElement("section");
-    sec.innerHTML = `<h2>${title}</h2><div class="grid"></div>`;
-    items.forEach(([scene, name]) => {
-      const f = document.createElement("figure");
-      f.innerHTML = `<figcaption><b>${name}</b><a href="/demo?scene=${scene}" target="_blank" rel="noopener">Відкрити ↗</a></figcaption>
-        <div class="shot"><span class="wait">Завантаження…</span></div>`;
-      sec.querySelector(".grid").appendChild(f);
-      frames.push({scene, name, shot: f.querySelector(".shot")});
-    });
-    board.appendChild(sec);
-  });
+  const board = document.getElementById("board"), frames = [], grid = document.createElement("div");
+  grid.className = "grid"; board.appendChild(grid);
+  groups.forEach(([title, items]) => items.forEach(([scene, name]) => {
+    const a = document.createElement("a"); // уся картка — посилання на живе демо цього екрана
+    a.className = "card"; a.href = `/demo?scene=${scene}`; a.target = "_blank"; a.rel = "noopener";
+    a.innerHTML = `<div class="cap"><span><small>${title}</small><b>${name}</b></span><span class="open" aria-hidden="true">Відкрити ↗</span></div>
+      <div class="shot"><span class="wait">Завантаження…</span></div>`;
+    grid.appendChild(a);
+    frames.push({scene, name, shot: a.querySelector(".shot")});
+  }));
   const fit = () => frames.forEach(x => { if(x.ifr) x.ifr.style.transform = `scale(${x.shot.clientWidth / 1440})`; });
   addEventListener("resize", fit);
   // кадри вантажаться по черзі: кожне демо на старті запам'ятовує свою вкладку, і так вони не переплутаються

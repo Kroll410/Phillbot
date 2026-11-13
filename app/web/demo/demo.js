@@ -6,7 +6,8 @@
     localStorage.setItem("phillbot-mode", VIEW.includes(scene) ? "viewing" : "subday");
     localStorage.setItem("phillbot-auswap", scene === "wheel" ? "1" : "0");
   }catch(e){}
-  addEventListener("DOMContentLoaded", () => document.body.classList.add("nowelcome"));
+  // у демо без вітання «Вітаю, …»: воно закриває екран саме тоді, коли його вперше бачать
+  document.head.insertAdjacentHTML("beforeend", "<style>#welcome{display:none!important}</style>");
   // вигляд як у вебверсії (без суто десктопних налаштувань) і позначка, що це демо
   document.documentElement.classList.add("web");
   addEventListener("DOMContentLoaded", () => {
@@ -47,7 +48,8 @@
     {id: "f3", ts: now - 40000, user: "Max", login: "max", color: "#C6FF00", text: "Hollow Knight: Silksong", amount: 1000, status: "new", lotId: "l6"},
     {id: "f4", ts: now - 60000, user: "Zo", login: "zo", color: "#FF69B4", text: "elden ring", amount: 10000, status: "added", lotId: "l1"}];
 
-  addEventListener("load", () => setTimeout(() => {
+  // стан заповнюємо одразу, до першого GetState — щоб жоден кадр не показав порожній екран
+  {
     const D = window.DEMO;
     D.set(S => {
       S.auth.user = {id: "1", login: "demo", display_name: "Демо"};
@@ -75,7 +77,7 @@
         S.don = {state: "on", url: "https://your-name.ngrok-free.dev/donatello"};
       }
     });
-    const open = {settings: "generalBtn", subdaysettings: "subdaySettingsBtn", ausettings: "auSettingsBtn", streams: "openJournal"}[scene];
-    if(open) setTimeout(() => document.getElementById(open).click(), 300);
-  }, 700));
+  }
+  const open = {settings: "generalBtn", subdaysettings: "subdaySettingsBtn", ausettings: "auSettingsBtn", streams: "openJournal"}[scene];
+  if(open) addEventListener("load", () => setTimeout(() => document.getElementById(open).click(), 300));
 })();

@@ -22,7 +22,7 @@
       vote:{status:"idle", yes:0, no:0},
       auction:{cfg:{rewardIds:["q","s","m"], rewardsSet:false, durationMin:10, spinMode:"elim", spinGapSec:1, center:{kind:""}},
         timer:{status:"idle", remainingMs:600000}, lots:[], feed:[], winner:"", merges:[], spin:null},
-      auth:{status:"ok", user:{id:"1", login:"phillhess", display_name:"PhillHess"}}, conn:{status:"on", text:"Підключено до Twitch"},
+      auth:{status:"ok", user:{id:"1", login:"demo", display_name:"Демо"}}, conn:{status:"on", text:"Підключено до Twitch"},
       rewards: REWARDS, rewardsErr:"", log:[], obs:{running:true, port:17841, url:"http://127.0.0.1:17841"}, chatWindow:false, subBadges:{}};
   }
   let S = fresh();

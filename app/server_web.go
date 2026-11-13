@@ -835,6 +835,22 @@ func (s *webServer) serveUI(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = io.WriteString(w, page)
+	case "/demo":
+		// публічне демо без входу: той самий інтерфейс, але «бекенд» працює в браузері з вигаданими даними —
+		// жодного звернення до API, каналів чи БД
+		b, err := assets.ReadFile("frontend/dist/index.html")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		page := strings.Replace(string(b), `<script src="app.js`, `<script src="/demo/demo-backend.js"></script><script src="/demo/demo.js"></script>`+"\n"+`<script src="/app.js`, 1)
+		page = strings.Replace(page, "</head>", faviconTags+"</head>", 1)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = io.WriteString(w, page)
+	case "/demo/demo-backend.js", "/demo/demo.js":
+		w.Header().Set("Cache-Control", "no-store")
+		serveEmbedded(w, r, webFS, "web"+p)
 	case "/web.js":
 		w.Header().Set("Cache-Control", "no-store")
 		serveEmbedded(w, r, webFS, "web/web.js")

@@ -534,3 +534,31 @@ func TestServerFavicon(t *testing.T) {
 		}
 	}
 }
+
+// /demo відкривається без входу, працює на вигаданих даних у браузері й не підключає місток до API.
+func TestServerDemoPublic(t *testing.T) {
+	_, srv := authServer(t)
+	resp, err := http.Get(srv.URL + "/demo")
+	if err != nil || resp.StatusCode != 200 {
+		t.Fatal(err, resp.StatusCode)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	page := string(b)
+	if !strings.Contains(page, `/demo/demo-backend.js`) || strings.Contains(page, `src="web.js"`) || strings.Contains(page, "лише за запрошенням") {
+		t.Fatal("demo page must load the demo backend, not web.js or the login page")
+	}
+	for _, p := range []string{"/demo/demo-backend.js", "/demo/demo.js", "/app.js", "/style.css"} {
+		r, err := http.Get(srv.URL + p)
+		if err != nil || r.StatusCode != 200 {
+			t.Fatal(p, err, r.StatusCode)
+		}
+		r.Body.Close()
+	}
+	// API без входу так і лишається закритим
+	r, _ := http.Post(srv.URL+"/api/call/GetState", "application/json", strings.NewReader("[]"))
+	if r.StatusCode == 200 {
+		t.Fatal("API must stay closed without login")
+	}
+	r.Body.Close()
+}

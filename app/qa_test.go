@@ -66,6 +66,14 @@ func TestVoteAddTimeAndContinue(t *testing.T) {
 		t.Fatal("vote +1 min")
 	}
 	a.FinishVote() // нічия 0:0
+	if a.st.Vote.Result != "tie" {
+		t.Fatalf("result %q", a.st.Vote.Result)
+	}
+	// нічия — можна переголосувати: нове голосування з нуля
+	if _, err := a.StartVote(); err != nil || a.st.Vote.Status != "running" || len(a.st.Vote.Votes) != 0 {
+		t.Fatalf("revote: %v %+v", err, a.st.Vote)
+	}
+	a.FinishVote()
 	s := a.ContinueGame()
 	if s.Phase != "play" || s.Game.Status != "running" || s.Round != 2 {
 		t.Fatalf("continue: phase=%s game=%s round=%d", s.Phase, s.Game.Status, s.Round)

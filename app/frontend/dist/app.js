@@ -66,8 +66,9 @@ function D(){ const c = viewColl(); return c ? {entries: c.entries || [], settin
 /* ---------- бали ---------- */
 function pointsOf(e, st = D().settings){
   if(e.donation) return Number(e.donPoints) || 0; // донат Donatello: бали вже з гривень
-  if(!e.tier) return Number(st.nonSubPoints)||0;
-  return (Number(st.mult[String(e.tier)])||0) * Math.max(1, Number(e.months)||1);
+  const gifts = Number(e.gifts) || 0; // +1 бал за кожну подаровану сабку за 30 днів (як у бекенді)
+  if(!e.tier) return (Number(st.nonSubPoints)||0) + gifts;
+  return (Number(st.mult[String(e.tier)])||0) * Math.max(1, Number(e.months)||1) + gifts;
 }
 // «діюче» замовлення кожного чатерса (останнє / перше / у «ділити» — усі), включно з прихованими — лише вони є в таблиці
 function effectiveSet(d = D()){
@@ -422,7 +423,7 @@ function renderTable(){
     let rows = aggregate().filter(g=>!q || g.name.toLowerCase().includes(q) || g.users.some(u=>u.name.toLowerCase().includes(q)));
     rows = sortRows(rows, sortKey.summary);
     const max = Math.max(1,...rows.map(r=>r.points)), total = rows.reduce((a,r)=>a+r.points,0)||1;
-    if(!rows.length){ wrap.innerHTML = `<div class="empty">${D().entries.length?"Нічого не знайдено":"Замовлень поки немає. Виберіть нагороду і натисніть «Почати збір»."}</div>`; return; }
+    if(!rows.length){ wrap.innerHTML = `<div class="empty">${D().entries.length?"Нічого не знайдено":"Замовлень поки немає"}</div>`; return; }
     const counted = countedSet(), pm = pointsMap();
     wrap.innerHTML = `<table class="dnd summary"><thead><tr><th class="gripcol"></th><th style="width:44px">#</th>${th("Замовлення","name")}${th("Бали","points","num")}<th style="width:220px">Частка</th>${th("Людей","count","num")}<th style="width:1%"></th><th style="width:44px"></th></tr></thead><tbody>${
       rows.map((g,i)=>{
@@ -433,10 +434,10 @@ function renderTable(){
         if(!open) return main;
         const list = D().entries.filter(e=>counted.has(e.id) && norm(e.text)===g.key).sort((a,b)=>(pm.get(b.id)||0)-(pm.get(a.id)||0) || a.ts-b.ts);
         return main + `<tr class="gdetail"><td colspan="8"><table class="subtable"><thead><tr><th>Час</th><th>Чатерс</th><th>Тір сабки</th><th class="num">Має сабку</th><th class="num">Бали</th></tr></thead><tbody>${
-          list.map(e=>`<tr><td class="muted">${fmtClock(e.ts)}</td><td>${userTag(e)}${giftChip(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
+          list.map(e=>`<tr><td class="muted">${fmtClock(e.ts)}</td><td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
             <td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td>
             <td class="num">${e.tier?`<span class="subcell">${subBadgeFor(e)}${e.months} міс.</span>`:'<span class="muted">—</span>'}</td>
-            <td class="num pts">${pm.get(e.id) || 0}</td></tr>`).join("")
+            <td class="num pts">${ptGift(e)}${pm.get(e.id) || 0}</td></tr>`).join("")
         }</tbody></table></td></tr>`;
       }).join("")
     }</tbody></table>`;
@@ -447,15 +448,15 @@ function renderTable(){
     let rows = D().entries.filter(e=>eff.has(e.id)).map(e=>({...e, points: counted.has(e.id) ? (pm.get(e.id)||0) : pointsOf(e), counted:counted.has(e.id)}))
       .filter(e=>!q || e.text.toLowerCase().includes(q) || e.user.toLowerCase().includes(q));
     rows = sortRows(rows, sortKey.entries);
-    if(!rows.length){ wrap.innerHTML = `<div class="empty">${D().entries.length?"Нічого не знайдено":"Замовлень поки немає."}</div>`; return; }
+    if(!rows.length){ wrap.innerHTML = `<div class="empty">${D().entries.length?"Нічого не знайдено":"Замовлень поки немає"}</div>`; return; }
     wrap.innerHTML = `<table class="dnd"><thead><tr><th class="gripcol"></th>${th("Час","ts")}${th("Чатерс","user")}${th("Тір сабки","tier")}${th("Має сабку","months","num")}${th("Бали","points","num")}${th("Замовлення","text")}<th class="acts">${D().live?`<button class="small editbtn${editMode?" on":""}" data-act="editmode">${editMode?"Готово":"Редагувати"}</button>`:""}</th></tr></thead><tbody>${
       rows.map(e=>`<tr data-id="${e.id}"${DRAG()} class="${e.excluded?"off":!e.counted?"replaced":""} ${freshIds.has(e.id)?"fresh":""}" title="${esc(e.excluded?"Приховано — не рахується":!e.counted?"Не рахується: від цього чатерса враховано інше замовлення":(e.source||""))}">
         <td class="gripcol">${D().live?GRIP:""}</td><td class="muted">${fmtClock(e.ts)}</td>
-        <td>${userTag(e)}${giftChip(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
+        <td>${userTag(e)}${e.manual?' <span class="muted">(вручну)</span>':""}</td>
         ${e.donation ? `<td>${donChip(e.uah)}</td><td class="num"><span class="muted">Donatello</span></td>` : editMode ? `<td><select data-f="tier"><option value="0" ${!e.tier?"selected":""}>—</option>${[1,2,3].map(t=>`<option value="${t}" ${e.tier===t?"selected":""}>T${t}</option>`).join("")}</select></td>
         <td class="num"><span class="subcell">${subBadgeFor(e)}<input class="mo" type="number" min="1" data-f="months" value="${e.months||""}" ${!e.tier?"disabled":""}></span></td>`
         : `<td>${e.tier?`<span class="tier tier${e.tier}">T${e.tier}</span>`:'<span class="muted">—</span>'}</td><td class="num">${e.tier?`<span class="subcell">${subBadgeFor(e)}${e.months} міс.</span>`:'<span class="muted">—</span>'}</td>`}
-        <td class="num pts">${e.points}</td>
+        <td class="num pts">${e.counted ? ptGift(e) : ""}${e.points}</td>
         <td>${editMode ? `<input class="edit" data-f="text" value="${esc(e.text)}">` : `<span class="otext">${esc(e.text)}</span>`}</td>
         <td class="acts">${D().live?`<button class="icon${e.excluded?" on":""}" data-act="toggle" title="${e.excluded?"Показати — знову рахувати":"Приховати — не рахувати (можна повернути)"}">${e.excluded?ICON_EYE_OFF:ICON_EYE}</button>${editMode?`<button class="icon danger" data-act="del" title="Видалити назавжди">${ICON_TRASH}</button>`:""}`:""}</td></tr>`).join("")
     }</tbody></table>`;
@@ -628,13 +629,19 @@ $("donLink").addEventListener("click", async e => {
 });
 // подаровані сабки глядача за 30 днів: +1 бал за кожну
 const GIFT_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11h16v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM3 7h18v4H3zM12 7v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 7c-1.5-3-5-3.6-5.5-1.5S9.5 7 12 7zm0 0c1.5-3 5-3.6 5.5-1.5S14.5 7 12 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`;
-const giftChip = e => e.gifts > 0 ? `<span class="giftchip" title="Подарував(ла) сабок за 30 днів: ${e.gifts} — +${e.gifts} бал.">${GIFT_ICON}+${e.gifts}</span>` : "";
+// у колонці «Бали»: скільки з них — за подаровані сабки
+const ptGift = e => e.gifts > 0 && !e.donation ? `<span class="ptgift" title="+${e.gifts} за подаровані сабки">${GIFT_ICON}+${e.gifts}</span>` : "";
 // бейдж донату Donatello: серце + сума в гривнях
 const DON_HEART = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.5 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 4.3 2.4.7-1.3 2.2-2.4 4.3-2.4 3.8 0 5.8 4 4.3 7.3C19.5 16.4 12 21 12 21z" fill="currentColor"/></svg>`;
 const donChip = uah => `<span class="donchip">${DON_HEART}<i>₴</i><b>${fmtUAH(uah)}</b></span>`;
 const fmtUAH = v => { const x = Number(v) || 0; return x % 1 ? x.toFixed(2).replace(".", ",") : String(x); };
 $("openBase").onclick = () => call("OpenFolder", "");
 $("openCsv").onclick = () => call("OpenFolder", "exports");
+// експорт за весь час: діалог «Зберегти як», потім програма показує файл у провіднику
+document.querySelectorAll("[data-export]").forEach(b => b.onclick = async () => {
+  if(b.classList.contains("is-loading")) return;
+  await withLoading(b, () => call("ExportAll", b.dataset.export)).catch(() => {});
+});
 
 // СабДей: нагорода + правила балів
 $("subdaySettingsBtn").onclick = () => {
@@ -949,7 +956,7 @@ function renderGameTimer(){
     const k = `${v.yes}:${v.no}`;
     if(k !== lastV){ $("vn1").textContent = `${v.yes||0}${tot?` · ${Math.round(v.yes/tot*100)}%`:""}`; $("vn2").textContent = `${v.no||0}${tot?` · ${Math.round(v.no/tot*100)}%`:""}`; lastV = k; }
   }
-  if(sec === "gTie") $("tieInfo").textContent = `Голоси розділились порівну: 1 — ${v.yes||0}, 2 — ${v.no||0}. Вирішіть самі.`;
+  if(sec === "gTie") $("tieInfo").textContent = `Голоси розділились порівну: 1 — ${v.yes||0}, 2 — ${v.no||0}. Переголосуйте або вирішіть самі.`;
 }
 setInterval(renderGameTimer, 250);
 $("gFinish").insertAdjacentHTML("afterbegin", LIQUID);
@@ -957,7 +964,7 @@ $("gFinish").querySelector(".liquid").insertAdjacentHTML("beforeend", `<span cla
 $("gPause").onclick = async () => setState(await call(S.game.status==="paused" ? "GameResume" : "GamePause"));
 $("gPlus").onclick = async () => setState(await call("GameAddTime", 60000));
 $("gMinus").onclick = async () => setState(await call("GameAddTime", -60000));
-$("vStart").onclick = async () => setState(await call("StartVote"));
+$("vStart").onclick = $("tRevote").onclick = async () => setState(await call("StartVote")); // нічия — можна переголосувати
 $("vPlus").onclick = async () => setState(await call("VoteAddTime", 60000));
 $("vFinish").onclick = async () => setState(await call("FinishVote"));
 $("gContinue").onclick = $("tContinue").onclick = async () => setState(await call("ContinueGame"));
@@ -1133,7 +1140,7 @@ function renderAuList(){
   const au = AU(), lots = [...au.lots].sort((a, b) => gone(a) - gone(b) || b.amount - a.amount);
   const active = au.lots.filter(l => !gone(l)).length;
   $("auListHint").textContent = au.lots.length ? `${active} на колесі` + (au.lots.length > active ? ` · ${au.lots.length - active} вибуло` : "") : "";
-  if(!lots.length){ $("auList").innerHTML = `<div class="empty">Лотів ще немає. Запустіть таймер — ставки з'являться тут.</div>`; return; }
+  if(!lots.length){ $("auList").innerHTML = `<div class="empty">Лотів ще немає</div>`; return; }
   if(auSwapped){ // стисло: топ-3 та інформація
     // завжди топ-3: переможець — найвище, далі за сумою (вибулі теж, приглушені)
     const win = lots.find(l => l.id === au.winner);
@@ -1365,17 +1372,29 @@ function animateSpin(sp){
     wRot = tgt;
     const lot = lotById(sp.pick);
     if(sp.mode === "instant" || sp.ids.length <= 1){ wAnim = null; wheelDraw(secs); showWinner(); endRes(); return; }
-    // вибування: сектор тьмяніє, потім колесо перебудовується без нього
+    // вибування: сектор тьмяніє і плавно стискається до нуля, решта секторів розходиться до нових розмірів
     $("wResult").innerHTML = `Вибуває: <b>${esc(lot ? lot.name : "?")}</b>`; $("wResult").className = "wresult show out";
-    wFade = {id: sp.pick, k: 1};
-    const f0 = performance.now();
-    const fade = now => { if(!wFade) return; const k = Math.min(1, (now - f0) / 900); wFade.k = 1 - k; wheelDraw(secs); if(k < 1) requestAnimationFrame(fade); };
-    requestAnimationFrame(fade);
     renderAuList(); // лот, що вибуває, виїжджає зі списку одночасно з «Вибуває: …»
+    const sum = a => a.reduce((x, s) => x + s.w, 0), T0 = sum(secs);
+    const next = wheelSectors(), T1 = sum(next) || 1, nw = Object.fromEntries(next.map(s => [s.id, s.w / T1]));
+    // поворот: точка під стрілкою зберігається, колесо доїжджає до нульового кута найкоротшим шляхом
+    const r0 = wRot, dr = (((-r0) % TAU) + TAU * 1.5) % TAU - TAU / 2;
+    const HOLD = 350, DUR = 1100, f0 = performance.now() + HOLD;
+    const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    wFade = {id: sp.pick, k: 1};
+    const morph = now => {
+      if(tok !== spinToken || !wFade) return;
+      const t = Math.max(0, Math.min(1, (now - f0) / DUR)), e = ease(t);
+      wFade.k = 1 - Math.min(1, t * 1.6); // спершу тьмяніє, потім зникає
+      const cur = secs.map(s => ({id: s.id, w: (s.w / T0) * (1 - e) + (s.id === sp.pick ? 0 : (nw[s.id] || 0)) * e}));
+      wRot = r0 + dr * e; wheelDraw(cur);
+      if(t < 1) requestAnimationFrame(morph);
+    };
+    requestAnimationFrame(morph);
     setTimeout(() => {
       if(tok !== spinToken){ endRes(); return; }
       wAnim = null; wFade = null; wRot = 0; if(!sp.final) $("wResult").className = "wresult"; wheelDraw(); renderSpinBtn(); renderAuList(); if(sp.final) showWinner(); endRes();
-    }, 1700);
+    }, HOLD + DUR + 120);
   };
   const step = now => {
     if(finished) return;
@@ -1419,12 +1438,8 @@ function renderSpinBtn(){
 }
 $("auSpin").insertAdjacentHTML("afterbegin", LIQUID);
 /* ---------- автооберти «на вибування» ----------
-   крутить сам із паузою з налаштувань (5 с); коли на колесі ≤5 лотів — пауза ×1.2, ×1.4, ×1.6, ×1.8, ×2 */
-function spinGap(){
-  const n = AU().lots.filter(l => !l.out && !l.hidden && l.amount > 0).length;
-  const f = n <= 5 ? Math.min(2, 1 + .2 * (6 - n)) : 1;
-  return (AU().cfg.spinGapSec || 5) * 1000 * f;
-}
+   крутить сам: після кожного вибування — пауза 1 с і наступний оберт */
+const SPIN_GAP = 1000;
 function setRunUI(on){
   $("auWrap").classList.toggle("autorun", on);
   renderAuList(); renderSpinBtn();
@@ -1438,12 +1453,7 @@ async function autoRun(){
       setState(await call("AuctionSpin"));
       await spinEndP;
       if(run.stop || AU().winner) break;
-      const end = Date.now() + spinGap();
-      while(!run.stop && Date.now() < end){
-        $("wResult").innerHTML = `Наступний оберт через <b>${Math.ceil((end - Date.now()) / 1000)} с</b>`; $("wResult").className = "wresult show next";
-        await new Promise(r => setTimeout(r, 150));
-      }
-      if(!run.stop) $("wResult").className = "wresult";
+      await new Promise(r => setTimeout(r, SPIN_GAP)); // коротка пауза між обертами, без напису
     }
   } catch(e){}
   finally { if(auRun === run){ auRun = null; setRunUI(false); } }
@@ -1592,7 +1602,7 @@ function auModeSeg(){
 document.querySelectorAll("#auModeSeg .tab").forEach(b => b.onclick = () => { auModePending = b.dataset.mode; auModeSeg(); });
 $("auSettingsBtn").onclick = () => {
   auPending = null; auShowAll = false; auModePending = null; auCenterPending = null;
-  $("auMin").value = AU().cfg.durationMin || 10; $("auGap").value = AU().cfg.spinGapSec || 5; $("auDonPer1000").value = AU().cfg.donUahPer1000 || 10;
+  $("auMin").value = AU().cfg.durationMin || 10; $("auDonPer1000").value = AU().cfg.donUahPer1000 || 10;
   auRewardGrid(); openModal("auctionModal"); requestAnimationFrame(() => { auModeSeg(); auCenterUI(); });
   if(((AU().cfg || {}).center || {}).kind === "emote") loadEmotes();
   if(!(S.rewards || []).length) withLoading([$("auctionModal").querySelector(".box"), $("auRewardRefresh")], () => call("RefreshRewards")).then(() => auRewardGrid());
@@ -1602,7 +1612,7 @@ $("auctionSave").onclick = async () => {
   if(center.kind === "emote" && !center.url) center = {kind: ""}; // вкладку відкрили, але емодзі не вибрали
   if(center.kind === "file" && !center.name) center = {kind: ""};
   const cfg = {...AU().cfg, center, rewardIds: auPending ?? AU().cfg.rewardIds, spinMode: auModePending || AU().cfg.spinMode,
-    durationMin: Math.min(180, Math.max(1, Math.round(n("auMin", 10)))), spinGapSec: Math.min(60, Math.max(1, Math.round(n("auGap", 5)))),
+    durationMin: Math.min(180, Math.max(1, Math.round(n("auMin", 10)))),
     donUahPer1000: Math.min(100000, Math.max(1, Math.round(n("auDonPer1000", 10))))};
   setState(await call("AuctionSaveSettings", cfg));
   const noText = cfg.rewardIds.map(rewardById).filter(r => r && r.is_user_input_required === false);

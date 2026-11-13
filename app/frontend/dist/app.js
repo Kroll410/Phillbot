@@ -738,12 +738,36 @@ async function resetAnimSubday(){
   ]);
   await sleep(250);
 }
+// «Новий аукціон»: сектори колеса швидко вибувають по одному (як при вибуванні — тьмяніють і стискаються,
+// решта розходиться на їхнє місце), наприкінці — порожнє колесо
+function drainWheel(total = 900){
+  return new Promise(res => {
+    let done = false; const finish = () => { if(done) return; done = true; wFade = null; wheelDraw([]); res(); };
+    let secs = wheelSectors().map(s => ({...s}));
+    if(wAnim || !secs.length || !$("wheelBox").clientWidth){ finish(); return; }
+    $("wResult").className = "wresult";
+    const order = secs.slice().sort((a, b) => a.w - b.w).map(s => s.id); // спершу найменші
+    const per = Math.max(110, Math.min(260, total / secs.length));
+    let i = 0, t0 = performance.now();
+    const step = now => {
+      if(done) return;
+      const id = order[i], t = Math.min(1, (now - t0) / per), e = t * t * (3 - 2 * t);
+      wFade = {id, k: 1 - Math.min(1, t * 1.4)};
+      const cur = secs.map(s => s.id === id ? {...s, w: s.w * (1 - e)} : s).filter(s => s.w > 1e-6);
+      if(cur.length) wheelDraw(cur);
+      if(t >= 1){ secs = secs.filter(s => s.id !== id); i++; t0 = now; if(i >= order.length) return finish(); }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+    setTimeout(finish, per * secs.length + 600); // якщо кадри призупинено (вкладка у фоні)
+  });
+}
 async function resetAnimAuction(){
   auResetting = true;
   await Promise.all([
     animOut($("auList").querySelectorAll("tbody > tr, .autop-i"), ROW_OUT, {dur: 560, stagger: 55, max: 16}),
     animOut($("auFeed").querySelectorAll(".fbid"), [{transform: "none", opacity: 1}, {transform: "translateX(48px)", opacity: 0}], {dur: 560, stagger: 55, max: 16}),
-    animDone($("wheel").animate([{opacity: 1}, {opacity: .15}], {duration: 800, fill: "forwards"}), 1000),
+    drainWheel(900),
     countTo0($("auLots"), undefined, 1100), countTo0($("auBids"), undefined, 1100), countTo0($("auSum"), fmtN, 1100),
   ]);
   await sleep(250);
@@ -809,7 +833,6 @@ async function holdDone(){
       const snap = await call("AuctionNew");
       auResetting = false; setState(snap);
       $("wheel").getAnimations().forEach(a => a.cancel());
-      $("wheel").animate([{opacity: .15}, {opacity: 1}], {duration: 450, easing: "ease-out"});
       toast("Почато новий аукціон");
     } catch(e){ auResetting = false; $("wheel").getAnimations().forEach(a => a.cancel()); renderAuction(); }
     finally { setTimeout(() => { btn.classList.remove("full"); setLevel(btn, 0); }, 500); }
@@ -1437,15 +1460,14 @@ async function showWinner(){
   $("wResult").innerHTML = `Переможець: <b>${esc(l.name)}</b>`; $("wResult").className = "wresult show win";
   if(mode === "viewing") await sparkles(1500);
 }
-// ----- міні-колесо: під час прийому ставок колесо в правій колонці згортається, стрічка ставок займає висоту -----
+// ----- міні-колесо: у правій колонці колесо згорнуте в смужку (крутять його у великому вікні), стрічка ставок займає висоту -----
 const plural = (n, one, few, many) => { const d = n % 10, h = n % 100; return d === 1 && h !== 11 ? one : d >= 2 && d <= 4 && (h < 12 || h > 14) ? few : many; };
-let wMiniOpen = false, wMiniWas = false; // wMiniOpen — стрімер розгорнув колесо вручну під час ставок
+let wMiniOpen = false, wMiniWas = null; // wMiniOpen — стрімер розгорнув колесо вручну (запам'ятовується)
+try{ wMiniOpen = localStorage.getItem("phillbot-wminiopen") === "1"; }catch(e){}
 function renderMini(){
-  const au = AU(), t = au.timer.status, bidding = t === "running" || t === "paused";
-  if(!bidding) wMiniOpen = false; // після завершення прийому колесо розгортається саме
-  const mini = bidding && !auSwapped && !wMiniOpen && !auRun;
+  const au = AU(), mini = !auSwapped && !wMiniOpen && !auRun;
   const wrap = $("auWrap");
-  wrap.classList.toggle("bidding", bidding && !auSwapped);
+  wrap.classList.toggle("bidding", !auSwapped); // «Згорнути» — для розгорнутого колеса в правій колонці
   if(mini !== wMiniWas){ wMiniWas = mini; wrap.classList.toggle("mini", mini); requestAnimationFrame(() => wheelDraw()); }
   if(!mini) return;
   const live = au.lots.filter(l => !l.out && !l.hidden && l.amount > 0), sum = live.reduce((a, l) => a + l.amount, 0);
@@ -1454,8 +1476,9 @@ function renderMini(){
     ? `<b>${esc(top.name)}</b> <span class="pct">${(top.amount / sum * 100).toFixed(1).replace(".0", "")}%</span><small>${live.length} ${plural(live.length, "лот", "лоти", "лотів")} · ${fmtN(sum)} балів</small>`
     : `<small>Лотів поки немає</small>`;
 }
-$("wMiniExpand").onclick = () => { wMiniOpen = true; renderMini(); };
-$("wMiniCollapse").onclick = () => { wMiniOpen = false; renderMini(); };
+const setMiniOpen = v => { wMiniOpen = v; try{ localStorage.setItem("phillbot-wminiopen", v ? "1" : "0"); }catch(e){} renderMini(); };
+$("wMiniExpand").onclick = () => setMiniOpen(true);
+$("wMiniCollapse").onclick = () => setMiniOpen(false);
 function renderWheel(){
   const au = AU(), sp = au.spin;
   renderMini();

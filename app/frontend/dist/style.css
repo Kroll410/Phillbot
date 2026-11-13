@@ -980,3 +980,6 @@ td > .donchip{margin-left:0}
 .mpair>.box{flex:1 1 0;min-width:0;max-width:480px;width:auto;overflow:auto}
 .mpair>.box.donbox h3:first-of-type{margin-top:8px}
 @media (max-width:900px){.mpair{flex-direction:column;align-items:center;overflow:auto}.mpair>.box{width:100%;flex:0 0 auto}}
+/* поле «Порт» — без стрілок угору/вниз */
+#obsPort{-moz-appearance:textfield;appearance:textfield}
+#obsPort::-webkit-inner-spin-button,#obsPort::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}

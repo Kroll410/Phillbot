@@ -74,9 +74,9 @@ func (a *App) runTunnel(ctx context.Context, token, domain string) {
 			if domain != "" {
 				opts = append(opts, ngrok.WithURL("https://"+domain))
 			}
-			lctx, lcancel := context.WithTimeout(ctx, 30*time.Second)
-			ln, lerr := agent.Listen(lctx, opts...)
-			lcancel()
+			// контекст — увесь час роботи тунелю: ngrok бере його і для своїх перепідключень,
+			// тож короткий (скасований після Listen) контекст давав безкінечні «обриви»
+			ln, lerr := agent.Listen(ctx, opts...)
 			if lerr == nil {
 				pub := strings.TrimRight(ln.URL().String(), "/") + "/donatello"
 				a.setDon(ctx, DonStatus{State: "on", URL: pub})

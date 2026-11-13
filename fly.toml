@@ -1,0 +1,33 @@
+# Приклад для Fly.io: fly launch --no-deploy --copy-config (див. docs/DEPLOY.md)
+app = "phillbot"            # змініть на свою унікальну назву
+primary_region = "waw"
+
+# Контекст збірки — тека app/, тому деплой запускайте звідти:
+#   cd app && fly deploy -c ../fly.toml --dockerfile Dockerfile
+
+[env]
+  PHILLBOT_DATA = "/data"
+  PHILLBOT_ADDR = "0.0.0.0:8080"
+  PHILLBOT_PUBLIC_URL = "https://phillbot.fly.dev"   # змініть на свою адресу
+
+[[mounts]]
+  source = "phillbot_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false   # таймери й EventSub мають працювати постійно
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

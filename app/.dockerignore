@@ -1,0 +1,9 @@
+build/
+frontend/wailsjs/
+*.db
+*.db-*
+*.db*
+*_test.go
+*.exe
+.git
+data/

@@ -241,6 +241,7 @@
     <div class="auside">
       <div class="auwin card" id="auWheelWin">
         <div class="auwin-h"><span class="auMode" id="auModeLbl"></span>
+          <button class="small wminitoggle" id="wMiniCollapse">Згорнути</button>
           <button class="icon-btn auswap" data-swap title="Поміняти вікна місцями"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h13l-4-4M17 17H4l4 4"/></svg></button></div>
         <div class="wheelbox" id="wheelBox">
           <canvas id="wheel"></canvas>
@@ -248,6 +249,8 @@
           <img id="wCenter" class="wcenter-img hidden" alt="">
           <div class="wresult" id="wResult"></div>
         </div>
+        <!-- міні-колесо: поки приймаються ставки, колесо згорнуте в смужку — стрічці ставок більше місця -->
+        <div class="wmini" id="wMini"><div class="wmini-t" id="wMiniText"></div><button class="small" id="wMiniExpand">Розгорнути</button></div>
         <div class="wctl">
           <button id="auSpin" class="winbtn spinbtn" data-hold="spin" title="Затисніть і тримайте, щоб крутити колесо"><span class="wl">Крутити</span></button>
           <button id="auReset" class="winbtn holdend resetbtn" data-hold="resetspins" title="Затисніть і тримайте, щоб скинути колесо: усі лоти повертаються, переможця скасовано"><span class="wl">Скинути колесо</span></button>

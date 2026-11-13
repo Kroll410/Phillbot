@@ -1437,8 +1437,28 @@ async function showWinner(){
   $("wResult").innerHTML = `Переможець: <b>${esc(l.name)}</b>`; $("wResult").className = "wresult show win";
   if(mode === "viewing") await sparkles(1500);
 }
+// ----- міні-колесо: під час прийому ставок колесо в правій колонці згортається, стрічка ставок займає висоту -----
+const plural = (n, one, few, many) => { const d = n % 10, h = n % 100; return d === 1 && h !== 11 ? one : d >= 2 && d <= 4 && (h < 12 || h > 14) ? few : many; };
+let wMiniOpen = false, wMiniWas = false; // wMiniOpen — стрімер розгорнув колесо вручну під час ставок
+function renderMini(){
+  const au = AU(), t = au.timer.status, bidding = t === "running" || t === "paused";
+  if(!bidding) wMiniOpen = false; // після завершення прийому колесо розгортається саме
+  const mini = bidding && !auSwapped && !wMiniOpen && !auRun;
+  const wrap = $("auWrap");
+  wrap.classList.toggle("bidding", bidding && !auSwapped);
+  if(mini !== wMiniWas){ wMiniWas = mini; wrap.classList.toggle("mini", mini); requestAnimationFrame(() => wheelDraw()); }
+  if(!mini) return;
+  const live = au.lots.filter(l => !l.out && !l.hidden && l.amount > 0), sum = live.reduce((a, l) => a + l.amount, 0);
+  const top = live.slice().sort((a, b) => b.amount - a.amount)[0];
+  $("wMiniText").innerHTML = top
+    ? `<b>${esc(top.name)}</b> <span class="pct">${(top.amount / sum * 100).toFixed(1).replace(".0", "")}%</span><small>${live.length} ${plural(live.length, "лот", "лоти", "лотів")} · ${fmtN(sum)} балів</small>`
+    : `<small>Лотів поки немає</small>`;
+}
+$("wMiniExpand").onclick = () => { wMiniOpen = true; renderMini(); };
+$("wMiniCollapse").onclick = () => { wMiniOpen = false; renderMini(); };
 function renderWheel(){
   const au = AU(), sp = au.spin;
+  renderMini();
   $("auModeLbl").textContent = au.cfg.spinMode === "instant" ? "одразу результат" : "на вибування";
   if(sp && lastSpinAt !== null && sp.at !== lastSpinAt){ lastSpinAt = sp.at; if(Date.now() - sp.at < 15000){ animateSpin(sp); return; } }
   if(lastSpinAt === null) lastSpinAt = sp ? sp.at : 0;
@@ -1500,6 +1520,7 @@ function placeWins(){
   if(auSwapped){ side.prepend($("auListWin")); wrap.prepend($("auWheelWin")); }
   else { side.prepend($("auWheelWin")); wrap.prepend($("auListWin")); }
   wrap.classList.toggle("swapped", auSwapped);
+  if(S) renderMini(); // велике колесо ліворуч — міні-режим не потрібен
 }
 document.querySelectorAll("[data-swap]").forEach(b => b.onclick = () => {
   if(wAnim) return; // під час оберту колесо не мінімізується

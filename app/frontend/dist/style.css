@@ -1065,3 +1065,15 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px soli
 #generalModal .privacybox p{margin:4px 0 10px;font-size:12.5px;line-height:1.5;color:var(--muted)}
 .privacybox .legal a{color:var(--muted)} .privacybox .legal a:hover{color:var(--brand-text)}
 .privacybox #webDataBox{margin-top:0}
+/* міні-колесо (права колонка, поки приймаються ставки): колесо — смужка, стрічка ставок — на всю висоту */
+.wmini,.wminitoggle{display:none}
+.auwrap.bidding:not(.mini) .wminitoggle{display:inline-flex;margin-left:auto}
+.auside .wheelbox{transition:height .5s cubic-bezier(.2,.9,.25,1),flex-basis .5s cubic-bezier(.2,.9,.25,1)}
+.auwrap.mini #auWheelWin{display:flex;flex-direction:row;align-items:center;gap:12px;padding:10px 12px}
+.auwrap.mini #auWheelWin .auwin-h,.auwrap.mini .wpointer,.auwrap.mini .wresult{display:none}
+.auwrap.mini .auside .wheelbox{height:56px;flex:0 0 56px;width:56px}
+.auwrap.mini .wmini{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.wmini-t{flex:1;min-width:0;line-height:1.35;font-size:13px}
+.wmini-t b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;max-width:70%;vertical-align:bottom}
+.wmini-t .pct{color:var(--brand-text);font-weight:600;margin-left:4px}
+.wmini-t small{display:block;color:var(--muted);font-size:12px}

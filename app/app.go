@@ -41,6 +41,7 @@ type Snapshot struct {
 	Obs        OverlayInfo       `json:"obs"`
 	ChatWindow bool              `json:"chatWindow"`
 	Don        DonStatus         `json:"don"`       // підключення до Donatello
+	Version    string            `json:"version"`   // dev — тестова збірка; у релізі — тег (v1.1.0)
 	SubBadges  map[string]string `json:"subBadges"` // значки підписки каналу: версія ("0", "3", "2012", "3036"…) → картинка // чат відкрито в окремому вікні — вкладка заблокована
 }
 
@@ -162,7 +163,7 @@ func (a *App) snapshotLocked() Snapshot {
 	}
 	return Snapshot{State: st, Auth: auth, Conn: a.conn, Rewards: append([]Reward(nil), a.rewards...), RewardsErr: a.rewErr,
 		BaseDir: a.baseDir, ClientID: a.clientID, Now: time.Now().UnixMilli(), Log: append([]LogLine(nil), a.logLines...), Obs: obs,
-		ChatWindow: a.chatWinClients > 0 || a.chatWinPending, SubBadges: a.subBadges(), Don: a.don}
+		ChatWindow: a.chatWinClients > 0 || a.chatWinPending, SubBadges: a.subBadges(), Don: a.don, Version: version}
 }
 
 // подія для головного вікна і для оверлеїв OBS

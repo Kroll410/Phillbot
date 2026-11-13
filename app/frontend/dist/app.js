@@ -389,11 +389,10 @@ wrapEl.addEventListener("drop", async ev => {
 function renderTable(){
   if(resetting) return;
   const wrap = $("tableWrap");
-  $("search").classList.toggle("hidden", tab==="log");
   // не перемальовувати, поки користувач редагує клітинку
   if(drag || holding || (wrap.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName))){ tableDirty = true; return; }
   tableDirty = false;
-  const q = $("search").value.trim().toLowerCase();
+  const q = ""; // пошук прибрано
   if(tab==="log"){
     const log = (S.log||[]).slice().reverse();
     wrap.innerHTML = log.length ? `<table class="logtable"><thead><tr><th style="width:1%">Час</th><th style="width:1%">Чатерс</th><th>Подія</th></tr></thead><tbody>${
@@ -931,6 +930,12 @@ $("vFinish").onclick = async () => setState(await call("FinishVote"));
 $("gContinue").onclick = $("tContinue").onclick = async () => setState(await call("ContinueGame"));
 $("gNext").onclick = $("tNext").onclick = async () => setState(await call("NextCollection"));
 
+// вкладка «Журнал» — лише в тестовій збірці (version = dev); у релізі її немає
+function renderLogTab(){
+  const t = document.querySelector('.tabs .tab[data-tab="log"]'), prod = !!S.version && S.version !== "dev";
+  t.classList.toggle("hidden", prod);
+  if(prod && tab === "log"){ tab = "summary"; document.querySelectorAll(".tabs .tab").forEach(x => x.classList.toggle("active", x.dataset.tab === tab)); renderTable(); slideSeg(document.querySelector(".tabs .seg")); }
+}
 function renderAll(){
   if(!inited){ initInputs(); inited = true; }
   renderAuth();
@@ -941,7 +946,7 @@ function renderAll(){
     if(ck !== lastCollKey){ lastCollKey = ck; if(streams.length) loadStreams(); }
     if(!resetting){ renderStreamBar(); renderStats(); renderTable(); renderRewardCurrent(); renderSteps(); }
     renderObs(); renderChat(); slideAll();
-    renderAuction(); renderDon();
+    renderAuction(); renderDon(); renderLogTab();
     if($("subdayModal").classList.contains("show")) renderRewardGrid();
     if(!chatLoaded){ chatLoaded = true; api().GetChat().then(m => { chatPending = (m||[]).concat(chatPending); }); }
   }
@@ -978,7 +983,6 @@ document.querySelectorAll(".tabs .tab").forEach(b => b.onclick = () => {
   const w = $("tableWrap"); w.classList.remove("slidein"); void w.offsetWidth; w.classList.add("slidein");
 });
 document.fonts && document.fonts.ready.then(slideAll); // після завантаження шрифтів ширини вкладок уточнюються
-$("search").oninput = renderTable;
 
 $("tableWrap").addEventListener("click", async e => {
   const h = e.target.closest("th[data-sort]");

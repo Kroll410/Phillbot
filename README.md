@@ -48,14 +48,4 @@
 
 Потрібно: Windows 10/11 (WebView2), для СабДею — Marbles on Stream (Steam).
 Налаштування, вхід і історія зберігаються поруч з exe — передавайте іншим лише сам `PhillBot.exe`.
-
-## Розробка
-
-```
-cd app
-go test ./...
-wails build -clean -skipbindings
-```
-
-Go + Wails v2, інтерфейс — чистий HTML/JS у `app/frontend/dist` (правила оформлення — [app/frontend/README.md](app/frontend/README.md)).
-Реліз: тег `vX.Y.Z` → GitHub Actions збирає `PhillBot.exe` і публікує його в Releases.
+X.Y.Z` → GitHub Actions збирає `PhillBot.exe` і публікує його в Releases.

@@ -42,16 +42,13 @@
 </div>
 <div class="box settings donbox">
   <h2>Донати Donatello</h2>
-  <h3>Тунель ngrok</h3>
-  <div class="hint" style="margin:-2px 0 6px">Donatello миттєво надсилає кожен донат у PhillBot. Публічну адресу для цього дає вбудований ngrok. Під час збору СабДею донат стає замовленням, під час аукціону — ставкою.</div>
-  <label>Токен ngrok (authtoken)</label>
-  <input type="password" id="ngrokToken" autocomplete="off" spellcheck="false" placeholder="dashboard.ngrok.com → Your Authtoken">
-  <div class="hint">Взяти токен: <a href="#" data-url="https://dashboard.ngrok.com/get-started/your-authtoken">dashboard.ngrok.com/get-started/your-authtoken</a> (потрібен безкоштовний акаунт ngrok).</div>
-  <div class="hint">Посилання постійне: ngrok закріплює за вашим акаунтом одну адресу, тож вставити її в Donatello треба лише раз.</div>
-  <label>Ключ колбека Donatello (API Key)</label>
-  <input type="password" id="donKey" autocomplete="off" spellcheck="false" placeholder="ключ з Donatello → API → Колбеки">
+  <label>Токен ngrok</label>
+  <input type="password" id="ngrokToken" autocomplete="off" spellcheck="false">
+  <div class="hint"><a href="#" data-url="https://dashboard.ngrok.com/get-started/your-authtoken">dashboard.ngrok.com/get-started/your-authtoken</a></div>
+  <label>Ключ колбека Donatello</label>
+  <input type="password" id="donKey" autocomplete="off" spellcheck="false">
+  <div class="hint"><a href="#" data-url="https://donatello.to/panel/doc-api?tab=callbacks">donatello.to/panel/doc-api?tab=callbacks</a></div>
   <div class="donlink" id="donLink"></div>
-  <div class="hint">Donatello → Панель → API → Колбеки: метод <b>POST</b>, вставте посилання вище, а ключ звідти — у поле «Ключ колбека». Перевірте кнопкою «Тестове повідомлення».</div>
 </div>
 </div></div>
 

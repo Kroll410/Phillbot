@@ -17,6 +17,7 @@
   button{cursor:pointer}
   button.primary{background:var(--brand);border:0;font-weight:600}
   .err{color:#ffb4ae;min-height:1.5em;margin:0 0 8px}
+  form label{flex:1 1 100%;font-size:12px;color:var(--muted);margin:0 0 -2px}
   table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
   th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
   th{color:var(--muted);font-weight:500;font-size:12px}
@@ -29,16 +30,18 @@
 <main>
   <header><h1>Доступ до PhillBot</h1><a href="/">← До програми</a></header>
   <form id="add">
-    <input id="login" placeholder="Логін Twitch (наприклад, streamer_name)" autocomplete="off" spellcheck="false" required>
-    <select id="role"><option value="streamer">Стрімер</option><option value="admin">Адміністратор</option></select>
-    <button class="primary">Додати</button>
+    <label for="login">Логін Twitch</label>
+    <input id="login" placeholder="streamer_name" autocomplete="off" spellcheck="false" required>
+    <select id="role" aria-label="Роль"><option value="streamer">Стрімер</option><option value="admin">Адміністратор</option></select>
+    <button class="primary">Додати до доступу</button>
   </form>
   <p class="err" id="err" role="alert"></p>
   <h2 style="font-size:16px;margin:28px 0 6px">Видалити дані глядача</h2>
   <p class="tag" style="margin:0 0 10px">На запит глядача чи донатера: його ім'я замінюється на «видалено» в усій історії всіх каналів (замовлення, ставки, лоти, подарунки).</p>
   <form id="forget">
-    <input id="forgetName" placeholder="Логін Twitch або ім'я донатера" autocomplete="off" spellcheck="false" required>
-    <button>Видалити дані</button>
+    <label for="forgetName">Логін Twitch або ім'я донатера</label>
+    <input id="forgetName" placeholder="viewer_name" autocomplete="off" spellcheck="false" required>
+    <button>Видалити дані глядача</button>
   </form>
   <p class="tag" id="forgetRes" role="status"></p>
   <table><thead><tr><th>Логін</th><th>Роль</th><th>Останній вхід</th><th></th></tr></thead><tbody id="rows"></tbody></table>

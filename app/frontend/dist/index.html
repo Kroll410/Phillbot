@@ -160,7 +160,8 @@
         <li>OAuth Redirect URL: <code>http://localhost</code>, Category: <i>Application Integration</i>, Client Type: <b>Public</b>.</li>
         <li>Скопіюйте Client ID сюди.</li>
       </ol>
-      <div class="row"><input id="clientIdInput" placeholder="Client ID"><button id="clientIdSave" class="primary cidnext">Далі</button></div>
+      <label for="clientIdInput">Client ID застосунку Twitch</label>
+      <div class="row"><input id="clientIdInput" placeholder="abcd1234efgh5678" autocomplete="off" spellcheck="false"><button id="clientIdSave" class="primary cidnext">Зберегти Client ID</button></div>
     </div>
     <div id="authLogin" class="hidden">
       <h2>Вхід у Twitch</h2>
@@ -219,7 +220,7 @@
       <button class="winbtn holdend ctlhold" id="auStop" data-hold="stopauction" aria-label="Завершити (затисніть)" disabled><span class="wl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.2" fill="currentColor"/></svg></span></button>
     </div>
     <div class="aubar-r">
-      <button id="auNew" class="winbtn holdend newaubtn" data-hold="newauction" title="Затисніть і тримайте, щоб почати новий аукціон (поточні лоти й ставки збережуться в історію)"><span class="wl">Новий аукціон</span></button>
+      <button id="auNew" class="winbtn holdend newaubtn" data-hold="newauction" title="Затисніть і тримайте, щоб почати новий аукціон (поточні лоти й ставки збережуться в історію)"><span class="wl">Почати новий аукціон</span></button>
       <button id="auSettingsBtn" class="icon-btn sgear" title="Налаштування аукціону"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
     </div>
   </div>
@@ -306,8 +307,8 @@
       <h2>Стрім</h2>
       <div class="scur" id="streamCur">—</div>
       <div class="scardbtns">
-        <button id="openJournal">Журнал стрімів</button>
-        <button id="newStreamHold" class="winbtn holdend newstreambtn" data-hold="newstream" title="Затисніть і тримайте, щоб завершити цей стрім і почати новий (усі збори збережуться в журналі)"><span class="wl">Новий стрім</span></button>
+        <button id="openJournal">Відкрити журнал</button>
+        <button id="newStreamHold" class="winbtn holdend newstreambtn" data-hold="newstream" title="Затисніть і тримайте, щоб завершити цей стрім і почати новий (усі збори збережуться в журналі)"><span class="wl">Почати стрім</span></button>
       </div>
     </div>
   </aside>
@@ -366,7 +367,7 @@
       <button id="tRevote" class="primary vstart">Голосувати ще раз</button>
       <div class="gctl small2">
         <button id="tContinue">Продовжити гру</button>
-        <button id="tNext">Дроп</button>
+        <button id="tNext">Дропнути гру</button>
       </div>
     </div>
   </div>
@@ -376,7 +377,7 @@
     <button id="vStart" class="primary vstart">Почати голосування</button>
     <div class="gctl small2">
       <button id="gContinue">Продовжити гру без голосування</button>
-      <button id="gNext">Дроп</button>
+      <button id="gNext">Дропнути гру</button>
     </div>
   </div>
   <div class="gctl gplayctl" id="gPlayCtl">

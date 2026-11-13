@@ -15,7 +15,9 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const fmtTime = ms => { ms = Math.max(0, ms); const t = Math.ceil(ms/1000), m = Math.floor(t/60), s = t%60; return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`; };
 const fmtClock = ts => new Date(ts).toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
 const norm = t => String(t).toLowerCase().replace(/\s+/g," ").trim().replace(/[.!?,;:…]+$/,"").trim();
-function toast(msg, ms=2600){} // нижні сповіщення прибрано з додатку (дії видно з самого інтерфейсу)
+function toast(msg, ms=2600){}
+// «зменшити рух» у системі: без блискіток і декоративних перетікань (оберт колеса лишається — це результат)
+const RM = matchMedia("(prefers-reduced-motion: reduce)"); // нижні сповіщення прибрано з додатку (дії видно з самого інтерфейсу)
 // підказки при наведенні (title) прибрано всюди: знімаємо атрибут і з нових елементів
 (() => {
   // кнопкам без тексту (шестерні, іконки) підказка лишається як aria-label — для екранних читачів
@@ -26,7 +28,7 @@ function toast(msg, ms=2600){} // нижні сповіщення прибран
     .observe(document.documentElement, {subtree: true, childList: true, attributes: true, attributeFilter: ["title"]});
   strip(document.body);
 })();
-function confirmBox(text, yes="Так", no="Скасувати"){ return new Promise(res=>{ $("modalText").textContent=text; $("modalYes").textContent=yes; $("modalNo").textContent=no; $("modal").classList.add("show");
+function confirmBox(text, yes="Підтвердити", no="Скасувати"){ return new Promise(res=>{ $("modalText").textContent=text; $("modalYes").textContent=yes; $("modalNo").textContent=no; $("modal").classList.add("show");
   const done=v=>{ $("modal").classList.remove("show"); $("modalYes").onclick=$("modalNo").onclick=null; res(v); };
   $("modalYes").onclick=()=>done(true); $("modalNo").onclick=()=>done(false); }); }
 async function call(fn, ...args){
@@ -603,6 +605,29 @@ function dismissModal(m){
   if(m.id === "modal"){ $("modalNo").click(); return; }
   closeModal(m.id); pendingReward = null;
 }
+// фокус у вікнах: при відкритті — всередину вікна, Tab ходить лише по ньому, при закритті — назад до кнопки, що відкрила
+const FOCUSABLE = 'button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+const visibleIn = m => [...m.querySelectorAll(FOCUSABLE)].filter(el => el.offsetParent !== null);
+const modalFocusObs = new MutationObserver(ms => ms.forEach(({target: m}) => {
+  const shown = m.classList.contains("show");
+  if(shown && !m._opener){
+    m._opener = document.activeElement && !document.activeElement.closest(".modal") ? document.activeElement : null;
+    m._opener = m._opener || document.body;
+    requestAnimationFrame(() => { const f = visibleIn(m); const first = f.find(el => el.matches("input,select,textarea")) || f.find(el => !el.matches("[data-close]")) || f[0]; if(first) first.focus({preventScroll: true}); });
+  } else if(!shown && m._opener){
+    const o = m._opener; m._opener = null;
+    if(o !== document.body && o.isConnected && !document.querySelector(".modal.show")) o.focus({preventScroll: true});
+  }
+}));
+document.querySelectorAll(".modal").forEach(m => modalFocusObs.observe(m, {attributes: true, attributeFilter: ["class"]}));
+document.addEventListener("keydown", e => {
+  if(e.key !== "Tab") return;
+  const open = [...document.querySelectorAll(".modal.show")]; if(!open.length) return;
+  const f = visibleIn(open[open.length-1]); if(!f.length) return;
+  const i = f.indexOf(document.activeElement);
+  if(e.shiftKey && i <= 0){ e.preventDefault(); f[f.length-1].focus(); }
+  else if(!e.shiftKey && (i === -1 || i === f.length - 1)){ e.preventDefault(); f[0].focus(); }
+});
 document.addEventListener("keydown", e => {
   if(e.key !== "Escape") return;
   const open = [...document.querySelectorAll(".modal.show")]; if(!open.length) return;
@@ -744,7 +769,7 @@ function drainWheel(total = 900){
   return new Promise(res => {
     let done = false; const finish = () => { if(done) return; done = true; wFade = null; wheelDraw([]); wDrawn = []; res(); };
     let secs = wheelSectors().map(s => ({...s}));
-    if(wAnim || !secs.length || !$("wheelBox").clientWidth){ finish(); return; }
+    if(wAnim || !secs.length || !$("wheelBox").clientWidth || RM.matches){ finish(); return; }
     $("wResult").className = "wresult";
     const order = secs.slice().sort((a, b) => a.w - b.w).map(s => s.id); // спершу найменші
     const per = Math.max(110, Math.min(260, total / secs.length));
@@ -939,6 +964,7 @@ window.addEventListener("blur", () => holdCancel());
 
 // зелено-фіолетові блискітки, що злітаються від меж екрана
 function sparkles(ms){
+  if(RM.matches) return Promise.resolve(); // зменшений рух — без блискіток
   return new Promise(resolve => {
     const cv = $("sparkles"), ctx = cv.getContext("2d"), W = cv.width = innerWidth, H = cv.height = innerHeight;
     cv.classList.add("on");
@@ -1111,7 +1137,7 @@ $("tableWrap").addEventListener("click", async e => {
   if(btn.dataset.act==="editmode"){ editMode = !editMode; renderTable(); return; }
   const id = btn.closest("tr").dataset.id, ent = S.entries.find(x=>x.id===id); if(!ent) return;
   if(btn.dataset.act==="toggle") setState(await call("UpdateEntry", {...ent, excluded: !ent.excluded}));
-  if(btn.dataset.act==="del"){ if(!(await confirmBox(`Видалити замовлення «${ent.text}» від ${ent.user}?`))) return; setState(await call("DeleteEntry", id)); }
+  if(btn.dataset.act==="del"){ if(!(await confirmBox(`Видалити замовлення «${ent.text}» від ${ent.user}?`, "Видалити замовлення"))) return; setState(await call("DeleteEntry", id)); }
 });
 $("tableWrap").addEventListener("change", async e => {
   const f = e.target.dataset.f; if(!f) return;
@@ -1516,7 +1542,7 @@ $("wMiniCollapse").onclick = () => setMiniOpen(false);
 function morphWheel(){
   const next = wheelSectors(), prev = wDrawn;
   const same = prev && prev.length === next.length && prev.every((s, i) => s.id === next[i].id && Math.abs(s.w - next[i].w) < 1e-9);
-  if(!prev || same || !$("wheelBox").clientWidth){ wheelDraw(); return; }
+  if(!prev || same || !$("wheelBox").clientWidth || RM.matches){ wheelDraw(); return; }
   const tok = ++wMorphTok, sum = a => a.reduce((x, s) => x + s.w, 0) || 1;
   const pf = new Map(prev.map(s => [s.id, s.w / sum(prev)])), nf = new Map(next.map(s => [s.id, s.w / sum(next)]));
   const order = next.map(s => s.id); // прибрані лишаються на своїх старих місцях

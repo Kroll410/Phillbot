@@ -42,7 +42,7 @@ main{flex:1;min-height:0;display:flex;flex-direction:column}
 aside{overflow-y:auto;padding-right:4px}
 section{display:flex;flex-direction:column;min-height:0;min-width:0}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:16px}
-.card h2{font:600 11.5px/1.3 var(--font-ui);text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:0 0 10px}
+.card h2{font:600 12px/1.3 var(--font-ui);text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:0 0 10px}
 label{display:block;color:var(--muted);font-size:12px;margin:8px 0 3px}
 input,select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 9px;font:inherit;width:100%}
 input:focus,select:focus{outline:none;border-color:var(--accent)}
@@ -87,14 +87,14 @@ td input.edit{background:transparent;border:1px solid transparent;padding:3px 5p
 td input.edit:hover{border-color:var(--line)} td input.edit:focus{border-color:var(--accent);background:var(--panel2)}
 td select{width:auto;padding:3px 5px}
 td input.mo{width:66px;padding:3px 5px;text-align:right}
-.tier{display:inline-block;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700}
+.tier{display:inline-block;border-radius:4px;padding:1px 6px;font-size:12px;font-weight:700}
 .tier1{background:rgba(145,71,255,.2);color:#c9a6ff}.tier2{background:rgba(0,181,173,.2);color:#5fe3dc}.tier3{background:rgba(255,140,0,.2);color:#ffb866}
 .pts{font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
 .bar{height:6px;background:var(--accent);border-radius:3px;min-width:2px}
 .users{color:var(--muted);font-size:12px;max-width:420px}
 .empty{padding:28px 24px;color:var(--muted)}
 .reward{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;margin-top:6px;font-size:12px}
-.reward code{font-size:11px;word-break:break-all}
+.reward code{font-size:12px;word-break:break-all}
 .reward.bound{border-color:var(--ok)}
 details summary{cursor:pointer;color:var(--muted);font-size:12px;margin-top:8px}
 .log{font-family:var(--font-mono);font-size:12px;padding:10px 14px;white-space:pre-wrap;color:var(--muted)}
@@ -115,7 +115,7 @@ details summary{cursor:pointer;color:var(--muted);font-size:12px;margin-top:8px}
 .settings h3{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:16px 0 4px}
 .obsrow{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px}
 .obsrow span{flex:1;min-width:0}
-.obsrow code{display:block;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.obsrow code{display:block;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* чат */
 .chatwrap{position:relative;padding:6px 4px}
 #chatList{font-size:13.5px}
@@ -125,8 +125,8 @@ details summary{cursor:pointer;color:var(--muted);font-size:12px;margin-top:8px}
 .cemote{height:26px;vertical-align:middle;margin:-4px 1px}
 .cname{font-weight:700}
 .cmention{color:#ffd35a}
-.ctime{color:var(--muted);font-size:11px;margin-right:6px}
-.ctag{margin-left:8px;font-size:11px;background:var(--accent);border-radius:4px;padding:0 5px}
+.ctime{color:var(--muted);font-size:12px;margin-right:6px}
+.ctag{margin-left:8px;font-size:12px;background:var(--accent);border-radius:4px;padding:0 5px}
 .cmsg.order{background:rgba(145,71,255,.18);border-left:3px solid var(--accent)}
 .cmsg.reward{border-left:3px solid #5fe3dc}
 .cmsg.hl{background:rgba(0,181,173,.15)}
@@ -165,7 +165,7 @@ tr.drop td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .mode-tab:not(:disabled):hover{background:var(--panel2);color:var(--text)}
 .mode-tab.active{background:var(--accent);color:#fff}
 .mode-tab.active:hover{background:var(--accent2)!important}
-.mode-tab small{font-size:10px;font-weight:600;opacity:.8;margin-left:2px;text-transform:uppercase;letter-spacing:.5px}
+.mode-tab small{font-size:12px;font-weight:600;opacity:.8;margin-left:2px;text-transform:uppercase;letter-spacing:.5px}
 .mode-tab .lock{margin-left:6px;font-size:12px;color:var(--warn)}
 .mode-tab.active .lock{color:#fff}
 .icon-btn{width:34px;height:32px;padding:0;font-size:16px;display:inline-flex;align-items:center;justify-content:center}
@@ -191,7 +191,7 @@ input[type=range]{padding:0;accent-color:var(--accent);background:transparent;bo
 .rtile .rcost svg{width:12px;height:12px}
 .rtile .rtitle{padding:7px 9px 9px;font-size:12.5px;font-weight:600;line-height:1.3;color:var(--text);min-height:2.6em;overflow-wrap:anywhere}
 .rtile .rtags{display:flex;gap:4px;flex-wrap:wrap;padding:0 9px 8px;margin-top:-4px}
-.rtile .rtag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;border-radius:3px;padding:1px 5px;background:#3a2a10;color:var(--warn)}
+.rtile .rtag{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;border-radius:3px;padding:1px 5px;background:#3a2a10;color:var(--warn)}
 .rtile .rtag.off{background:#2a2a30;color:var(--muted)}
 .rtile.off .rimg{filter:grayscale(.7) brightness(.7)}
 .rtile.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(145,71,255,.25)}
@@ -246,7 +246,7 @@ body{font-size:14px;line-height:1.5}
 .pane.subday{grid-template-columns:340px minmax(0,1fr);gap:20px;padding:20px 24px}
 aside{padding-right:6px}
 .card{border-radius:var(--r);padding:18px;margin-bottom:var(--gap)}
-.card h2{font:600 11px/1.3 var(--font-ui);letter-spacing:1.2px;margin:0 0 12px}
+.card h2{font:600 12px/1.3 var(--font-ui);letter-spacing:1.2px;margin:0 0 12px}
 
 /* таймер */
 .timerbox{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px;margin:2px 0 2px}
@@ -273,7 +273,7 @@ details.fold>summary:hover{color:var(--text)}
 details.fold[open]{padding:0 18px 16px}
 details.fold[open]>summary{padding:14px 0 10px}
 .obsrow{font-size:12.5px;padding:6px 8px;margin:4px -8px 0}
-.obsrow code{font:11.5px/1.4 var(--font-mono);margin-top:2px}
+.obsrow code{font:12px/1.4 var(--font-mono);margin-top:2px}
 
 /* статистика */
 .stats{gap:12px;margin-bottom:16px}
@@ -294,7 +294,7 @@ details.fold[open]>summary{padding:14px 0 10px}
 /* таблиці */
 .tablewrap{border-radius:var(--r)}
 th,td{padding:11px 14px}
-th{font:600 11px/1.3 var(--font-ui);text-transform:uppercase;letter-spacing:.8px;color:var(--muted);background:#1c1c20;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font:600 12px/1.3 var(--font-ui);text-transform:uppercase;letter-spacing:.8px;color:var(--muted);background:#1c1c20;border-bottom:1px solid var(--line);white-space:nowrap}
 td{font-size:14px}
 tbody tr:last-child td{border-bottom:0}
 .gripcol{width:28px;padding-left:12px;padding-right:0}
@@ -307,7 +307,7 @@ tbody tr:last-child td{border-bottom:0}
 .users .utag{margin-right:4px}
 .utag .cname{font-weight:700;font-size:14px}
 .utag .cbadge{height:18px;margin-right:4px}
-.tier{font-size:11.5px;padding:2px 7px;border-radius:5px}
+.tier{font-size:12px;padding:2px 7px;border-radius:5px}
 .empty{padding:60px 20px;font-size:14px}
 #tableHint{margin-top:10px;font-size:12.5px}
 .logtable td{font-size:13.5px}
@@ -333,7 +333,7 @@ tr.grow.open td{background:#202026;border-bottom-color:transparent}
 tr.gdetail>td{padding:0 14px 14px 52px;background:#202026}
 tr.gdetail:hover{background:transparent}
 .subtable{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;border-collapse:separate;border-spacing:0}
-.subtable th{position:static;background:#1c1c20;cursor:default;padding:8px 12px;font-size:10.5px}
+.subtable th{position:static;background:#1c1c20;cursor:default;padding:8px 12px;font-size:12px}
 .subtable td{padding:8px 12px;font-size:13.5px}
 .subtable tbody tr:hover{background:#232329}
 .subtable .pts{font-size:15px}
@@ -366,7 +366,7 @@ tr.gdetail:hover{background:transparent}
 .chatmain .chatwrap,.chatmain .locked{flex:1;min-height:0}
 .cusers{background:var(--panel);border:1px solid var(--line);border-radius:var(--r,12px);overflow-y:auto;padding:8px 0;scrollbar-gutter:stable}
 .cugroup+.cugroup{margin-top:6px}
-.cuhead{display:flex;justify-content:space-between;align-items:center;padding:8px 16px 4px;font:600 11px/1.3 var(--font-ui);text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.cuhead{display:flex;justify-content:space-between;align-items:center;padding:8px 16px 4px;font:600 12px/1.3 var(--font-ui);text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
 .cuhead span{font-variant-numeric:tabular-nums;background:var(--panel2);border-radius:10px;padding:1px 8px;letter-spacing:0}
 .curow{padding:4px 16px;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .curow:hover{background:var(--panel2)}
@@ -379,7 +379,7 @@ tr.gdetail:hover{background:transparent}
 .cchips{flex:1;min-width:0;display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
 .cchip{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:5px 12px;border-radius:10px;background:var(--panel);border:1px solid var(--line);line-height:1.2;flex:0 0 auto}
 .cchip b{font-size:13px}
-.cchip span{font-size:11.5px;color:var(--muted)}
+.cchip span{font-size:12px;color:var(--muted)}
 .cchip.active{border-color:var(--accent);background:rgba(145,71,255,.16)}
 .cchip.live b::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:1px}
 .cchip.live.on b::before{background:var(--ok);box-shadow:0 0 0 3px rgba(0,200,83,.2)}
@@ -444,7 +444,7 @@ td.wincell{white-space:nowrap;padding-left:0;padding-right:6px}
 .srow.active{border-color:var(--accent);background:rgba(145,71,255,.14)}
 .sdate{font-weight:700;min-width:170px}
 .smeta{flex:1;color:var(--muted);font-size:13px}
-.sbadge{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ok)}
+.sbadge{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ok)}
 
 /* ---------- індикатор завантаження (див. frontend/README.md) ----------
    Будь-який елемент з класом .is-loading отримує анімовану рамку: градієнт зелений → фіолетовий, що біжить по контуру. */
@@ -521,7 +521,7 @@ h1,h2,h3,h4{font-family:var(--font-brand)}
 .vopt{position:relative;overflow:hidden;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;background:var(--panel2);text-align:left}
 .vopt .vfill{position:absolute;left:0;top:0;bottom:0;width:0;opacity:.35;transition:width .6s cubic-bezier(.2,1,.3,1)}
 .vopt.v1 .vfill{background:#00c853} .vopt.v2 .vfill{background:#9147ff}
-.vopt b{position:relative;font:800 30px/1 var(--font-display)} .vopt.v1 b{color:#00e676} .vopt.v2 b{color:#c9a6ff}
+.vopt b{position:relative;font:700 30px/1 var(--font-display)} .vopt.v1 b{color:#00e676} .vopt.v2 b{color:#c9a6ff}
 .vopt span{position:relative;font-weight:600}
 .vopt em{position:relative;font-style:normal;font:700 15px/1 var(--font-ui);font-variant-numeric:tabular-nums;color:var(--muted)}
 /* степер: оптичне центрування цифр у колі (виміряно: гліф на 1px нижче, «1» на ~0.8px лівіше) */
@@ -729,14 +729,14 @@ button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--gr
 .wctl button{height:38px}
 .winbtn.spinbtn{width:100%;min-width:0;height:38px}
 .winbtn.spinbtn:disabled{opacity:.5;cursor:default}
-.wsrc{margin-top:6px;font-size:11.5px;color:var(--muted)}
+.wsrc{margin-top:6px;font-size:12px;color:var(--muted)}
 .auMode{font-size:12px;color:#c9a6ff;padding:2px 9px;border-radius:999px;background:var(--grad-soft)}
 /* лоти — повна таблиця */
 .autable td.num,.autable th.num{text-align:right;white-space:nowrap}
 .autable .ldot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px;vertical-align:middle}
 .autable .lname{font-weight:600}
 .autable .lamt{font:600 15px/1 var(--font-display);font-variant-numeric:tabular-nums}
-.autable .uam{font-size:11.5px;margin:0 6px 0 3px}
+.autable .uam{font-size:12px;margin:0 6px 0 3px}
 .autable tr.out td{opacity:.42}
 /* рядок переможця: один градієнт на весь рядок (не на кожну клітинку) */
 .autable tr.win{background:linear-gradient(90deg,rgba(0,200,83,.14),rgba(145,71,255,.14))}
@@ -768,7 +768,7 @@ button.primary:not(.mode-tab):not(.tab):not(:disabled):hover{background:var(--gr
 .frow .utag{min-width:0;overflow:hidden}
 .frow .utag .cname{font-size:13px}
 .frow .famt{margin-left:auto;font-size:12.5px}
-.ftime{font-size:11px;color:var(--muted)}
+.ftime{font-size:12px;color:var(--muted)}
 .ftext{margin-top:3px;font-weight:600;word-break:break-word}
 .fst{margin-top:3px;font-size:12px;color:var(--muted)}
 .fst b{color:var(--text);font-weight:600}
@@ -967,7 +967,7 @@ button.cidnext{flex:0 0 auto;min-width:110px;height:44px;padding:0 22px;font-wei
 .wcdrop:not(:has(.wcprev)) .wcdrop-t,.wcdrop:not(:has(.wcprev)) .wcdrop-h{grid-column:1 / -1}
 
 /* Donatello: індикатор у шапці, позначка донату в таблицях і стрічці */
-.donpill{font:600 11.5px/1 var(--font-ui);padding:5px 9px;border-radius:999px;background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+.donpill{font:600 12px/1 var(--font-ui);padding:5px 9px;border-radius:999px;background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
 .donpill.on{color:#ffd36b;border-color:rgba(255,211,107,.35);background:rgba(255,211,107,.08)}
 .donpill.err{color:#ff8a80;border-color:rgba(255,90,82,.4);background:rgba(255,90,82,.08)}
 .donchip{display:inline-flex;align-items:center;gap:4px;height:21px;padding:0 9px 0 7px;margin-left:8px;border-radius:999px;white-space:nowrap;
@@ -1078,3 +1078,8 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px soli
 .wmini-t b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;max-width:70%;vertical-align:bottom}
 .wmini-t .pct{color:var(--brand-text);font-weight:600;margin-left:4px}
 .wmini-t small{display:block;color:var(--muted);font-size:12px}
+/* «зменшити рух» у системі: замість переїздів і пульсацій — миттєві зміни (прозорість — коротко) */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+  .modal,.welcome,.modenote,#toast{transition:opacity .15s ease-out!important}
+}

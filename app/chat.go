@@ -63,7 +63,7 @@ type chatEvent struct {
 
 type badgeImg struct{ url, title string }
 
-func (a *App) buildChatMsg(ev chatEvent) ChatMsg {
+func (a *Channel) buildChatMsg(ev chatEvent) ChatMsg {
 	m := ChatMsg{ID: ev.MessageID, Ts: time.Now().UnixMilli(), UserID: ev.ChatterUserID, Login: ev.ChatterUserLogin,
 		Name: ev.ChatterUserName, Color: ev.Color, Text: ev.Message.Text, RewardID: ev.RewardID,
 		Highlight: ev.MessageType == "channel_points_highlighted"}
@@ -97,7 +97,7 @@ func (a *App) buildChatMsg(ev chatEvent) ChatMsg {
 	return m
 }
 
-func (a *App) onChatMessage(raw json.RawMessage) {
+func (a *Channel) onChatMessage(raw json.RawMessage) {
 	var ev chatEvent
 	if json.Unmarshal(raw, &ev) != nil {
 		return
@@ -124,7 +124,7 @@ func (a *App) onChatMessage(raw json.RawMessage) {
 }
 
 // видалення: ids — конкретні повідомлення; userID — усі повідомлення людини; all — очищення чату
-func (a *App) onChatDelete(ids []string, userID string, all bool) {
+func (a *Channel) onChatDelete(ids []string, userID string, all bool) {
 	a.chatMu.Lock()
 	out := a.chat[:0]
 	set := map[string]bool{}
@@ -142,7 +142,7 @@ func (a *App) onChatDelete(ids []string, userID string, all bool) {
 	a.emitEvent("chatdel", map[string]any{"ids": ids, "userId": userID, "all": all})
 }
 
-func (a *App) handleChatNotification(subType string, raw json.RawMessage) bool {
+func (a *Channel) handleChatNotification(subType string, raw json.RawMessage) bool {
 	switch subType {
 	case "channel.chat.message":
 		a.onChatMessage(raw)
@@ -170,7 +170,7 @@ func (a *App) handleChatNotification(subType string, raw json.RawMessage) bool {
 }
 
 // Бейджі каналу і глобальні (Helix, скоупи не потрібні).
-func (a *App) loadBadges(bcID string) {
+func (a *Channel) loadBadges(bcID string) {
 	type badgeSet struct {
 		SetID    string `json:"set_id"`
 		Versions []struct {
@@ -209,7 +209,7 @@ func (a *App) loadBadges(bcID string) {
 
 // Замовлення без кольору/бейджів (записані раніше або без повідомлення в чаті) отримують вигляд
 // з першого ж повідомлення цього чатерса.
-func (a *App) backfillLook(userID, color string, badges []ChatBadge) {
+func (a *Channel) backfillLook(userID, color string, badges []ChatBadge) {
 	if userID == "" || (color == "" && len(badges) == 0) {
 		return
 	}
@@ -233,7 +233,7 @@ func (a *App) backfillLook(userID, color string, badges []ChatBadge) {
 }
 
 // Колір ніку через Helix (GET /chat/color) для замовлень, де його ще немає.
-func (a *App) fillColors() {
+func (a *Channel) fillColors() {
 	a.mu.Lock()
 	var ids []string
 	seen := map[string]bool{}
@@ -278,7 +278,7 @@ func (a *App) fillColors() {
 }
 
 // subscriber-бейджі каналу для показу стажу підписки в таблиці
-func (a *App) subBadges() map[string]string {
+func (a *Channel) subBadges() map[string]string {
 	a.badgeMu.Lock()
 	defer a.badgeMu.Unlock()
 	out := map[string]string{}
@@ -290,7 +290,7 @@ func (a *App) subBadges() map[string]string {
 	return out
 }
 
-func (a *App) GetChat() []ChatMsg {
+func (a *Channel) GetChat() []ChatMsg {
 	a.chatMu.Lock()
 	defer a.chatMu.Unlock()
 	return append([]ChatMsg(nil), a.chat...)

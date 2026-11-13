@@ -53,7 +53,7 @@ func newStreamInfo(t time.Time) StreamInfo {
 }
 
 // остання активність стріму: старт/завершення збору, останнє замовлення
-func (a *App) lastActivityLocked() int64 {
+func (a *Channel) lastActivityLocked() int64 {
 	st := &a.st
 	last := st.Stream.StartedAt
 	for _, v := range []int64{st.Session.StartedAt, st.Session.FinishedAt} {
@@ -75,7 +75,7 @@ func (a *App) lastActivityLocked() int64 {
 }
 
 // поточний збір як Collection (для збереження)
-func (a *App) currentCollectionLocked() Collection {
+func (a *Channel) currentCollectionLocked() Collection {
 	return Collection{N: a.st.CollN, StartedAt: a.st.Session.StartedAt, FinishedAt: a.st.Session.FinishedAt,
 		Settings: a.st.Settings, Entries: append([]Entry(nil), a.st.Entries...), Winner: a.st.Winner}
 }
@@ -127,7 +127,7 @@ func collectionCSV(s Settings, entries []Entry) string {
 }
 
 // поточному збору — стрім і номер (самі дані пише saveLocked у БД). Викликати під a.mu.
-func (a *App) persistCollectionLocked() {
+func (a *Channel) persistCollectionLocked() {
 	a.initStreamLocked() // замовлення без стріму (старий стан / додано вручну до старту)
 	if a.st.CollN == 0 && len(a.st.Entries) > 0 {
 		a.st.CollN = len(a.st.Past) + 1
@@ -135,7 +135,7 @@ func (a *App) persistCollectionLocked() {
 }
 
 // Перенести поточний збір у завершені збори стріму. Викликати під a.mu.
-func (a *App) archiveLocked() {
+func (a *Channel) archiveLocked() {
 	if len(a.st.Entries) == 0 {
 		return
 	}
@@ -144,7 +144,7 @@ func (a *App) archiveLocked() {
 }
 
 // Почати новий стрім (попередній уже збережено). Викликати під a.mu.
-func (a *App) beginStreamLocked(now time.Time) {
+func (a *Channel) beginStreamLocked(now time.Time) {
 	if a.store != nil && a.st.Stream.ID != "" {
 		a.saveLocked() // спершу дописати в БД завершені збори старого стріму — далі вони зникнуть з пам'яті
 	}
@@ -159,14 +159,14 @@ func (a *App) beginStreamLocked(now time.Time) {
 }
 
 // Перед новим збором: якщо стріму немає або була довга перерва — новий стрім. Викликати під a.mu.
-func (a *App) ensureStreamLocked(now time.Time) {
+func (a *Channel) ensureStreamLocked(now time.Time) {
 	if a.st.Stream.ID == "" || now.Sub(time.UnixMilli(a.lastActivityLocked())) > streamGap {
 		a.beginStreamLocked(now)
 	}
 }
 
 // Старі стани (до появи стрімів): поточний збір стає «Збір 1» нового стріму.
-func (a *App) initStreamLocked() {
+func (a *Channel) initStreamLocked() {
 	if a.st.Stream.ID != "" {
 		return
 	}
@@ -183,7 +183,7 @@ func (a *App) initStreamLocked() {
 // ---------- методи для інтерфейсу ----------
 
 // NewStream — завершити поточний стрім і почати новий (поточний збір зберігається в старий стрім).
-func (a *App) NewStream() Snapshot {
+func (a *Channel) NewStream() Snapshot {
 	return a.mutate(func(st *State) {
 		s := &st.Session
 		if s.Status == "running" || s.Status == "paused" {
@@ -204,7 +204,7 @@ func (a *App) NewStream() Snapshot {
 var streamIDRe = regexp.MustCompile(`^[0-9_-]{8,32}$`)
 
 // ListStreams — усі збережені стріми (найновіші зверху), включно з поточним.
-func (a *App) ListStreams() []StreamMeta {
+func (a *Channel) ListStreams() []StreamMeta {
 	a.mu.Lock()
 	cur := a.st.Stream
 	curColls, curOrders := len(a.st.Past), 0
@@ -233,7 +233,7 @@ func (a *App) ListStreams() []StreamMeta {
 }
 
 // GetStream — збори стріму для перегляду (поточного — разом із поточним збором).
-func (a *App) GetStream(id string) (StreamFile, error) {
+func (a *Channel) GetStream(id string) (StreamFile, error) {
 	if !streamIDRe.MatchString(id) {
 		return StreamFile{}, errors.New("невідомий стрім")
 	}

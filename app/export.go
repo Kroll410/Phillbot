@@ -65,7 +65,7 @@ func marbleLines(s Settings, entries []Entry) []string {
 	return lines
 }
 
-func (a *App) MarbleLines() []string {
+func (a *Channel) MarbleLines() []string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return marbleLines(a.st.Settings, a.st.Entries)

@@ -48,7 +48,7 @@ func (c *Chatter) needsFollowCheck() bool {
 	return c.follow == followUnknown && (c.Group == "viewer")
 }
 
-func (a *App) trackChatter(ev chatEvent, msg ChatMsg) {
+func (a *Channel) trackChatter(ev chatEvent, msg ChatMsg) {
 	if ev.ChatterUserID == "" {
 		return
 	}
@@ -77,7 +77,7 @@ func (a *App) trackChatter(ev chatEvent, msg ChatMsg) {
 	a.notifyChatters()
 }
 
-func (a *App) checkFollow(userID string) {
+func (a *Channel) checkFollow(userID string) {
 	a.mu.Lock()
 	bcID := a.bc.ID
 	a.mu.Unlock()
@@ -101,7 +101,7 @@ func (a *App) checkFollow(userID string) {
 	a.notifyChatters()
 }
 
-func (a *App) removeChatter(userID string) {
+func (a *Channel) removeChatter(userID string) {
 	a.chattersMu.Lock()
 	delete(a.chatters, userID)
 	a.chattersMu.Unlock()
@@ -109,7 +109,7 @@ func (a *App) removeChatter(userID string) {
 }
 
 // GetChatters — активні глядачі, найсвіжіші зверху.
-func (a *App) GetChatters() []Chatter {
+func (a *Channel) GetChatters() []Chatter {
 	a.chattersMu.Lock()
 	defer a.chattersMu.Unlock()
 	out := make([]Chatter, 0, len(a.chatters))
@@ -121,14 +121,14 @@ func (a *App) GetChatters() []Chatter {
 }
 
 // не частіше ніж раз на 400 мс — у великих чатах подій багато
-func (a *App) notifyChatters() {
+func (a *Channel) notifyChatters() {
 	select {
 	case a.chattersCh <- struct{}{}:
 	default:
 	}
 }
 
-func (a *App) chattersLoop() {
+func (a *Channel) chattersLoop() {
 	for range a.chattersCh {
 		a.emitEvent("chatters", a.GetChatters())
 		time.Sleep(400 * time.Millisecond)

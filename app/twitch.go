@@ -97,14 +97,14 @@ func writeJSON(f string, v any) {
 
 // ---------- токени ----------
 
-func (a *App) saveTokens(b map[string]any) *Tokens {
+func (a *Channel) saveTokens(b map[string]any) *Tokens {
 	t := &Tokens{AccessToken: str(b, "access_token"), RefreshToken: str(b, "refresh_token"),
 		ExpiresAt: time.Now().Add(time.Duration(num(b, "expires_in", 3600)) * time.Second).UnixMilli()}
-	writeJSON(a.tokensFile, t)
+	a.host.SaveTokens(t)
 	return t
 }
 
-func (a *App) refresh(t *Tokens) *Tokens {
+func (a *Channel) refresh(t *Tokens) *Tokens {
 	if t == nil || t.RefreshToken == "" {
 		return nil
 	}
@@ -117,10 +117,9 @@ func (a *App) refresh(t *Tokens) *Tokens {
 }
 
 // перевіряє збережені токени; nil — потрібен новий вхід
-func (a *App) storedToken() *Tokens {
-	var t Tokens
-	tok := &t
-	if !readJSON(a.tokensFile, tok) {
+func (a *Channel) storedToken() *Tokens {
+	tok := a.host.LoadTokens()
+	if tok == nil {
 		return nil
 	}
 	if tok.ExpiresAt-time.Now().UnixMilli() < 5*60*1000 {
@@ -203,7 +202,7 @@ func (a *App) deviceLogin(ctx context.Context) (*Tokens, error) {
 
 var helixBase = "https://api.twitch.tv/helix/" // у тестах підміняється тестовим сервером
 
-func (a *App) helix(method, pathq string, body any, out any) error {
+func (a *Channel) helix(method, pathq string, body any, out any) error {
 	for attempt := 0; attempt < 2; attempt++ {
 		a.tokMu.Lock()
 		tok := a.token
@@ -252,7 +251,7 @@ func (a *App) helix(method, pathq string, body any, out any) error {
 	return errNeedLogin
 }
 
-func (a *App) fetchUser() (User, error) {
+func (a *Channel) fetchUser() (User, error) {
 	var users struct {
 		Data []User `json:"data"`
 	}
@@ -265,7 +264,7 @@ func (a *App) fetchUser() (User, error) {
 	return users.Data[0], nil
 }
 
-func (a *App) fetchRewards(broadcasterID string) ([]Reward, error) {
+func (a *Channel) fetchRewards(broadcasterID string) ([]Reward, error) {
 	var d struct {
 		Data []Reward `json:"data"`
 	}
@@ -275,7 +274,7 @@ func (a *App) fetchRewards(broadcasterID string) ([]Reward, error) {
 	return d.Data, nil
 }
 
-func (a *App) helixTier(broadcasterID, userID string) (int, error) {
+func (a *Channel) helixTier(broadcasterID, userID string) (int, error) {
 	var d struct {
 		Data []struct {
 			Tier string `json:"tier"`
@@ -374,7 +373,7 @@ type wsMsg struct {
 	} `json:"payload"`
 }
 
-func (a *App) runSession(ctx context.Context, u string, subscribe bool, bc User) (string, error) {
+func (a *Channel) runSession(ctx context.Context, u string, subscribe bool, bc User) (string, error) {
 	ws, err := wsDial(u)
 	if err != nil {
 		return "", err
@@ -461,7 +460,7 @@ func (a *App) runSession(ctx context.Context, u string, subscribe bool, bc User)
 	}
 }
 
-func (a *App) listen(ctx context.Context, bc User) {
+func (a *Channel) listen(ctx context.Context, bc User) {
 	go a.giftLoop(ctx, bc.ID) // подаровані сабки: список одразу і раз на 10 хв
 	next, subscribe := eventsubURL, true
 	for ctx.Err() == nil {
@@ -488,7 +487,7 @@ func (a *App) listen(ctx context.Context, bc User) {
 }
 
 // Визначає тір (Helix — точно) і місяці (бейдж з повідомлення чату, що приходить разом з redeem-ом).
-func (a *App) lookupSub(bcID, userID, rewardID string) (tier, months int, source, color string, badges []ChatBadge) {
+func (a *Channel) lookupSub(bcID, userID, rewardID string) (tier, months int, source, color string, badges []ChatBadge) {
 	var chat *subInfo
 	for i := 0; i < 8; i++ {
 		a.badgeMu.Lock()

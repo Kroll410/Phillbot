@@ -10,8 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type AuthInfo struct {
@@ -45,13 +43,26 @@ type Snapshot struct {
 	SubBadges  map[string]string `json:"subBadges"` // значки підписки каналу: версія ("0", "3", "2012", "3036"…) → картинка // чат відкрито в окремому вікні — вкладка заблокована
 }
 
-type App struct {
-	ctx context.Context
+// Host — те, що дає каналу оболонка: десктоп (Wails + локальні файли) або вебсервер.
+type Host interface {
+	Emit(event string, data any) // подія для інтерфейсу (і віджетів OBS)
+	Notify()                     // віджетам: стан каналу змінився
+	Decorate(s *Snapshot)        // доповнити знімок даними оболонки (OBS, тека, вікно чату); під c.mu
+	SaveTokens(t *Tokens)        // зберегти токени Twitch каналу (nil — видалити)
+	LoadTokens() *Tokens         // nil — токенів немає
+	SettingsChanged(old, nu Settings)
+	KeepWheelImage(name string) // картинка центру колеса змінилась — інші можна прибрати
+}
 
-	baseDir, configFile, tokensFile, stateFile, historyDir, exportsDir, streamsDir string
+// Channel — один канал Twitch: стан, логіка СабДею й аукціону, підключення до Twitch, чат.
+// Не знає, де працює: усе про вікно, файли й мережу назовні — через Host.
+type Channel struct {
+	host Host
 
-	store    *Store // внутрішня БД (phillbot.db); nil — БД недоступна, стан пишеться в subday_state.json
+	store    *Store // внутрішня БД; nil — БД недоступна, стан пишеться у fallbackFile
 	storeErr string
+	// запасний файл стану, якщо БД не відкрилась (десктоп: subday_state.json)
+	fallbackFile string
 
 	mu       sync.Mutex
 	st       State
@@ -66,16 +77,11 @@ type App struct {
 	tokMu    sync.Mutex
 	token    *Tokens
 
-	tunStop    context.CancelFunc // тунель ngrok для колбеків Donatello
-	giftSnap   map[string]int     // активні подаровані підписки: дарувальник → кількість (Helix)
-	don        DonStatus
+	giftSnap   map[string]int // активні подаровані підписки: дарувальник → кількість (Helix)
+	don        DonStatus      // підключення до Donatello
 	badgeMu    sync.Mutex
 	badgeCache map[string]subInfo
 	badgeImgs  map[string]badgeImg
-
-	chatWinClients int         // підключені вікна чату (SSE з ?window=1)
-	chatWinPending bool        // вікно запускається, ще не підключилось
-	chatWinProc    *os.Process // процес Edge --app
 
 	chattersMu sync.Mutex
 	chatters   map[string]*Chatter
@@ -84,17 +90,54 @@ type App struct {
 	chatMu sync.Mutex
 	chat   []ChatMsg
 
-	overlay *overlayServer
 	lastOrd *LastOrder
 
 	authCancel   context.CancelFunc
 	listenCancel context.CancelFunc
 }
 
+// nopHost — канал без оболонки (тести, фонові задачі).
+type nopHost struct{}
+
+func (nopHost) Emit(string, any)              {}
+func (nopHost) Notify()                       {}
+func (nopHost) Decorate(*Snapshot)            {}
+func (nopHost) SaveTokens(*Tokens)            {}
+func (nopHost) LoadTokens() *Tokens           { return nil }
+func (nopHost) SettingsChanged(_, _ Settings) {}
+func (nopHost) KeepWheelImage(string)         {}
+
+func newChannel(host Host) *Channel {
+	if host == nil {
+		host = nopHost{}
+	}
+	c := &Channel{host: host, badgeCache: map[string]subInfo{}, badgeImgs: map[string]badgeImg{},
+		chatters: map[string]*Chatter{}, chattersCh: make(chan struct{}, 1), st: fixState(defaultState())}
+	c.conn = ConnInfo{Status: "off", Text: "Не підключено"}
+	go c.chattersLoop()
+	return c
+}
+
+// App — десктопна оболонка (Wails): вікно, файли поруч з exe, локальний сервер віджетів, ngrok, вікно чату.
+// Методи каналу (*Channel) доступні інтерфейсу через вбудовування.
+type App struct {
+	*Channel
+	ctx context.Context
+
+	baseDir, configFile, tokensFile, stateFile, historyDir, exportsDir, streamsDir string
+
+	tunStop context.CancelFunc // тунель ngrok для колбеків Donatello
+
+	chatWinClients int         // підключені вікна чату (SSE з ?window=1)
+	chatWinPending bool        // вікно запускається, ще не підключилось
+	chatWinProc    *os.Process // процес Edge --app
+
+	overlay *overlayServer
+}
+
 func NewApp() *App {
-	a := &App{badgeCache: map[string]subInfo{}, badgeImgs: map[string]badgeImg{},
-		chatters: map[string]*Chatter{}, chattersCh: make(chan struct{}, 1)}
-	go a.chattersLoop()
+	a := &App{}
+	a.Channel = newChannel(desktopHost{a})
 	if exe, err := os.Executable(); err == nil {
 		a.baseDir = filepath.Dir(exe)
 	} else {
@@ -108,7 +151,6 @@ func NewApp() *App {
 	a.exportsDir = filepath.Join(a.baseDir, "exports")
 	a.openStore()
 	a.initStreamLocked()
-	a.conn = ConnInfo{Status: "off", Text: "Не підключено"}
 	return a
 }
 
@@ -148,12 +190,16 @@ func (a *App) shutdown(ctx context.Context) {
 	}
 	a.mu.Lock()
 	a.saveLocked()
+	if a.store != nil {
+		_ = a.store.Close() // переносить журнал WAL у phillbot.db
+		a.store = nil
+	}
 	a.mu.Unlock()
 }
 
 // ---------- внутрішнє ----------
 
-func (a *App) snapshotLocked() Snapshot {
+func (a *Channel) snapshotLocked() Snapshot {
 	b, _ := json.Marshal(a.st) // глибока копія
 	var st State
 	_ = json.Unmarshal(b, &st)
@@ -164,30 +210,23 @@ func (a *App) snapshotLocked() Snapshot {
 	}
 	auth := a.auth
 	auth.User = user
-	var obs OverlayInfo
-	if a.overlay != nil {
-		obs = a.overlay.info()
-	}
-	return Snapshot{State: st, Auth: auth, Conn: a.conn, Rewards: append([]Reward(nil), a.rewards...), RewardsErr: a.rewErr,
-		BaseDir: a.baseDir, ClientID: a.clientID, Now: time.Now().UnixMilli(), Log: append([]LogLine(nil), a.logLines...), Obs: obs,
-		ChatWindow: a.chatWinClients > 0 || a.chatWinPending, SubBadges: a.subBadges(), Don: a.don, Version: version}
+	snap := Snapshot{State: st, Auth: auth, Conn: a.conn, Rewards: append([]Reward(nil), a.rewards...), RewardsErr: a.rewErr,
+		ClientID: a.clientID, Now: time.Now().UnixMilli(), Log: append([]LogLine(nil), a.logLines...),
+		SubBadges: a.subBadges(), Don: a.don, Version: version}
+	a.host.Decorate(&snap)
+	return snap
 }
 
 // подія для головного вікна і для оверлеїв OBS
-func (a *App) emitEvent(name string, data any) {
-	if a.ctx != nil {
-		wruntime.EventsEmit(a.ctx, name, data)
-	}
-	if a.overlay != nil {
-		a.overlay.hub.broadcast(name, data)
-	}
-}
+func (a *Channel) emitEvent(name string, data any) { a.host.Emit(name, data) }
 
 // openStore — відкрити phillbot.db; першого разу перенести туди дані з JSON-файлів попередніх версій.
 func (a *App) openStore() {
+	a.fallbackFile = ""
 	st, err := openStore(filepath.Join(a.baseDir, "phillbot.db"), "local")
 	if err != nil {
 		a.storeErr = "База даних недоступна (" + err.Error() + ") — стан зберігається у subday_state.json"
+		a.fallbackFile = a.stateFile
 		a.st = loadState(a.stateFile)
 		return
 	}
@@ -211,30 +250,29 @@ func (a *App) openStore() {
 	}
 }
 
-func (a *App) saveLocked() {
+func (a *Channel) saveLocked() {
 	if a.store != nil {
 		if err := a.store.Sync(&a.st); err != nil {
 			go a.logf("Не вдалося зберегти в БД: %v", err)
 		}
 		return
 	}
+	if a.fallbackFile == "" {
+		return
+	}
 	b, err := json.MarshalIndent(a.st, "", "  ")
 	if err == nil {
-		_ = writeFileAtomic(a.stateFile, b)
+		_ = writeFileAtomic(a.fallbackFile, b)
 	}
 }
 
-func (a *App) emitLocked() {
-	if a.ctx != nil {
-		wruntime.EventsEmit(a.ctx, "state", a.snapshotLocked())
-	}
-	if a.overlay != nil {
-		a.overlay.notify()
-	}
+func (a *Channel) emitLocked() {
+	a.host.Emit("state", a.snapshotLocked())
+	a.host.Notify()
 }
 
 // змінити стан, зберегти і повідомити інтерфейс
-func (a *App) mutate(fn func(st *State)) Snapshot {
+func (a *Channel) mutate(fn func(st *State)) Snapshot {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	fn(&a.st)
@@ -243,7 +281,7 @@ func (a *App) mutate(fn func(st *State)) Snapshot {
 	return a.snapshotLocked()
 }
 
-func (a *App) setAuth(ai AuthInfo) {
+func (a *Channel) setAuth(ai AuthInfo) {
 	a.mu.Lock()
 	if ai.User == nil && ai.Status == "ok" {
 		ai.User = a.auth.User
@@ -253,7 +291,7 @@ func (a *App) setAuth(ai AuthInfo) {
 	a.mu.Unlock()
 }
 
-func (a *App) setConn(status, text string) {
+func (a *Channel) setConn(status, text string) {
 	a.mu.Lock()
 	a.conn = ConnInfo{Status: status, Text: text}
 	a.emitLocked()
@@ -270,7 +308,7 @@ type LogLine struct {
 	Badges []ChatBadge `json:"badges,omitempty"`
 }
 
-func (a *App) addLog(l LogLine) {
+func (a *Channel) addLog(l LogLine) {
 	l.Ts = time.Now().UnixMilli()
 	a.mu.Lock()
 	a.logLines = append(a.logLines, l)
@@ -281,10 +319,12 @@ func (a *App) addLog(l LogLine) {
 	a.mu.Unlock()
 }
 
-func (a *App) logf(format string, args ...any) { a.addLog(LogLine{Text: fmt.Sprintf(format, args...)}) }
+func (a *Channel) logf(format string, args ...any) {
+	a.addLog(LogLine{Text: fmt.Sprintf(format, args...)})
+}
 
 // подія від глядача: колір і бейджі беремо з останнього його повідомлення в чаті (якщо є)
-func (a *App) logUser(userID, name, login, rewardID, format string, args ...any) {
+func (a *Channel) logUser(userID, name, login, rewardID, format string, args ...any) {
 	l := LogLine{Text: fmt.Sprintf(format, args...), User: name, Login: login}
 	a.badgeMu.Lock()
 	c, ok := a.badgeCache[userID+"|"+rewardID]
@@ -298,7 +338,7 @@ func (a *App) logUser(userID, name, login, rewardID, format string, args ...any)
 	a.addLog(l)
 }
 
-func (a *App) ticker(ctx context.Context) {
+func (a *Channel) ticker(ctx context.Context) {
 	t := time.NewTicker(300 * time.Millisecond)
 	defer t.Stop()
 	for {
@@ -396,7 +436,7 @@ func (a *App) authFlow(forceLogin bool) {
 
 // ---------- методи для інтерфейсу ----------
 
-func (a *App) GetState() Snapshot {
+func (a *Channel) GetState() Snapshot {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.snapshotLocked()
@@ -430,7 +470,7 @@ func (a *App) CancelLogin() {
 	a.setAuth(AuthInfo{Status: "need_login"})
 }
 
-func (a *App) Logout() {
+func (a *Channel) Logout() {
 	a.mu.Lock()
 	if a.listenCancel != nil {
 		a.listenCancel()
@@ -440,7 +480,7 @@ func (a *App) Logout() {
 	a.tokMu.Lock()
 	a.token = nil
 	a.tokMu.Unlock()
-	_ = os.Remove(a.tokensFile)
+	a.host.SaveTokens(nil)
 	a.setConn("off", "Не підключено")
 	a.setAuth(AuthInfo{Status: "need_login"})
 }
@@ -456,7 +496,7 @@ func (a *App) OpenURL(u string) {
 	}
 }
 
-func (a *App) RefreshRewards() {
+func (a *Channel) RefreshRewards() {
 	a.mu.Lock()
 	bcID := a.bc.ID
 	a.mu.Unlock()
@@ -486,15 +526,14 @@ func (a *App) RefreshRewards() {
 	a.emitLocked()
 }
 
-func (a *App) SelectReward(id, title string) Snapshot {
+func (a *Channel) SelectReward(id, title string) Snapshot {
 	return a.mutate(func(st *State) { st.Settings.RewardID, st.Settings.RewardTitle = strings.TrimSpace(id), title })
 }
 
-func (a *App) SaveSettings(s Settings) Snapshot {
-	var oldPort int
-	var oldTok, oldDom string
+func (a *Channel) SaveSettings(s Settings) Snapshot {
+	var old Settings
 	snap := a.mutate(func(st *State) {
-		oldPort, oldTok, oldDom = st.Settings.ObsPort, st.Settings.NgrokToken, st.Settings.NgrokDomain
+		old = st.Settings
 		s.RewardID, s.RewardTitle = st.Settings.RewardID, st.Settings.RewardTitle
 		s.normalize()
 		st.Settings = s
@@ -502,12 +541,8 @@ func (a *App) SaveSettings(s Settings) Snapshot {
 			st.Session.RemainingMs = int64(s.DurationMin) * 60000
 		}
 	})
-	if s.NgrokToken != oldTok || s.NgrokDomain != oldDom { // інший токен чи домен ngrok — новий тунель
-		a.restartTunnel()
-	}
-	if a.overlay != nil && s.ObsPort != oldPort {
-		a.overlay.stop()
-		a.overlay.start(s.ObsPort)
+	a.host.SettingsChanged(old, snap.Settings) // десктоп: новий порт віджета, новий тунель ngrok
+	if snap.Settings.ObsPort != old.ObsPort {
 		snap = a.GetState()
 		a.mu.Lock()
 		a.emitLocked()
@@ -518,7 +553,7 @@ func (a *App) SaveSettings(s Settings) Snapshot {
 
 // ---------- таймер ----------
 
-func (a *App) StartTimer() Snapshot {
+func (a *Channel) StartTimer() Snapshot {
 	return a.mutate(func(st *State) {
 		s, now := &st.Session, time.Now().UnixMilli()
 		switch s.Status {
@@ -546,7 +581,7 @@ func (a *App) StartTimer() Snapshot {
 	})
 }
 
-func (a *App) PauseTimer() Snapshot {
+func (a *Channel) PauseTimer() Snapshot {
 	return a.mutate(func(st *State) {
 		s := &st.Session
 		if s.Status != "running" {
@@ -557,7 +592,7 @@ func (a *App) PauseTimer() Snapshot {
 	})
 }
 
-func (a *App) FinishTimer() Snapshot {
+func (a *Channel) FinishTimer() Snapshot {
 	return a.mutate(func(st *State) {
 		s := &st.Session
 		if s.Status != "running" && s.Status != "paused" {
@@ -568,7 +603,7 @@ func (a *App) FinishTimer() Snapshot {
 	})
 }
 
-func (a *App) AddTime(ms int64) Snapshot {
+func (a *Channel) AddTime(ms int64) Snapshot {
 	return a.mutate(func(st *State) {
 		s, now := &st.Session, time.Now().UnixMilli()
 		switch s.Status {
@@ -589,7 +624,7 @@ func max64(a, b int64) int64 {
 
 // ---------- замовлення ----------
 
-func (a *App) onRedemption(ev Redemption, bc User) {
+func (a *Channel) onRedemption(ev Redemption, bc User) {
 	a.mu.Lock()
 	sr := a.st.SeenRewards[ev.Reward.ID]
 	sample := []rune(ev.UserInput)
@@ -665,7 +700,7 @@ func (a *App) onRedemption(ev Redemption, bc User) {
 	a.addLog(LogLine{Text: fmt.Sprintf("Замовлення «%s» — %s", e.Text, sub), User: e.User, Login: e.Login, Color: e.Color, Badges: e.Badges})
 }
 
-func (a *App) UpdateEntry(e Entry) Snapshot {
+func (a *Channel) UpdateEntry(e Entry) Snapshot {
 	return a.mutate(func(st *State) {
 		for i := range st.Entries {
 			if st.Entries[i].ID != e.ID {
@@ -692,7 +727,7 @@ func (a *App) UpdateEntry(e Entry) Snapshot {
 }
 
 // Об'єднання схожих замовлень (drag-n-drop): текст вибраних замовлень замінюється на текст цільового.
-func (a *App) RenameEntries(ids []string, text string) Snapshot {
+func (a *Channel) RenameEntries(ids []string, text string) Snapshot {
 	text = strings.TrimSpace(text)
 	set := map[string]bool{}
 	for _, id := range ids {
@@ -710,7 +745,7 @@ func (a *App) RenameEntries(ids []string, text string) Snapshot {
 	})
 }
 
-func (a *App) DeleteEntry(id string) Snapshot {
+func (a *Channel) DeleteEntry(id string) Snapshot {
 	return a.mutate(func(st *State) {
 		out := st.Entries[:0]
 		for _, e := range st.Entries {
@@ -722,7 +757,7 @@ func (a *App) DeleteEntry(id string) Snapshot {
 	})
 }
 
-func (a *App) AddManual(user string, tier, months int, text string) (Snapshot, error) {
+func (a *Channel) AddManual(user string, tier, months int, text string) (Snapshot, error) {
 	user, text = strings.TrimSpace(user), strings.TrimSpace(text)
 	if user == "" || text == "" {
 		return a.GetState(), errors.New("вкажіть нік і замовлення")
@@ -740,7 +775,7 @@ func (a *App) AddManual(user string, tier, months int, text string) (Snapshot, e
 }
 
 // Новий збір: поточний переходить у завершені збори стріму, замовлення очищаються.
-func (a *App) NewSession() (string, error) {
+func (a *Channel) NewSession() (string, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.archiveLocked()

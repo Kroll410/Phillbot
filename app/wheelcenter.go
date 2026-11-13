@@ -31,7 +31,7 @@ type ChannelEmote struct {
 }
 
 // GetChannelEmotes — емодзі каналу (Helix chat/emotes). Анімовані — у вигляді GIF.
-func (a *App) GetChannelEmotes() ([]ChannelEmote, error) {
+func (a *Channel) GetChannelEmotes() ([]ChannelEmote, error) {
 	a.mu.Lock()
 	bcID := a.bc.ID
 	a.mu.Unlock()

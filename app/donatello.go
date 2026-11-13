@@ -77,7 +77,7 @@ func auctionDonPoints(uah float64, per1000 int) int {
 }
 
 // donatelloHandler — приймач колбеків: лише POST /donatello з правильним X-Key.
-func (a *App) donatelloHandler() http.Handler {
+func (a *Channel) donatelloHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/donatello" {
 			http.NotFound(w, r)
@@ -113,7 +113,7 @@ func (a *App) donatelloHandler() http.Handler {
 }
 
 // receiveDonate — повтор того самого донату (Donatello може надіслати ще раз) рахується один раз.
-func (a *App) receiveDonate(d Donate) {
+func (a *Channel) receiveDonate(d Donate) {
 	if id := strings.TrimSpace(d.PubID); id != "" {
 		a.mu.Lock()
 		for _, s := range a.st.DonSeen {
@@ -133,7 +133,7 @@ func (a *App) receiveDonate(d Donate) {
 }
 
 // onDonate — куди йде донат: аукціон (якщо приймає ставки), інакше СабДей (якщо йде збір), інакше — лише в журнал.
-func (a *App) onDonate(d Donate) {
+func (a *Channel) onDonate(d Donate) {
 	uah, isUAH := d.uah()
 	text := strings.TrimSpace(d.Message)
 	name := strings.TrimSpace(d.ClientName)

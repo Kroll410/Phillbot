@@ -31,7 +31,7 @@ type VoteState struct {
 }
 
 // SetWinner — вибрати переможця поточного збору і перейти до етапу 2 (таймер гри стартує одразу).
-func (a *App) SetWinner(name string) (Snapshot, error) {
+func (a *Channel) SetWinner(name string) (Snapshot, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return a.GetState(), errors.New("переможця не вказано")
@@ -62,7 +62,7 @@ func (a *App) SetWinner(name string) (Snapshot, error) {
 	return snap, nil
 }
 
-func (a *App) GamePause() Snapshot {
+func (a *Channel) GamePause() Snapshot {
 	return a.mutate(func(st *State) {
 		g := &st.Game
 		if g.Status == "running" {
@@ -72,7 +72,7 @@ func (a *App) GamePause() Snapshot {
 	})
 }
 
-func (a *App) GameResume() Snapshot {
+func (a *Channel) GameResume() Snapshot {
 	return a.mutate(func(st *State) {
 		g := &st.Game
 		if g.Status == "paused" {
@@ -82,7 +82,7 @@ func (a *App) GameResume() Snapshot {
 	})
 }
 
-func (a *App) GameAddTime(ms int64) Snapshot {
+func (a *Channel) GameAddTime(ms int64) Snapshot {
 	return a.mutate(func(st *State) {
 		g, now := &st.Game, time.Now().UnixMilli()
 		switch g.Status {
@@ -99,11 +99,11 @@ func (a *App) GameAddTime(ms int64) Snapshot {
 }
 
 // FinishGame — завершити таймер гри вручну (далі — очікування стрімера / голосування).
-func (a *App) FinishGame() Snapshot {
+func (a *Channel) FinishGame() Snapshot {
 	return a.mutate(func(st *State) { a.gameTimeUpLocked() })
 }
 
-func (a *App) gameTimeUpLocked() {
+func (a *Channel) gameTimeUpLocked() {
 	g := &a.st.Game
 	if a.st.Phase != phasePlay || g.Status == "finished" {
 		return
@@ -113,7 +113,7 @@ func (a *App) gameTimeUpLocked() {
 }
 
 // StartVote — почати голосування в чаті: «1» продовжити гру, «2» дроп (наступний збір).
-func (a *App) StartVote() (Snapshot, error) {
+func (a *Channel) StartVote() (Snapshot, error) {
 	a.mu.Lock()
 	ok := a.st.Phase == phasePlay && a.st.Game.Status == "finished" && a.st.Vote.Status != "running"
 	a.mu.Unlock()
@@ -129,7 +129,7 @@ func (a *App) StartVote() (Snapshot, error) {
 }
 
 // FinishVote — завершити голосування достроково і застосувати результат.
-func (a *App) FinishVote() Snapshot {
+func (a *Channel) FinishVote() Snapshot {
 	return a.mutate(func(st *State) {
 		if st.Vote.Status == "running" {
 			a.resolveVoteLocked()
@@ -137,7 +137,7 @@ func (a *App) FinishVote() Snapshot {
 	})
 }
 
-func (a *App) VoteAddTime(ms int64) Snapshot {
+func (a *Channel) VoteAddTime(ms int64) Snapshot {
 	return a.mutate(func(st *State) {
 		if st.Vote.Status == "running" {
 			st.Vote.EndsAt = max64(time.Now().UnixMilli()+1000, st.Vote.EndsAt+ms)
@@ -146,16 +146,16 @@ func (a *App) VoteAddTime(ms int64) Snapshot {
 }
 
 // ContinueGame — новий раунд гри з тим самим переможцем (вручну або за голосуванням).
-func (a *App) ContinueGame() Snapshot {
+func (a *Channel) ContinueGame() Snapshot {
 	return a.mutate(func(st *State) { a.continueGameLocked() })
 }
 
 // NextCollection — завершити етап 2 і повернутися до збору замовлень.
-func (a *App) NextCollection() Snapshot {
+func (a *Channel) NextCollection() Snapshot {
 	return a.mutate(func(st *State) { a.endPlayLocked() })
 }
 
-func (a *App) continueGameLocked() {
+func (a *Channel) continueGameLocked() {
 	st := &a.st
 	if st.Phase != phasePlay {
 		return
@@ -168,7 +168,7 @@ func (a *App) continueGameLocked() {
 	}
 }
 
-func (a *App) endPlayLocked() {
+func (a *Channel) endPlayLocked() {
 	st := &a.st
 	if st.Phase != phasePlay {
 		return
@@ -183,7 +183,7 @@ func (a *App) endPlayLocked() {
 	a.persistCollectionLocked()
 }
 
-func (a *App) resolveVoteLocked() {
+func (a *Channel) resolveVoteLocked() {
 	v := &a.st.Vote
 	v.Status, v.FinishedAt = "finished", time.Now().UnixMilli()
 	switch {
@@ -199,7 +199,7 @@ func (a *App) resolveVoteLocked() {
 }
 
 // Голос з чату під час голосування: «1» або «2» (від кожного — останній).
-func (a *App) onVoteMessage(userID, text string) {
+func (a *Channel) onVoteMessage(userID, text string) {
 	t := strings.TrimSpace(text)
 	if t != "1" && t != "2" || userID == "" {
 		return
@@ -228,7 +228,7 @@ func (a *App) onVoteMessage(userID, text string) {
 }
 
 // таймери гри й голосування (з ticker під a.mu); повертає повідомлення для журналу або ""
-func (a *App) tickGameLocked(now int64) string {
+func (a *Channel) tickGameLocked(now int64) string {
 	if a.st.Phase != phasePlay {
 		return ""
 	}

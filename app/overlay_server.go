@@ -317,7 +317,7 @@ func (o *overlayServer) serveSSE(w http.ResponseWriter, r *http.Request) {
 
 // ---------- публічний зріз стану ----------
 
-func (a *App) overlayState() OverlayState {
+func (a *Channel) overlayState() OverlayState {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	st := a.st

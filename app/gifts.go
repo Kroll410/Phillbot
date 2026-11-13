@@ -25,7 +25,7 @@ type GiftEvent struct {
 }
 
 // giftsForLocked — скільки сабок глядач подарував за 30 днів (викликати під a.mu).
-func (a *App) giftsForLocked(userID string) int {
+func (a *Channel) giftsForLocked(userID string) int {
 	if userID == "" {
 		return 0
 	}
@@ -42,7 +42,7 @@ func (a *App) giftsForLocked(userID string) int {
 }
 
 // оновити кількість подарунків у замовленнях поточного збору (викликати під a.mu)
-func (a *App) refreshEntryGiftsLocked() bool {
+func (a *Channel) refreshEntryGiftsLocked() bool {
 	changed := false
 	for i := range a.st.Entries {
 		e := &a.st.Entries[i]
@@ -57,7 +57,7 @@ func (a *App) refreshEntryGiftsLocked() bool {
 }
 
 // прибрати з журналу подарунки, старші за 30 днів (викликати під a.mu)
-func (a *App) pruneGiftsLocked() {
+func (a *Channel) pruneGiftsLocked() {
 	since := time.Now().Add(-giftWindow).UnixMilli()
 	out := a.st.Gifts[:0]
 	for _, g := range a.st.Gifts {
@@ -78,7 +78,7 @@ type giftEvent struct {
 	IsAnonymous bool   `json:"is_anonymous"`
 }
 
-func (a *App) onGift(ev giftEvent) {
+func (a *Channel) onGift(ev giftEvent) {
 	if ev.IsAnonymous || ev.UserID == "" || ev.Total <= 0 {
 		return
 	}
@@ -91,7 +91,7 @@ func (a *App) onGift(ev giftEvent) {
 }
 
 // fetchGiftSnapshot — активні подаровані підписки каналу: дарувальник → кількість.
-func (a *App) fetchGiftSnapshot(bcID string) (map[string]int, error) {
+func (a *Channel) fetchGiftSnapshot(bcID string) (map[string]int, error) {
 	out := map[string]int{}
 	cursor := ""
 	for page := 0; page < 100; page++ {
@@ -125,7 +125,7 @@ func (a *App) fetchGiftSnapshot(bcID string) (map[string]int, error) {
 	return out, nil
 }
 
-func (a *App) applyGiftSnapshot(snap map[string]int) {
+func (a *Channel) applyGiftSnapshot(snap map[string]int) {
 	a.mu.Lock()
 	a.giftSnap = snap
 	a.pruneGiftsLocked()
@@ -138,7 +138,7 @@ func (a *App) applyGiftSnapshot(snap map[string]int) {
 }
 
 // giftLoop — список подарованих підписок одразу після підключення і далі раз на 10 хвилин.
-func (a *App) giftLoop(ctx context.Context, bcID string) {
+func (a *Channel) giftLoop(ctx context.Context, bcID string) {
 	t := time.NewTicker(10 * time.Minute)
 	defer t.Stop()
 	for {

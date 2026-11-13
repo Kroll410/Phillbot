@@ -35,7 +35,7 @@ type auctionRec struct {
 }
 
 // усі збори СабДею: завершені збори з БД + поточний збір з пам'яті
-func (a *App) loadAllSubday() []subdayColl {
+func (a *Channel) loadAllSubday() []subdayColl {
 	a.mu.Lock()
 	curID := a.st.Stream.ID
 	cur := append([]Collection(nil), a.st.Past...)
@@ -68,7 +68,7 @@ func (a *App) loadAllSubday() []subdayColl {
 }
 
 // усі аукціони: з БД; поточний — з пам'яті (у БД його ставки можуть бути повніші, ніж останні 300 у пам'яті — беремо з БД, якщо він там є)
-func (a *App) loadAllAuctions() []auctionRec {
+func (a *Channel) loadAllAuctions() []auctionRec {
 	byID := map[string]auctionRec{}
 	if a.store != nil {
 		for _, r := range a.store.allAuctions() {

@@ -289,7 +289,7 @@ func (au *AuctionState) place(b Bid) Bid {
 // ---------- ставки з Twitch ----------
 
 // Нагорода — ставка аукціону? Поки стрімер нічого не вибрав, нагороди «Квиток / Середній квиток / Мегаквиток» підхоплюються самі.
-func (a *App) isAuctionReward(id, title string) bool {
+func (a *Channel) isAuctionReward(id, title string) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	c := &a.st.Auction.Cfg
@@ -307,7 +307,7 @@ func (a *App) isAuctionReward(id, title string) bool {
 }
 
 // автовибір нагород за замовчуванням зі списку нагород каналу (викликати під a.mu)
-func (a *App) autoAuctionRewardsLocked(list []Reward) {
+func (a *Channel) autoAuctionRewardsLocked(list []Reward) {
 	c := &a.st.Auction.Cfg
 	if c.RewardsSet || len(c.RewardIDs) > 0 {
 		return
@@ -324,7 +324,7 @@ func (a *App) autoAuctionRewardsLocked(list []Reward) {
 	}
 }
 
-func (a *App) onAuctionBid(ev Redemption) {
+func (a *Channel) onAuctionBid(ev Redemption) {
 	text := strings.TrimSpace(ev.UserInput)
 	a.mu.Lock()
 	au := &a.st.Auction
@@ -382,7 +382,7 @@ func (a *App) onAuctionBid(ev Redemption) {
 // ---------- методи для інтерфейсу ----------
 
 // Налаштування аукціону: нагороди (до 5), тривалість прийому ставок, режим колеса.
-func (a *App) AuctionSaveSettings(c AuctionSettings) Snapshot {
+func (a *Channel) AuctionSaveSettings(c AuctionSettings) Snapshot {
 	return a.mutate(func(st *State) {
 		out := []string{}
 		seen := map[string]bool{}
@@ -411,11 +411,11 @@ func (a *App) AuctionSaveSettings(c AuctionSettings) Snapshot {
 		if c.Center.Kind == "file" {
 			keep = c.Center.Name
 		}
-		go a.cleanWheelDir(keep)
+		go a.host.KeepWheelImage(keep)
 	})
 }
 
-func (a *App) AuctionStart() Snapshot {
+func (a *Channel) AuctionStart() Snapshot {
 	return a.mutate(func(st *State) {
 		au := &st.Auction
 		t, now := &au.Timer, time.Now().UnixMilli()
@@ -429,7 +429,7 @@ func (a *App) AuctionStart() Snapshot {
 	})
 }
 
-func (a *App) AuctionPause() Snapshot {
+func (a *Channel) AuctionPause() Snapshot {
 	return a.mutate(func(st *State) {
 		t := &st.Auction.Timer
 		if t.Status == "running" {
@@ -438,7 +438,7 @@ func (a *App) AuctionPause() Snapshot {
 	})
 }
 
-func (a *App) AuctionFinish() Snapshot {
+func (a *Channel) AuctionFinish() Snapshot {
 	return a.mutate(func(st *State) {
 		t := &st.Auction.Timer
 		if t.Status == "running" || t.Status == "paused" {
@@ -447,7 +447,7 @@ func (a *App) AuctionFinish() Snapshot {
 	})
 }
 
-func (a *App) AuctionAddTime(ms int64) Snapshot {
+func (a *Channel) AuctionAddTime(ms int64) Snapshot {
 	return a.mutate(func(st *State) {
 		t, now := &st.Auction.Timer, time.Now().UnixMilli()
 		switch t.Status {
@@ -460,7 +460,7 @@ func (a *App) AuctionAddTime(ms int64) Snapshot {
 }
 
 // Відповідь стрімера на «Додати до X?»: accept=true — додати до запропонованого лота, false — новий лот.
-func (a *App) AuctionResolve(bidID string, accept bool) (Snapshot, error) {
+func (a *Channel) AuctionResolve(bidID string, accept bool) (Snapshot, error) {
 	var err error
 	snap := a.mutate(func(st *State) {
 		au := &st.Auction
@@ -487,7 +487,7 @@ func (a *App) AuctionResolve(bidID string, accept bool) (Snapshot, error) {
 }
 
 // Об'єднати лот from у лот to (перетягування, як у СабДеї).
-func (a *App) AuctionMergeLots(from, to string) (Snapshot, error) {
+func (a *Channel) AuctionMergeLots(from, to string) (Snapshot, error) {
 	var err error
 	snap := a.mutate(func(st *State) {
 		au := &st.Auction
@@ -530,7 +530,7 @@ func (a *App) AuctionMergeLots(from, to string) (Snapshot, error) {
 }
 
 // AuctionUpdateLot — пряме редагування лота: назва і (за потреби) сума. amount < 0 — суму не змінювати.
-func (a *App) AuctionUpdateLot(id, name string, amount int) (Snapshot, error) {
+func (a *Channel) AuctionUpdateLot(id, name string, amount int) (Snapshot, error) {
 	var err error
 	snap := a.mutate(func(st *State) {
 		au := &st.Auction
@@ -557,7 +557,7 @@ func (a *App) AuctionUpdateLot(id, name string, amount int) (Snapshot, error) {
 
 // AuctionUndoMerge — скасувати останнє об'єднання: лот повертається на своє місце з усіма ставками,
 // з цільового лота віднімається його внесок (ставки, що прийшли після об'єднання, лишаються).
-func (a *App) AuctionUndoMerge() (Snapshot, error) {
+func (a *Channel) AuctionUndoMerge() (Snapshot, error) {
 	var err error
 	snap := a.mutate(func(st *State) {
 		au := &st.Auction
@@ -624,7 +624,7 @@ func (a *App) AuctionUndoMerge() (Snapshot, error) {
 }
 
 // Приховати / показати лот: прихований лишається в таблиці, але не бере участі в колесі.
-func (a *App) AuctionToggleLot(id string) Snapshot {
+func (a *Channel) AuctionToggleLot(id string) Snapshot {
 	return a.mutate(func(st *State) {
 		if i := st.Auction.lotIndex(id); i >= 0 {
 			st.Auction.Lots[i].Hidden = !st.Auction.Lots[i].Hidden
@@ -632,7 +632,7 @@ func (a *App) AuctionToggleLot(id string) Snapshot {
 	})
 }
 
-func (a *App) AuctionRemoveLot(id string) Snapshot {
+func (a *Channel) AuctionRemoveLot(id string) Snapshot {
 	return a.mutate(func(st *State) {
 		au := &st.Auction
 		if i := au.lotIndex(id); i >= 0 {
@@ -664,7 +664,7 @@ var randomUnit = func() (float64, string) {
 //
 //	instant — частка сектора = сума лота; на кого вказала стрілка, той і переміг.
 //	elim    — частка сектора = шанс вибути (elimWeights); вибраний лот вибуває, останній — переможець.
-func (a *App) AuctionSpin() (Snapshot, error) {
+func (a *Channel) AuctionSpin() (Snapshot, error) {
 	a.mu.Lock()
 	au := &a.st.Auction
 	if au.Winner != "" {
@@ -748,7 +748,7 @@ func (a *App) AuctionSpin() (Snapshot, error) {
 }
 
 // Повернути всі лоти на колесо (скасувати вибування і переможця).
-func (a *App) AuctionResetSpins() Snapshot {
+func (a *Channel) AuctionResetSpins() Snapshot {
 	return a.mutate(func(st *State) {
 		au := &st.Auction
 		for i := range au.Lots {
@@ -759,7 +759,7 @@ func (a *App) AuctionResetSpins() Snapshot {
 }
 
 // Новий аукціон: поточний зберігається в history/, лоти й стрічка очищуються (налаштування лишаються).
-func (a *App) AuctionNew() Snapshot {
+func (a *Channel) AuctionNew() Snapshot {
 	return a.mutate(func(st *State) {
 		st.Auction = AuctionState{Cfg: st.Auction.Cfg} // історія об'єднань теж очищується
 		st.Auction.normalize()
@@ -767,7 +767,7 @@ func (a *App) AuctionNew() Snapshot {
 }
 
 // таймер прийому ставок (з ticker під a.mu)
-func (a *App) tickAuctionLocked(now int64) bool {
+func (a *Channel) tickAuctionLocked(now int64) bool {
 	t := &a.st.Auction.Timer
 	if t.Status == "running" && t.EndsAt <= now {
 		t.Status, t.RemainingMs, t.FinishedAt = "finished", 0, now

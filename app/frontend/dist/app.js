@@ -1434,28 +1434,30 @@ document.querySelectorAll("[data-swap]").forEach(b => b.onclick = () => {
   const feed = document.querySelector(".aufeedcard"), fb = feed.getBoundingClientRect(); // стрічка «Ставки» під верхнім вікном
   auSwapped = !auSwapped; try{ localStorage.setItem("phillbot-auswap", auSwapped ? "1" : "0"); }catch(e){}
   placeWins(); renderAuList(); wheelDraw(); renderSpinBtn();
+  // Плавний обмін: лише transform і opacity (їх рахує відеокарта), жодних filter/box-shadow у кадрах.
+  // Рух — один плавний перехід (FLIP від центру). «Глибина» — окрема м'яка хвиля масштабу (синус), без зламу посередині.
+  const DUR = 640, EASE = "cubic-bezier(.22,.8,.24,1)";
+  const wave = (peak, n = 8) => Array.from({length: n + 1}, (_, k) => 1 + (peak - 1) * Math.sin(Math.PI * k / n)); // 1 → peak → 1
   wins.forEach((w, i) => {
     const a = before[i], z = w.getBoundingClientRect();
-    // поки летять — над стрічкою «Ставки» (колесо, що мінімізується, не пірнає під неї)
-    // 3D-ефект: вікно, що стає більшим, на півдорозі «наближається» (більше, яскравіше, з тінню) і летить над іншим;
-    // вікно, що стає меншим, «віддаляється» (менше й темніше)
-    const grows = z.width * z.height > a.width * a.height, k = grows ? 1.06 : .86;
-    const dx = a.left - z.left, dy = a.top - z.top, sx = a.width / z.width, sy = a.height / z.height;
-    const mx = (sx + 1) / 2, my = (sy + 1) / 2;
-    const midT = `translate(${dx / 2 + z.width * mx * (1 - k) / 2}px,${dy / 2 + z.height * my * (1 - k) / 2}px) scale(${mx * k},${my * k})`;
-    w.style.position = "relative"; w.style.zIndex = grows ? 6 : 4;
-    w.animate([
-      {transform: `translate(${dx}px,${dy}px) scale(${sx},${sy})`, transformOrigin: "0 0", filter: "brightness(1)", boxShadow: "0 0 0 rgba(0,0,0,0)"},
-      {transform: midT, transformOrigin: "0 0", offset: .5, filter: grows ? "brightness(1.08)" : "brightness(.6)",
-        boxShadow: grows ? "0 28px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(145,71,255,.35)" : "0 0 0 rgba(0,0,0,0)"},
-      {transform: "none", transformOrigin: "0 0", filter: "brightness(1)", boxShadow: "0 0 0 rgba(0,0,0,0)"}],
-      {duration: 720, easing: "cubic-bezier(.3,.7,.3,1)"}).onfinish = () => { w.style.zIndex = ""; };
+    const grows = z.width * z.height > a.width * a.height; // це вікно стає великим — летить зверху й «наближається»
+    const dx = (a.left + a.width / 2) - (z.left + z.width / 2), dy = (a.top + a.height / 2) - (z.top + z.height / 2);
+    const sx = a.width / z.width, sy = a.height / z.height;
+    w.style.position = "relative"; w.style.zIndex = grows ? 6 : 4; w.style.transformOrigin = "50% 50%"; w.style.willChange = "transform, opacity";
+    w.classList.toggle("flying", grows); // статична тінь на час польоту (не анімується)
+    const move = w.animate([{transform: `translate(${dx}px,${dy}px) scale(${sx},${sy})`}, {transform: "none"}], {duration: DUR, easing: EASE});
+    // глибина: окрема властивість scale складається з transform; синус дає плавне наближення/віддалення
+    w.animate(wave(grows ? 1.045 : .9).map(v => ({scale: String(v)})), {duration: DUR, easing: "linear"});
+    if(!grows) w.animate(wave(.62).map(v => ({opacity: v})), {duration: DUR, easing: "linear"}); // віддалене — трохи тьмяніє
+    const done = () => { w.style.zIndex = ""; w.style.willChange = ""; w.style.transformOrigin = ""; w.classList.remove("flying"); };
+    move.onfinish = done; setTimeout(done, DUR + 200);
+    // вміст поки летить розтягнутий — приглушений, проявляється ближче до кінця
     const inner = w.querySelector(".aulist, .wheelbox");
-    if(inner) inner.animate([{opacity: .3}, {opacity: 1}], {duration: 180, easing: "ease-out"}); // коротке згасання вмісту, без паузи
+    if(inner) inner.animate([{opacity: .25}, {opacity: .25, offset: .35}, {opacity: 1}], {duration: DUR, easing: "ease-out"});
   });
-  // «Ставки» плавно переповзають на нове місце (верхнє вікно в колонці змінило висоту), а не стрибають
-  const fa = feed.getBoundingClientRect(), dy = fb.top - fa.top;
-  if(Math.abs(dy) > 1) feed.animate([{transform: `translateY(${dy}px)`}, {transform: "none"}], {duration: 720, easing: "cubic-bezier(.3,.7,.3,1)"});
+  // «Ставки» переповзають на нове місце тим самим рухом
+  const fa = feed.getBoundingClientRect(), fdy = fb.top - fa.top;
+  if(Math.abs(fdy) > 1) feed.animate([{transform: `translateY(${fdy}px)`}, {transform: "none"}], {duration: DUR, easing: EASE});
 });
 placeWins();
 

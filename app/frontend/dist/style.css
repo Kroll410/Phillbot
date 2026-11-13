@@ -1005,3 +1005,6 @@ td > .donchip{margin-left:0}
 .auctl{grid-template-columns:96px 56px 56px}
 .auctl button{height:32px}
 .donchip{border-width:2px;border-color:rgba(255,206,110,.55)}
+
+/* обмін вікон аукціону: вікно, що стає великим, летить з тінню (тінь статична — без перемальовування в кадрах) */
+.auwin.flying{box-shadow:0 26px 60px rgba(0,0,0,.55),0 0 0 1px rgba(145,71,255,.35)}

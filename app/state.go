@@ -225,3 +225,10 @@ func isSubdayReward(title string) bool {
 }
 
 func fmtErr(prefix string, err error) string { return fmt.Sprintf("%s: %v", prefix, err) }
+
+// нормалізація домену з налаштувань: «abc.ngrok-free.app», «https://abc.ngrok-free.app/» → «abc.ngrok-free.app»
+func ngrokDomain(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(strings.TrimPrefix(s, "https://"), "http://")
+	return strings.TrimRight(s, "/")
+}

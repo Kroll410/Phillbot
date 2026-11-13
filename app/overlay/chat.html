@@ -62,7 +62,7 @@
   }
   setInterval(flush, 150); // пакетний рендер — не навантажувати OBS на великих каналах
 
-  fetch("/api/chat").then(r => r.json()).then(msgs => { pending = (msgs || []).slice(-limit).concat(pending); flush(); });
+  fetch(OV.base + "api/chat").then(r => r.json()).then(msgs => { pending = (msgs || []).slice(-limit).concat(pending); flush(); });
   OV.connect({
     state: s => { document.getElementById("head").textContent = "Чат " + (s.channel || ""); document.title = "Чат " + (s.channel || ""); },
     chat: m => pending.push(m),

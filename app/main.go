@@ -16,9 +16,6 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-// version задається при збірці: -ldflags "-X main.version=v0.1.0" (див. .github/workflows/build.yml)
-var version = "dev"
-
 func main() {
 	app := NewApp()
 	err := wails.Run(&options.App{

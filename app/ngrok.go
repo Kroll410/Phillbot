@@ -21,13 +21,6 @@ import (
 // ключ колбека Donatello має вигляд UUID; authtoken ngrok — ні
 var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-// нормалізація домену з налаштувань: «abc.ngrok-free.app», «https://abc.ngrok-free.app/» → «abc.ngrok-free.app»
-func ngrokDomain(s string) string {
-	s = strings.TrimSpace(s)
-	s = strings.TrimPrefix(strings.TrimPrefix(s, "https://"), "http://")
-	return strings.TrimRight(s, "/")
-}
-
 // restartTunnel — (пере)запустити тунель з поточними налаштуваннями (при старті й після збереження).
 func (a *App) restartTunnel() {
 	a.mu.Lock()

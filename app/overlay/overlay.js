@@ -10,9 +10,11 @@
   if (Q.has("color")) document.documentElement.style.setProperty("--accent", "#" + param("color", "").replace(/[^0-9a-f]/gi, "").slice(0, 6));
   document.body.classList.add("theme-" + param("theme", "shadow"), "align-" + param("align", "left"));
 
+  // корінь API: на десктопі «/», у вебверсії «/w/<секрет>/» — сторінки віджетів лежать у <корінь>overlay/…
+  const base = location.pathname.replace(/overlay\/[^/]*$/, "");
   let offset = 0;
   function connect(h) {
-    const es = new EventSource("/api/events" + (flag("window", false) ? "?window=1" : ""));
+    const es = new EventSource(base + "api/events" + (flag("window", false) ? "?window=1" : ""));
     es.addEventListener("state", e => { const s = JSON.parse(e.data); offset = s.serverNow - Date.now(); h.state && h.state(s); });
     for (const n of ["chat", "chatdel", "redeem", "closewin"]) es.addEventListener(n, e => h[n] && h[n](JSON.parse(e.data)));
     es.onerror = () => h.offline && h.offline();
@@ -22,5 +24,5 @@
   function remaining(s) { return s.session.status === "running" ? s.session.endsAt - serverNow() : s.session.remainingMs; }
   function fmtTime(ms) { ms = Math.max(0, ms); const t = Math.ceil(ms / 1000), m = Math.floor(t / 60), s = t % 60; return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0"); }
 
-  window.OV = { Q, param, num, flag, connect, remaining, fmtTime, serverNow };
+  window.OV = { Q, param, num, flag, connect, remaining, fmtTime, serverNow, base };
 })();

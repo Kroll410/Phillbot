@@ -593,9 +593,12 @@ function renderDon(){
   if(!(S.auth && S.auth.status === "ok")){ pill.classList.add("hidden"); return; } // без входу в Twitch індикатора немає
   pill.className = "donpill " + ({on: "on", error: "err", starting: ""}[d.state] ?? "") + (d.state === "off" ? " hidden" : "");
   if(!$("generalModal").classList.contains("show")) return;
+  // підключення до ngrok — рамка завантаження навколо правої панелі
+  const panel = document.querySelector("#generalModal .donbox");
+  if(d.state === "starting") loadOn(panel); else loadOff(panel);
   const box = $("donLink");
   const html = d.state === "on" ? `<div class="donurl"><code>${esc(d.url)}</code><button class="small" id="donCopy">Копіювати</button></div><span class="ok">Готово: донати приходитимуть миттєво.</span>`
-    : d.state === "starting" ? `<span class="muted">Підключення до ngrok…</span>${d.error ? ` <span class="muted">(${esc(d.error)})</span>` : ""}`
+    : d.state === "starting" ? (d.error ? `<span class="muted">${esc(d.error)}</span>` : "")
     : d.state === "error" ? `<span class="err">${esc(d.error || "Помилка ngrok")}</span>`
     : `<span class="muted">Вставте токен ngrok і натисніть «Зберегти» — тут з'явиться посилання для Donatello.</span>`;
   if(box._k !== html){ box._k = html; box.innerHTML = html; }

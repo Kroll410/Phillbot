@@ -792,6 +792,9 @@ func (s *webServer) serveWidget(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// іконка PhillBot у вкладці браузера (і на головному екрані телефона)
+const faviconTags = `<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">`
+
 var contentTypes = map[string]string{".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
 	".js": "text/javascript; charset=utf-8", ".woff2": "font/woff2", ".png": "image/png", ".svg": "image/svg+xml", ".ico": "image/x-icon"}
 
@@ -828,12 +831,16 @@ func (s *webServer) serveUI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		page := strings.Replace(string(b), `<script src="app.js`, `<script src="web.js"></script>`+"\n"+`<script src="app.js`, 1)
+		page = strings.Replace(page, "</head>", faviconTags+"</head>", 1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = io.WriteString(w, page)
 	case "/web.js":
 		w.Header().Set("Cache-Control", "no-store")
 		serveEmbedded(w, r, webFS, "web/web.js")
+	case "/favicon.ico", "/favicon.png", "/apple-touch-icon.png":
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		serveEmbedded(w, r, webFS, "web"+p)
 	default:
 		serveEmbedded(w, r, assets, "frontend/dist"+p)
 	}

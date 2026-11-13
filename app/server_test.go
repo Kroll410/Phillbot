@@ -514,3 +514,23 @@ func TestServerMarbles(t *testing.T) {
 		t.Fatal("winner pick must be enabled after the Marbles file")
 	}
 }
+
+// Іконка у вкладці: файли віддаються, сторінки на них посилаються.
+func TestServerFavicon(t *testing.T) {
+	_, srv := devServer(t)
+	for p, ct := range map[string]string{"/favicon.ico": "image/x-icon", "/favicon.png": "image/png", "/apple-touch-icon.png": "image/png"} {
+		resp, err := http.Get(srv.URL + p)
+		if err != nil || resp.StatusCode != 200 || resp.Header.Get("Content-Type") != ct {
+			t.Fatal(p, err, resp.StatusCode, resp.Header.Get("Content-Type"))
+		}
+		resp.Body.Close()
+	}
+	for _, p := range []string{"/", "/privacy", "/admin"} {
+		resp, _ := http.Get(srv.URL + p)
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if !strings.Contains(string(b), `rel="icon" href="/favicon.ico"`) {
+			t.Fatal(p, "has no favicon link")
+		}
+	}
+}

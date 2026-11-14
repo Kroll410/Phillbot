@@ -404,3 +404,19 @@ func TestVoteFirstOnly(t *testing.T) {
 		t.Fatalf("votes %+v", v)
 	}
 }
+
+// Свій звук кінця гри: лише https-посилання; інше відкидається (грає вбудований сигнал).
+func TestGameSoundURL(t *testing.T) {
+	for in, want := range map[string]string{
+		" https://www.myinstants.com/media/sounds/x.mp3 ": "https://www.myinstants.com/media/sounds/x.mp3",
+		"http://example.com/a.mp3":                        "",
+		"javascript:alert(1)":                             "",
+		"":                                                "",
+	} {
+		s := Settings{GameSoundURL: in}
+		s.normalize()
+		if s.GameSoundURL != want {
+			t.Fatalf("%q → %q, want %q", in, s.GameSoundURL, want)
+		}
+	}
+}

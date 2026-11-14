@@ -22,9 +22,11 @@ type Settings struct {
 	DupMode      string         `json:"dupMode"` // кілька замовлень від глядача: last — останнє, first — перше, split — бали діляться між усіма
 	ObsPort      int            `json:"obsPort"` // локальний сервер для OBS (127.0.0.1)
 	Chat         ChatSettings   `json:"chat"`
-	GameMin      int            `json:"gameMin"`   // хвилин на гру переможця (етап 2)
-	VoteMin      int            `json:"voteMin"`   // хвилин на голосування за продовження
-	VoteFirst    bool           `json:"voteFirst"` // голосування 1/2: true — рахується лише перший голос глядача, false — можна переголосувати (останній)
+	GameMin      int            `json:"gameMin"`                // хвилин на гру переможця (етап 2)
+	VoteMin      int            `json:"voteMin"`                // хвилин на голосування за продовження
+	GameSoundOff bool           `json:"gameSoundOff,omitempty"` // без звуку, коли час гри переможця вийшов
+	GameSoundURL string         `json:"gameSoundUrl,omitempty"` // свій звук (https-посилання на аудіо); порожньо — вбудований сигнал
+	VoteFirst    bool           `json:"voteFirst"`              // голосування 1/2: true — рахується лише перший голос глядача, false — можна переголосувати (останній)
 	// Донати Donatello через колбеки: тунель ngrok (authtoken, необов'язковий постійний домен) і ключ X-Key з Donatello.
 	// Усе це — лише на цьому ПК (subday_state.json не передається).
 	NgrokToken     string `json:"ngrokToken"`
@@ -149,6 +151,10 @@ func (s *Settings) normalize() {
 	}
 	if s.VoteMin < 1 || s.VoteMin > 60 {
 		s.VoteMin = 3
+	}
+	s.GameSoundURL = strings.TrimSpace(s.GameSoundURL)
+	if !strings.HasPrefix(s.GameSoundURL, "https://") || len(s.GameSoundURL) > 500 {
+		s.GameSoundURL = "" // лише https-посилання розумної довжини
 	}
 	if s.ObsPort < 1024 || s.ObsPort > 65000 {
 		s.ObsPort = defaultObsPort

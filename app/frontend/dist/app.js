@@ -58,7 +58,33 @@ function flashTable(){
   const f = $("tableFrame"); loadOn(f);
   clearTimeout(flashT); flashT = setTimeout(() => loadOff(f), 1300);
 }
-function setState(snap){ if(snap && snap.settings) { S = snap; renderAll(); } }
+function setState(snap){ if(snap && snap.settings) { const prev = S; S = snap; gameSoundCheck(prev, snap); renderAll(); } }
+// ----- звук, коли час гри переможця вийшов (не при ручному «Завершити гру») -----
+function gameSoundCheck(prev, s){
+  const a = prev && prev.game, b = s.game;
+  if(!a || !b || a.status !== "running" || b.status !== "finished" || s.phase !== "play" || s.settings.gameSoundOff) return;
+  if((b.finishedAt || 0) < (a.endsAt || 0) - 2000) return; // завершили вручну раніше часу — без звуку
+  playGameSound(s.settings.gameSoundUrl);
+}
+let audioCtx = null;
+document.addEventListener("click", e => { if(e.target.closest && e.target.closest("#gameSoundTest")) playGameSound($("gameSoundUrl").value.trim()); });
+function chime(){ // вбудований сигнал: три короткі ноти вгору, без файлів
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const t0 = audioCtx.currentTime + .02;
+    [880, 1175, 1568].forEach((f, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain(), t = t0 + i * .2;
+      o.type = "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.28, t + .02); g.gain.exponentialRampToValueAtTime(.001, t + .45);
+      o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + .5);
+    });
+  }catch(e){}
+}
+function playGameSound(url){
+  if(!url) return chime();
+  const a = new Audio(url); a.volume = .8;
+  a.play().catch(() => chime()); // посилання не відкрилося — хоча б вбудований сигнал
+}
 
 /* ---------- дані: поточний збір або збір, вибраний для перегляду ---------- */
 let view = null;        // null — поточний збір; {n} — завершений збір (лише перегляд)
@@ -695,7 +721,7 @@ document.querySelectorAll("[data-export]").forEach(b => b.onclick = async () => 
 $("subdaySettingsBtn").onclick = () => {
   pendingReward = null; showAllRewards = false;
   dupPending = null; renderDupSeg();
-  $("gameMin").value = S.settings.gameMin || 40; $("voteMin").value = S.settings.voteMin || 3; $("voteRevote").checked = !S.settings.voteFirst; $("donPerPoint").value = S.settings.donUahPerPoint || 30;
+  $("gameMin").value = S.settings.gameMin || 40; $("voteMin").value = S.settings.voteMin || 3; $("voteRevote").checked = !S.settings.voteFirst; $("gameSound").checked = !S.settings.gameSoundOff; $("gameSoundUrl").value = S.settings.gameSoundUrl || ""; $("donPerPoint").value = S.settings.donUahPerPoint || 30;
   renderRewardGrid(); openModal("subdayModal"); requestAnimationFrame(renderDupSeg);
   if(!(S.rewards||[]).length) withLoading([$("subdayModal").querySelector(".box"), $("rewardRefresh")], () => call("RefreshRewards")).then(() => renderRewardGrid());
 };
@@ -705,7 +731,7 @@ $("subdaySave").onclick = async () => {
     setState(await call("SelectReward", pendingReward, r ? r.title : ""));
     if(r && r.is_user_input_required === false) toast("Увага: ця нагорода не вимагає тексту — замовлення без тексту ігноруються", 4500);
   }
-  await saveSettings({ dupMode: dupPending || S.settings.dupMode || "last", gameMin: Math.min(600, Math.max(1, Math.round(n("gameMin",40)))), voteFirst: !$("voteRevote").checked, voteMin: Math.min(60, Math.max(1, Math.round(n("voteMin",3)))),
+  await saveSettings({ dupMode: dupPending || S.settings.dupMode || "last", gameMin: Math.min(600, Math.max(1, Math.round(n("gameMin",40)))), voteFirst: !$("voteRevote").checked, gameSoundOff: !$("gameSound").checked, gameSoundUrl: $("gameSoundUrl").value.trim(), voteMin: Math.min(60, Math.max(1, Math.round(n("voteMin",3)))),
     donUahPerPoint: Math.min(100000, Math.max(1, Math.round(n("donPerPoint",30)))) });
   pendingReward = null; closeModal("subdayModal"); toast("Налаштування СабДею збережено");
 };

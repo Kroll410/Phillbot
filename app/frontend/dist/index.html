@@ -79,6 +79,10 @@
     <div><label>Голосування (хв)</label><input type="number" id="voteMin" min="1" max="60" step="1"></div>
   </div>
   <label class="chk"><input type="checkbox" id="voteRevote"> Можна переголосувати в «1 / 2» (рахується останній голос)</label>
+  <label class="chk"><input type="checkbox" id="gameSound"> Звук, коли час гри вийшов</label>
+  <label for="gameSoundUrl">Свій звук — посилання на .mp3 (необов'язково)</label>
+  <div class="row"><input id="gameSoundUrl" type="url" placeholder="https://www.myinstants.com/media/sounds/….mp3" autocomplete="off" spellcheck="false"><button id="gameSoundTest" type="button" style="flex:0 0 auto">Прослухати</button></div>
+  <div class="hint">Без посилання грає короткий сигнал PhillBot.</div>
   <h3>Донати Donatello</h3>
   <div class="row" style="max-width:360px">
     <div><label>Гривень за 1 бал</label><input type="number" id="donPerPoint" min="1" max="100000" step="1"></div>

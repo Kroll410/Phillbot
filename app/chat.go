@@ -120,7 +120,7 @@ func (a *Channel) onChatMessage(raw json.RawMessage) {
 	a.emitEvent("chat", msg)
 	a.backfillLook(msg.UserID, msg.Color, msg.Badges)
 	a.trackChatter(ev, msg)
-	a.onVoteMessage(ev.ChatterUserID, ev.Message.Text)
+	a.onVoteMessage(ev.ChatterUserID, ev.Message.Text, t > 0) // голосують лише підписники (значок subscriber / founder)
 }
 
 // видалення: ids — конкретні повідомлення; userID — усі повідомлення людини; all — очищення чату

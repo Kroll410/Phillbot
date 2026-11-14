@@ -115,7 +115,7 @@ func (s *webServer) deleteChannel(id string) error {
 			return err
 		}
 	}
-	for _, k := range []string{"widget_secret:", "don_secret:", "view_secret:", "deauth_since:"} {
+	for _, k := range []string{"widget_secret:", "don_secret:", "view_secret:", "deauth_since:", "vote_reset_subs:"} {
 		if _, err := tx.Exec(rb(`DELETE FROM meta WHERE key = ?`), k+id); err != nil {
 			return err
 		}

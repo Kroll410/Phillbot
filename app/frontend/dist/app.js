@@ -1061,7 +1061,7 @@ function renderSteps(){
   const g = aggregate(LIVE()).find(x => x.name === S.winner || x.key === norm(S.winner||""));
   $("gUsers").innerHTML = g && g.users.length ? `<span class="gwho">${g.users.length > 1 ? "Замовили:" : "Замовив:"}</span> ` + g.users.map(u => `${userTag(u)} <span class="muted">(${u.p})</span>`).join(" ") : "";
   $("vStart").textContent = `Почати голосування · ${S.settings.voteMin || 3} хв`;
-  $("voteRule").innerHTML = `Чатерси пишуть <b>1</b> або <b>2</b> — від кожного рахується ${S.settings.voteFirst ? "лише перший голос" : "останній голос"}.`;
+  $("voteRule").innerHTML = `Підписники пишуть <b>1</b> або <b>2</b> — від кожного рахується ${S.settings.voteFirst ? "лише перший голос" : "останній голос"}.`;
   renderGameTimer();
 }
 function gameSection(){

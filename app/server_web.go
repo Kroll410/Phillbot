@@ -245,6 +245,14 @@ func (s *webServer) channel(id string) (*chanRT, error) {
 		ch.st = fixState(st)
 	}
 	ch.initStreamLocked()
+	// одноразово після хотфіксу «голосують лише підписники»: голосування, що вже йдуть, починають з 0:0
+	if k := "vote_reset_subs:" + id; store.meta(k) == "" {
+		if ch.st.Vote.Status == "running" {
+			ch.st.Vote.Votes, ch.st.Vote.Yes, ch.st.Vote.No = map[string]int{}, 0, 0
+			ch.saveLocked()
+		}
+		_ = store.setMeta(k, "1")
+	}
 	ch.auth = AuthInfo{Status: "need_login"}
 	cctx, cancel := context.WithCancel(s.ctx)
 	go ch.ticker(cctx)

@@ -200,9 +200,10 @@ func (a *Channel) resolveVoteLocked() {
 
 // Голос з чату під час голосування: «1» або «2». Від кожного рахується останній голос,
 // або лише перший, якщо в налаштуваннях СабДею переголосування вимкнено.
-func (a *Channel) onVoteMessage(userID, text string) {
+// sub — у глядача є підписка на канал (значок subscriber або founder); голоси без підписки не рахуються.
+func (a *Channel) onVoteMessage(userID, text string, sub bool) {
 	t := strings.TrimSpace(text)
-	if t != "1" && t != "2" || userID == "" {
+	if t != "1" && t != "2" || userID == "" || !sub {
 		return
 	}
 	a.mu.Lock()

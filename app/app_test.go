@@ -341,12 +341,13 @@ func TestGamePhase(t *testing.T) {
 	if _, err := a.StartVote(); err != nil {
 		t.Fatal(err)
 	}
-	a.onVoteMessage("u1", "1")
-	a.onVoteMessage("u2", " 1 ")
-	a.onVoteMessage("u3", "2")
-	a.onVoteMessage("u2", "2")     // передумав
-	a.onVoteMessage("u4", "12")    // не голос
-	a.onVoteMessage("u5", "lol 1") // не голос
+	a.onVoteMessage("u1", "1", true)
+	a.onVoteMessage("u2", " 1 ", true)
+	a.onVoteMessage("u3", "2", true)
+	a.onVoteMessage("u2", "2", true)     // передумав
+	a.onVoteMessage("u4", "12", true)    // не голос
+	a.onVoteMessage("u5", "lol 1", true) // не голос
+	a.onVoteMessage("u6", "1", false)    // без підписки — не рахується
 	if v := a.st.Vote; v.Yes != 1 || v.No != 2 {
 		t.Fatalf("votes %+v", v)
 	}
@@ -362,7 +363,7 @@ func TestGamePhase(t *testing.T) {
 	a.st.Phase, a.st.Game.Status = "play", "finished"
 	a.mu.Unlock()
 	a.StartVote()
-	a.onVoteMessage("u1", "1")
+	a.onVoteMessage("u1", "1", true)
 	s = a.FinishVote()
 	if s.Vote.Result != "continue" || s.Phase != "play" || s.Game.Status != "running" || s.Round != 2 {
 		t.Fatalf("continue: %+v phase=%s round=%d", s.Vote, s.Phase, s.Round)
@@ -397,9 +398,9 @@ func TestVoteFirstOnly(t *testing.T) {
 	if _, err := a.StartVote(); err != nil {
 		t.Fatal(err)
 	}
-	a.onVoteMessage("u1", "1")
-	a.onVoteMessage("u1", "2") // переголосування ігнорується
-	a.onVoteMessage("u2", "2")
+	a.onVoteMessage("u1", "1", true)
+	a.onVoteMessage("u1", "2", true) // переголосування ігнорується
+	a.onVoteMessage("u2", "2", true)
 	if v := a.st.Vote; v.Yes != 1 || v.No != 1 {
 		t.Fatalf("votes %+v", v)
 	}

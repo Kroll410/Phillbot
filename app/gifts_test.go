@@ -36,15 +36,15 @@ func TestGiftSubsPoints(t *testing.T) {
 	if len(a.st.Gifts) != 1 {
 		t.Fatalf("old gifts not pruned: %+v", a.st.Gifts)
 	}
-	// підписник T2 × 3 міс. = 6; 1 подарунок — менше трьох, бал не додає
+	// підписник T2 × 3 міс. / 3 = 2; 1 подарунок — менше двох, бал не додає
 	a.mu.Lock()
 	a.st.Entries = append(a.st.Entries, Entry{ID: "x", Ts: time.Now().UnixMilli(), User: "ira", Login: "ira", UserID: "ira", Tier: 2, Months: 3, Text: "Doom"})
 	a.refreshEntryGiftsLocked()
 	a.mu.Unlock()
-	if p := pointsOf(a.st.Settings, a.st.Entries[1]); p != 6 {
-		t.Fatalf("sub + 1 gift = %d, want 6", p)
+	if p := pointsOf(a.st.Settings, a.st.Entries[1]); p != 2 {
+		t.Fatalf("sub + 1 gift = %d, want 2", p)
 	}
-	for gifts, want := range map[int]int{0: 0, 2: 0, 3: 1, 5: 1, 6: 2, 10: 3} { // 3 сабки = 1 бал, вниз
+	for gifts, want := range map[int]int{0: 0, 1: 0, 2: 1, 3: 1, 5: 2, 6: 3, 10: 5} { // 2 сабки = 1 бал, вниз
 		if g := giftPoints(gifts); g != want {
 			t.Fatalf("giftPoints(%d) = %d, want %d", gifts, g, want)
 		}

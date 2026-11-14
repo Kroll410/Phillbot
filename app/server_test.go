@@ -493,7 +493,7 @@ func TestServerMarbles(t *testing.T) {
 		t.Fatal("empty marbles must be 400", resp.StatusCode)
 	}
 	callAPI(t, srv, "StartTimer")
-	callAPI(t, srv, "AddManual", "Phill", 1, 3, "Hades")
+	callAPI(t, srv, "AddManual", "Phill", 1, 9, "Hades") // 9 / 3 = 3 бали
 	callAPI(t, srv, "FinishTimer")
 	resp, err := http.Get(srv.URL + "/api/marbles")
 	if err != nil {

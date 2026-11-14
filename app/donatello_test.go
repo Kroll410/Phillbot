@@ -88,7 +88,7 @@ func TestDonatelloCallback(t *testing.T) {
 
 	// СабДей: збір іде — донат стає замовленням ⌊грн/30⌋; повторний колбек того самого донату не рахується
 	a.StartTimer()
-	a.AddManual("Phill", 1, 2, "Hades") // T1 × 2 міс. = 2 бали
+	a.AddManual("Phill", 1, 2, "Hades") // T1 × 2 міс. / 3 угору = 1 бал
 	for _, b := range []string{donJSON("d1", "Богдан", "Hades", "59"), donJSON("d2", "Богдан", "hades", "120"), donJSON("d2", "Богдан", "hades", "120")} {
 		if c := postDon(h, "15165cf7", b); c != http.StatusOK {
 			t.Fatalf("callback: %d", c)
@@ -103,7 +103,7 @@ func TestDonatelloCallback(t *testing.T) {
 	if len(donE) != 2 || donE[0].DonPoints != 1 || donE[1].DonPoints != 4 || donE[1].UAH != 120 {
 		t.Fatalf("subday donations %+v", donE)
 	}
-	if g := aggregate(a.st.Settings, a.st.Entries); len(g) != 1 || g[0].Points != 2+1+4 {
+	if g := aggregate(a.st.Settings, a.st.Entries); len(g) != 1 || g[0].Points != 1+1+4 {
 		t.Fatalf("group %+v", g)
 	}
 	// без тексту чи не в гривнях — не враховуються

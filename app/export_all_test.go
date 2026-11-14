@@ -47,7 +47,7 @@ func TestExportAll(t *testing.T) {
 		t.Fatalf("collections: %d", len(colls))
 	}
 	sub := string(subdayAllCSV(colls))
-	for _, want := range []string{"\xEF\xBB\xBFsep=;", "Mira;;3;2;;;6;Celeste;так;Celeste", "\"Hollow; Knight\"", "донат", ";120;4;Hades", "2026-10-01_10-00-00-a"} {
+	for _, want := range []string{"\xEF\xBB\xBFsep=;", "Mira;;3;2;;;2;Celeste;так;Celeste", "\"Hollow; Knight\"", "донат", ";120;4;Hades", "2026-10-01_10-00-00-a"} {
 		if !strings.Contains(sub, want) {
 			t.Errorf("subday csv lacks %q:\n%s", want, sub)
 		}

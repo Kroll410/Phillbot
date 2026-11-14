@@ -32,7 +32,7 @@ func TestOverlayServer(t *testing.T) {
 	var st OverlayState
 	json.NewDecoder(resp.Body).Decode(&st)
 	resp.Body.Close()
-	if st.Totals.Points != 138 || st.Totals.Marbles != 138 || len(st.Top) != 1 || st.Top[0].Name != "Dark Souls" {
+	if st.Totals.Points != 46 || st.Totals.Marbles != 46 || len(st.Top) != 1 || st.Top[0].Name != "Dark Souls" {
 		t.Fatalf("%+v", st)
 	}
 

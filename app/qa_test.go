@@ -209,8 +209,8 @@ func TestDupModes(t *testing.T) {
 	mk := func(id string, ts int64, user, text string, tier, months int) Entry {
 		return Entry{ID: id, Ts: ts, User: user, Login: user, UserID: user, Tier: tier, Months: months, Text: text}
 	}
-	// Mira: T2 × 5 міс. = 10 балів; три замовлення
-	es := []Entry{mk("a", 1, "mira", "Hades", 2, 5), mk("b", 2, "mira", "Celeste", 2, 5), mk("c", 3, "mira", "Doom", 2, 5), mk("d", 4, "ira", "Hades", 1, 2)}
+	// Mira: T2 × 15 міс. / 3 = 10 балів; три замовлення; Ira: T1 × 6 міс. / 3 = 2
+	es := []Entry{mk("a", 1, "mira", "Hades", 2, 15), mk("b", 2, "mira", "Celeste", 2, 15), mk("c", 3, "mira", "Doom", 2, 15), mk("d", 4, "ira", "Hades", 1, 6)}
 	pts := func(mode string, list []Entry) map[string]int { s.DupMode = mode; return entryPoints(s, list) }
 
 	if p := pts("last", es); len(p) != 2 || p["c"] != 10 || p["d"] != 2 {

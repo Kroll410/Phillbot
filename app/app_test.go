@@ -156,16 +156,16 @@ func TestAggregateAndMarbles(t *testing.T) {
 		{ID: "5", Ts: 5, UserID: "u4", User: "y", Tier: 0, Text: "Minecraft"},
 	}
 	g := aggregate(s, es)
-	if len(g) != 3 || g[0].Name != "Dark Souls" || g[0].Points != 158 || g[1].Name != "Hades" || g[1].Points != 6 || g[2].Points != 0 {
+	if len(g) != 3 || g[0].Name != "Dark Souls" || g[0].Points != 53 || g[1].Name != "Hades" || g[1].Points != 2 || g[2].Points != 0 {
 		t.Fatalf("%+v", g)
 	}
 	lines := marbleLines(s, es)
-	if len(lines) != 164 {
+	if len(lines) != 55 {
 		t.Fatal(len(lines))
 	}
 	big := append([]Entry{}, es...)
 	big = append(big, Entry{ID: "6", Ts: 6, UserID: "u6", User: "z", Tier: 3, Months: 400, Text: "Hades"})
-	if n := len(marbleLines(s, big)); n != 164+1200 { // без ліміту: куль = сума балів
+	if n := len(marbleLines(s, big)); n != 55+400 { // без ліміту: куль = сума балів
 		t.Fatal(n)
 	}
 	s.DupMode = "first"
@@ -179,7 +179,7 @@ func TestExport(t *testing.T) {
 	if _, err := a.ExportMarbles(false); err == nil {
 		t.Fatal("empty export accepted")
 	}
-	a.st.Entries = []Entry{{ID: "1", UserID: "u", User: "U", Tier: 1, Months: 2, Text: "Ой, \"так\""}}
+	a.st.Entries = []Entry{{ID: "1", UserID: "u", User: "U", Tier: 1, Months: 4, Text: "Ой, \"так\""}}
 	r, err := a.ExportMarbles(false)
 	if err != nil || r.Lines != 2 {
 		t.Fatal(r, err)
@@ -215,7 +215,7 @@ func TestRenameEntries(t *testing.T) {
 	ids := []string{s.Entries[1].ID}
 	s = a.RenameEntries(ids, "  dark souls 3 ")
 	g := aggregate(s.Settings, s.Entries)
-	if len(g) != 2 || g[0].Name != "dark souls 3" || g[0].Points != 5 || g[0].Count != 2 {
+	if len(g) != 2 || g[0].Name != "dark souls 3" || g[0].Points != 2 || g[0].Count != 2 {
 		t.Fatalf("%+v", g)
 	}
 	if s = a.RenameEntries(ids, " "); s.Entries[1].Text != "dark souls 3" {
@@ -237,7 +237,7 @@ func TestEachStartIsNewCollection(t *testing.T) {
 	if _, err := os.Stat(a.exportsDir); err == nil {
 		t.Fatal("CSV must be written only on demand")
 	}
-	if txt := collectionCSV(a.st.Settings, a.st.Entries); !strings.HasPrefix(txt, "sep=;\r\n") || !strings.Contains(txt, "Dark Souls;158;2;") {
+	if txt := collectionCSV(a.st.Settings, a.st.Entries); !strings.HasPrefix(txt, "sep=;\r\n") || !strings.Contains(txt, "Dark Souls;53;2;") {
 		t.Fatalf("%q", txt)
 	}
 	s := a.AddTime(60000) // +1 хв після завершення не діє

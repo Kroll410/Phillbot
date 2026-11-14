@@ -68,16 +68,24 @@ function gameSoundCheck(prev, s){
 }
 let audioCtx = null;
 document.addEventListener("click", e => { if(e.target.closest && e.target.closest("#gameSoundTest")) playGameSound($("gameSoundUrl").value.trim()); });
-function chime(){ // вбудований сигнал: три короткі ноти вгору, без файлів
+function chime(){ // вбудований сигнал «Крапля»: дві краплі з ковзанням униз, м'який фільтр і відлуння (~2,4 с), без файлів
   try{
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    const t0 = audioCtx.currentTime + .02;
-    [880, 1175, 1568].forEach((f, i) => {
-      const o = audioCtx.createOscillator(), g = audioCtx.createGain(), t = t0 + i * .2;
-      o.type = "triangle"; o.frequency.value = f;
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.28, t + .02); g.gain.exponentialRampToValueAtTime(.001, t + .45);
-      o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + .5);
-    });
+    const c = audioCtx, t0 = c.currentTime + .02;
+    const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3500; lp.Q.value = .3;
+    const dl = c.createDelay(); dl.delayTime.value = .16; const fb = c.createGain(); fb.gain.value = .5; const wet = c.createGain(); wet.gain.value = .45;
+    lp.connect(c.destination); lp.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(c.destination);
+    const drop = (t, f0, f1, dur, vol, glide) => {
+      const o = c.createOscillator(), o2 = c.createOscillator(), g = c.createGain(), g2 = c.createGain();
+      o.type = o2.type = "sine";
+      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + glide);
+      o2.frequency.setValueAtTime(f0 * 2, t); o2.frequency.exponentialRampToValueAtTime(f1 * 2, t + glide); g2.gain.value = .12;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .015); g.gain.exponentialRampToValueAtTime(.0008, t + dur);
+      o.connect(g); o2.connect(g2); g2.connect(g); g.connect(lp);
+      o.start(t); o2.start(t); o.stop(t + dur + .05); o2.stop(t + dur + .05);
+    };
+    drop(t0, 1180, 520, .8, .34, .12);
+    drop(t0 + .45, 1400, 620, 1.2, .3, .14);
   }catch(e){}
 }
 function playGameSound(url){

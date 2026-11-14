@@ -102,7 +102,7 @@
   function tick(){
     const a = active();
     w.classList.toggle("idle", !a);
-    if(!a){ kind = ""; return; }
+    if(!a){ kind = ""; w.classList.remove("voting"); lastY = lastN = -1; return; } // прихований — без «каната» на наступну появу
     if(a.kind !== kind){ if(kind) swap(a.kind); else { cur.className = "t " + a.kind + " in"; settle(cur); } kind = a.kind; }
     const r = remain(a.t);
     cur.textContent = OV.fmtTime(r);
@@ -127,6 +127,8 @@
   function $(id){ return document.getElementById(id); }
   OV.connect({ state: s => { S = s; tick(); } });
   setInterval(tick, 200);
+  // підстраховка: якщо потік подій мовчить (проксі, сон OBS), раз на 10 с беремо стан напряму
+  setInterval(() => { fetch(OV.base + "api/state", {cache: "no-store"}).then(r => r.ok ? r.json() : null).then(s => { if(s){ OV.sync && OV.sync(s); S = s; tick(); } }).catch(() => {}); }, 10000);
 })();
 </script>
 </body></html>

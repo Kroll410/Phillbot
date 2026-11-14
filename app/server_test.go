@@ -4,6 +4,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -591,5 +592,17 @@ func TestServerAssetVersion(t *testing.T) {
 		if !strings.Contains(string(b), want) {
 			t.Fatal("no versioned asset:", want)
 		}
+	}
+}
+
+// Потік подій (віджети OBS) проксі не стискає: інакше дрібні кадри стану застрягають у буфері.
+func TestSSENoTransform(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/w/x/api/events", nil).WithContext(ctx)
+	serveSSE(rec, req, &sseHub{clients: map[chan []byte]struct{}{}}, sseFrame("state", 1))
+	if cc := rec.Header().Get("Cache-Control"); !strings.Contains(cc, "no-transform") || rec.Header().Get("Content-Encoding") != "identity" {
+		t.Fatal(cc, rec.Header().Get("Content-Encoding"))
 	}
 }

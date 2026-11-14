@@ -21,8 +21,9 @@
     return es;
   }
   const serverNow = () => Date.now() + offset;
+  const sync = s => { if (s && s.serverNow) offset = s.serverNow - Date.now(); }; // поправка годинника зі стану, отриманого не з потоку
   function remaining(s) { return s.session.status === "running" ? s.session.endsAt - serverNow() : s.session.remainingMs; }
   function fmtTime(ms) { ms = Math.max(0, ms); const t = Math.ceil(ms / 1000), m = Math.floor(t / 60), s = t % 60; return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0"); }
 
-  window.OV = { Q, param, num, flag, connect, remaining, fmtTime, serverNow, base };
+  window.OV = { Q, param, num, flag, connect, remaining, fmtTime, serverNow, base, sync };
 })();

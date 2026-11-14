@@ -688,7 +688,10 @@ func serveSSE(w http.ResponseWriter, r *http.Request, hub *sseHub, first []byte)
 		return
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-store")
+	// проксі (Fly стискає відповіді zstd/br) не має стискати потік: стиснення буферизує дрібні кадри,
+	// і віджет OBS не бачить змін (напр. переходу на таймер гри), доки буфер не заповниться
+	w.Header().Set("Cache-Control", "no-store, no-transform")
+	w.Header().Set("Content-Encoding", "identity")
 	w.Header().Set("X-Accel-Buffering", "no") // проксі (nginx/Caddy) не мають буферизувати потік
 	c := hub.add()
 	defer hub.remove(c)

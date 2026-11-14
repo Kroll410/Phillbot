@@ -308,7 +308,7 @@ func (a *authStore) channelsWithTokens() []string {
 	return out
 }
 
-// channelBySecret — канал за секретом посилання (kind: widget_secret | don_secret)
+// channelBySecret — канал за секретом посилання (kind: widget_secret | don_secret | view_secret)
 func (a *authStore) channelBySecret(kind, secret string) string {
 	var key string
 	err := a.s.db.QueryRow(a.s.rb(`SELECT key FROM meta WHERE key LIKE ? AND value = ?`), kind+":%", secret).Scan(&key)

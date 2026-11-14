@@ -636,3 +636,38 @@ func TestAuthLastSeen(t *testing.T) {
 		t.Fatal("touch must be throttled")
 	}
 }
+
+// Сторінка для глядачів: /v/<секрет> без входу; у посиланні — не id каналу; чужий код — 404; у стані немає налаштувань і токенів.
+func TestServerViewerPage(t *testing.T) {
+	ws, srv := devServer(t)
+	rt, err := ws.channel("local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rt.viewSecret) != 32 || rt.viewSecret == rt.secret || rt.viewSecret == rt.donSecret || strings.Contains(rt.viewSecret, "local") {
+		t.Fatal("view secret", rt.viewSecret)
+	}
+	rt.ch.StartTimer()
+	rt.ch.AddManual("Mira", 1, 3, "Hades")
+	if r, _ := http.Get(srv.URL + "/v/00000000000000000000000000000000"); r.StatusCode != 404 {
+		t.Fatal("unknown viewer link", r.StatusCode)
+	}
+	page, err := http.Get(srv.URL + "/v/" + rt.viewSecret)
+	if err != nil || page.StatusCode != 200 || page.Header.Get("X-Robots-Tag") != "noindex" {
+		t.Fatal(err, page.StatusCode)
+	}
+	page.Body.Close()
+	r, err := http.Get(srv.URL + "/v/" + rt.viewSecret + "/api/state")
+	if err != nil || r.StatusCode != 200 {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(r.Body)
+	r.Body.Close()
+	body := string(b)
+	if !strings.Contains(body, `"Hades"`) || !strings.Contains(body, `"au"`) || strings.Contains(body, `"settings"`) || strings.Contains(body, "token") {
+		t.Fatal("viewer state", body)
+	}
+	if snap := rt.ch.GetState(); !strings.HasSuffix(snap.View, "/v/"+rt.viewSecret) {
+		t.Fatal("view link in snapshot", snap.View)
+	}
+}

@@ -309,6 +309,16 @@ function renderObs(){
        <button class="small" data-copy="${esc(o.url)}/overlay/widget">Копіювати</button><button class="small" data-open="/overlay/widget" title="Відкрити в браузері">↗</button></div>`
     : `<div class="hint err">${esc(o.error || "Сервер для OBS не запущено.")}</div>`;
 }
+// посилання для глядачів (вебверсія): поточний СабДей чи аукціон без входу; у посиланні — секрет, не нік
+function renderViewLink(){
+  const box = $("viewLink"); if(!box) return;
+  box.innerHTML = S.view ? `<div class="obsrow"><span><code>${esc(S.view)}</code></span>
+       <button class="small" data-copy="${esc(S.view)}">Копіювати</button><a class="small iconlink" href="${esc(S.view)}" target="_blank" rel="noopener" aria-label="Відкрити сторінку для глядачів">↗</a></div>` : "";
+}
+$("viewLink").addEventListener("click", async e => {
+  const c = e.target.closest("[data-copy]"); if(!c) return;
+  const ok = await call("CopyText", c.dataset.copy); c.textContent = ok ? "Скопійовано" : "Не вдалося"; setTimeout(() => c.textContent = "Копіювати", 1500);
+});
 $("obsWidget").addEventListener("click", async e => {
   const c = e.target.closest("[data-copy]"), o = e.target.closest("[data-open]");
   if(c){ const ok = await call("CopyText", c.dataset.copy); toast(ok ? "URL скопійовано — OBS → Джерела → Браузер" : "Не вдалося скопіювати"); }
@@ -639,7 +649,7 @@ document.querySelectorAll(".modal").forEach(m => m.addEventListener("mousedown",
 // Загальні: віджет і порт OBS, файли; праворуч — Donatello через ngrok
 $("generalBtn").onclick = () => {
   $("ngrokToken").value = S.settings.ngrokToken || ""; $("donKey").value = S.settings.donKey || ""; $("donLink")._k = "";
-  $("obsPort").value = S.settings.obsPort; renderObs(); openModal("generalModal"); renderDon();
+  $("obsPort").value = S.settings.obsPort; renderObs(); renderViewLink(); openModal("generalModal"); renderDon();
 };
 $("generalSave").onclick = async () => { await saveSettings({obsPort: Math.round(n("obsPort",17841)), ngrokToken: $("ngrokToken").value.trim(), donKey: $("donKey").value.trim()}); closeModal("generalModal"); toast("Збережено"); };
 // Donatello: статус і посилання для колбеків (десктоп — через ngrok, вебверсія — адреса сервера)

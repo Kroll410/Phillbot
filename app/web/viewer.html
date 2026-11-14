@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PhillBot — для глядачів</title>
+<meta name="robots" content="noindex">
+<meta name="description" content="Поточний СабДей або аукціон каналу наживо: таймер, замовлення, лоти й шанси.">
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+  @font-face{font-family:"Unbounded";font-display:swap;font-weight:200 900;src:url(/fonts/unbounded-cyrillic-wght-normal.woff2) format("woff2-variations");unicode-range:U+0400-045F,U+0490-0491}
+  @font-face{font-family:"Unbounded";font-display:swap;font-weight:200 900;src:url(/fonts/unbounded-latin-wght-normal.woff2) format("woff2-variations");unicode-range:U+0000-00FF,U+2000-206F}
+  :root{--bg:#0e0e10;--panel:#18181b;--panel2:#1f1f23;--line:#2a2a30;--text:#efeff1;--muted:#adadb8;--brand:#9147ff;--brand-text:#bf94ff;--ok:#00c853;--warn:#ffb300;--bad:#ff6b61;
+    --ui:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;--num:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 var(--ui);-webkit-font-smoothing:antialiased}
+  main{max-width:720px;margin:0 auto;padding:16px 16px 40px}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .logo{font:700 16px/1 "Unbounded",var(--ui);color:var(--text)} .logo span{color:var(--brand-text)}
+  .chan{font-size:14px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chan b{color:var(--text);font-weight:600}
+  .live{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);flex:0 0 auto}
+  .live i{width:8px;height:8px;border-radius:50%;background:#55555f}
+  .live.on i{background:var(--ok)}
+  .tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:16px}
+  .tabs button{flex:1;min-height:40px;border:0;border-radius:7px;background:transparent;color:var(--muted);font:600 14px var(--ui);cursor:pointer}
+  .tabs button[aria-selected="true"]{background:var(--brand);color:#fff}
+  .tabs button:focus-visible{outline:2px solid var(--brand-text);outline-offset:-2px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
+  .hero{text-align:center}
+  .status{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);padding:4px 10px;border:1px solid var(--line);border-radius:999px}
+  .status.run{color:#5cf29a;border-color:rgba(0,200,83,.5)} .status.pause{color:var(--warn);border-color:rgba(255,179,0,.45)}
+  .timer{font:600 64px/1.05 var(--num);font-variant-numeric:tabular-nums;margin:8px 0 4px}
+  .timer.run{color:var(--ok)} .timer.pause{color:var(--warn)} .timer.idle{color:var(--muted)}
+  .how{font-size:14px;color:var(--muted);margin:8px 0 0} .how b{color:var(--text);font-weight:600}
+  .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+  .stat{background:var(--panel2);border-radius:8px;padding:10px 6px;text-align:center}
+  .stat b{display:block;font:600 20px/1.1 var(--num);font-variant-numeric:tabular-nums}
+  .stat span{font-size:12px;color:var(--muted)}
+  h2{font:600 12px/1.3 var(--ui);text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0 0 10px}
+  ol{list-style:none;margin:0;padding:0}
+  li.row{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+  li.row:first-child{border-top:0;padding-top:0}
+  .rk{font:600 14px var(--num);color:var(--muted);text-align:right}
+  .nm{font-weight:600;overflow-wrap:anywhere}
+  .pt{font:600 15px var(--num);font-variant-numeric:tabular-nums;text-align:right}
+  .pt small{display:block;font:400 12px var(--ui);color:var(--muted)}
+  .bar{grid-column:2/4;height:6px;border-radius:3px;background:#26262c;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:3px;background:var(--brand)}
+  .who{grid-column:2/4;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  li.out .nm{text-decoration:line-through;color:var(--muted)} li.out .bar i{background:#3a3a42}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+  .winner{font:700 28px/1.2 "Unbounded",var(--ui);margin:6px 0 2px;overflow-wrap:anywhere}
+  .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+  .vote{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+  .vote div{border-radius:8px;padding:10px;text-align:left;background:var(--panel2)}
+  .vote div b{font:700 22px var(--num);margin-right:8px} .vote .y b{color:#3fe08a} .vote .n b{color:var(--brand-text)}
+  .vote em{display:block;font-style:normal;color:var(--muted);font-size:13px}
+  .empty{color:var(--muted);text-align:center;padding:24px 8px}
+  .empty b{display:block;color:var(--text);font-size:16px;margin-bottom:4px}
+  footer{font-size:12px;color:var(--muted);text-align:center;margin-top:24px}
+  footer a{color:var(--muted)}
+  .hidden{display:none!important}
+  @media (min-width:600px){.timer{font-size:84px}.winner{font-size:36px}}
+</style></head>
+<body>
+<main>
+  <header>
+    <div class="logo" aria-label="PhillBot">Phill<span>Bot</span></div>
+    <div class="chan" id="chan"></div>
+    <div class="live" id="live" role="status"><i></i><span id="liveTxt">Підключення…</span></div>
+  </header>
+  <div class="tabs hidden" id="tabs" role="tablist">
+    <button role="tab" id="tabS" aria-selected="true" data-v="subday">СабДей</button>
+    <button role="tab" id="tabA" aria-selected="false" data-v="auction">Аукціон</button>
+  </div>
+  <section id="vSubday"></section>
+  <section id="vAuction" class="hidden"></section>
+  <footer>Оновлюється наживо · <a href="/privacy">Конфіденційність</a></footer>
+</main>
+<script>
+(function(){
+  "use strict";
+  const base = location.pathname.replace(/\/+$/, "") + "/";
+  const PAL = ["#4f8ff7","#e0952e","#e5604f","#2fb59a","#d66ba0","#8f6cf0","#7fae32","#3aa9cc","#e07a3a","#b25bd6","#c9a43a","#5d6ff0"];
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const fmtN = n => Number(n || 0).toLocaleString("uk-UA");
+  const fmtT = ms => { ms = Math.max(0, ms); const t = Math.ceil(ms / 1000), m = Math.floor(t / 60), s = t % 60; return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0"); };
+  const plural = (n, a, b, c) => { const d = n % 10, h = n % 100; return d === 1 && h !== 11 ? a : d >= 2 && d <= 4 && (h < 12 || h > 14) ? b : c; };
+  let S = null, offset = 0, view = null, chosen = false;
+  const now = () => Date.now() + offset;
+  const left = t => !t ? 0 : t.status === "running" ? t.endsAt - now() : (t.remainingMs || 0);
+  const going = t => t && (t.status === "running" || t.status === "paused");
+  const cls = t => t && t.status === "running" ? "run" : t && t.status === "paused" ? "pause" : "idle";
+
+  // що показувати: те, що зараз іде; якщо нічого — те, де є дані
+  function autoView(){
+    const sub = going(S.session) || S.phase === "play" || (S.top || []).length > 0;
+    const au = going(S.au.timer) || S.au.lots.length > 0;
+    if(going(S.au.timer) && !going(S.session) && S.phase !== "play") return "auction";
+    if(sub) return "subday";
+    return au ? "auction" : "subday";
+  }
+  function setView(v){
+    view = v;
+    $("tabS").setAttribute("aria-selected", v === "subday"); $("tabA").setAttribute("aria-selected", v === "auction");
+    $("vSubday").classList.toggle("hidden", v !== "subday"); $("vAuction").classList.toggle("hidden", v !== "auction");
+  }
+  document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => { chosen = true; setView(b.dataset.v); });
+
+  function renderSubday(){
+    const el = $("vSubday");
+    if(S.phase === "play"){
+      const g = S.game || {}, v = S.vote || {};
+      const voting = v.status === "running";
+      el.innerHTML = `<div class="card hero">
+        <div class="lbl">Збір №${S.collN || 1} · гра переможця${S.round > 1 ? ` · раунд ${S.round}` : ""}</div>
+        <div class="winner">${esc(S.winner || "—")}</div>
+        ${voting ? `<div class="lbl" style="margin-top:12px">Голосування: продовжити гру?</div>
+          <div class="timer run" data-t="vote">${fmtT(left(v))}</div>
+          <div class="vote"><div class="y"><b>1</b>Продовжити<em>${v.yes || 0} ${plural(v.yes || 0, "голос", "голоси", "голосів")}</em></div>
+          <div class="n"><b>2</b>Дроп<em>${v.no || 0} ${plural(v.no || 0, "голос", "голоси", "голосів")}</em></div></div>
+          <p class="how">Пишіть у чат <b>1</b> або <b>2</b>.</p>`
+        : going(g) ? `<div class="timer ${cls(g)}" data-t="game">${fmtT(left(g))}</div><span class="status ${cls(g)}">${g.status === "paused" ? "Пауза" : "Гра йде"}</span>`
+        : `<div class="timer idle">00:00</div><span class="status">Час гри вийшов</span>`}
+      </div>`;
+      return;
+    }
+    const s = S.session || {}, top = S.top || [], tot = S.totals || {};
+    const label = {running: "Збір іде", paused: "Пауза", finished: "Збір завершено", idle: "Очікування старту"}[s.status] || "";
+    const max = top.reduce((m, g) => Math.max(m, g.points), 0) || 1, sum = top.reduce((a, g) => a + g.points, 0) || 1;
+    el.innerHTML = `<div class="card hero">
+        <span class="status ${cls(s)}">${label}</span>
+        <div class="timer ${cls(s)}" data-t="session">${fmtT(left(s))}</div>
+        ${S.rewardTitle ? `<p class="how">Замовити гру — нагорода <b>«${esc(S.rewardTitle)}»</b> за бали каналу.</p>` : ""}
+        <div class="stats"><div class="stat"><b>${fmtN(tot.orders)}</b><span>замовлень</span></div><div class="stat"><b>${fmtN(tot.users)}</b><span>чатерсів</span></div><div class="stat"><b>${fmtN(tot.points)}</b><span>балів</span></div></div>
+      </div>
+      <div class="card"><h2>Замовлення</h2>${top.length ? `<ol>${top.map((g, i) => `<li class="row">
+        <span class="rk">${i + 1}</span><span class="nm">${esc(g.name)}</span>
+        <span class="pt">${fmtN(g.points)}<small>${Math.round(g.points / sum * 100)}%</small></span>
+        <span class="bar"><i style="width:${Math.round(g.points / max * 100)}%"></i></span>
+        <span class="who">${(g.users || []).map(u => esc(u.name)).join(", ")}</span></li>`).join("")}</ol>`
+        : `<div class="empty"><b>Замовлень поки немає</b>${s.status === "running" ? "Купіть нагороду каналу й напишіть гру — вона з'явиться тут." : "Коли стрімер почне збір, замовлення з'являться тут."}</div>`}</div>`;
+  }
+
+  function renderAuction(){
+    const a = S.au, t = a.timer || {};
+    const label = {running: "Ставки приймаються", paused: "Пауза", finished: "Ставки закрито", idle: "Очікування старту"}[t.status] || "";
+    const lots = a.lots.map((l, i) => ({...l, color: PAL[i % PAL.length]})).sort((x, y) => (x.out ? 1 : 0) - (y.out ? 1 : 0) || y.amount - x.amount);
+    const max = lots.reduce((m, l) => Math.max(m, l.amount), 0) || 1;
+    $("vAuction").innerHTML = `<div class="card hero">
+        <span class="status ${cls(t)}">${label}</span>
+        ${a.winner ? `<div class="lbl" style="margin-top:12px">Переможець</div><div class="winner">${esc(a.winner)}</div>` : `<div class="timer ${cls(t)}" data-t="auction">${fmtT(left(t))}</div>`}
+        <div class="stats"><div class="stat"><b>${fmtN(lots.length)}</b><span>лотів</span></div><div class="stat"><b>${fmtN(a.bids)}</b><span>ставок</span></div><div class="stat"><b>${fmtN(a.sum)}</b><span>балів</span></div></div>
+      </div>
+      <div class="card"><h2>Лоти${a.mode === "elim" ? " · на вибування" : ""}</h2>${lots.length ? `<ol>${lots.map((l, i) => `<li class="row${l.out ? " out" : ""}">
+        <span class="rk">${l.out ? "—" : i + 1}</span><span class="nm"><span class="dot" style="background:${l.color}"></span>${esc(l.name)}</span>
+        <span class="pt">${fmtN(l.amount)}<small>${l.out ? "вибув" : (l.chance * 100).toFixed(1).replace(".0", "") + "%"}</small></span>
+        <span class="bar"><i style="width:${Math.round(l.amount / max * 100)}%;background:${l.out ? "" : l.color}"></i></span></li>`).join("")}</ol>`
+        : `<div class="empty"><b>Лотів поки немає</b>${going(t) ? "Ставте бали каналу на гру — вона з'явиться тут." : "Коли стрімер почне аукціон, лоти з'являться тут."}</div>`}</div>`;
+  }
+
+  function render(){
+    if(!S) return;
+    $("chan").innerHTML = S.channel ? `Канал <b>${esc(S.channel)}</b>` : "";
+    const both = (going(S.session) || S.phase === "play" || (S.top || []).length) && (going(S.au.timer) || S.au.lots.length);
+    $("tabs").classList.toggle("hidden", !both);
+    if(!chosen || !both) setView(autoView());
+    renderSubday(); renderAuction();
+  }
+  // таймери тікають локально між оновленнями
+  setInterval(() => {
+    if(!S) return;
+    document.querySelectorAll("[data-t]").forEach(el => {
+      const k = el.dataset.t, t = k === "session" ? S.session : k === "game" ? S.game : k === "vote" ? S.vote : S.au.timer;
+      el.textContent = fmtT(left(t));
+    });
+  }, 250);
+
+  let busy = false, again = false;
+  async function load(){
+    if(busy){ again = true; return; }
+    busy = true;
+    try{
+      const r = await fetch(base + "api/state", {cache: "no-store"});
+      if(r.ok){ S = await r.json(); offset = S.serverNow - Date.now(); render(); }
+    }catch(e){}
+    busy = false;
+    if(again){ again = false; setTimeout(load, 300); }
+  }
+  function connect(){
+    const es = new EventSource(base + "api/events");
+    es.addEventListener("state", () => { $("live").classList.add("on"); $("liveTxt").textContent = "Наживо"; load(); });
+    es.onerror = () => { $("live").classList.remove("on"); $("liveTxt").textContent = "Перепідключення…"; };
+  }
+  load(); connect();
+  setInterval(load, 15000); // підстраховка, якщо потік подій мовчить
+})();
+</script>
+</body></html>

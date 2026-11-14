@@ -58,6 +58,7 @@ type webHost struct {
 	notifyCh chan struct{}
 	obsURL   string // https://домен/w/<секрет>
 	donURL   string // https://домен/donatello/<секрет> — вставити в Donatello → API → Колбеки
+	viewURL  string // https://домен/v/<секрет> — сторінка для глядачів (без входу)
 }
 
 func newHub() *sseHub { return &sseHub{clients: map[chan []byte]struct{}{}} }
@@ -78,6 +79,7 @@ func (h *webHost) Notify() {
 func (h *webHost) Decorate(s *Snapshot) {
 	s.Obs = OverlayInfo{Running: true, URL: h.obsURL}
 	s.Don = DonStatus{State: "off", URL: h.donURL}
+	s.View = h.viewURL
 	if strings.TrimSpace(s.Settings.DonKey) != "" {
 		s.Don.State = "on"
 	}
@@ -125,11 +127,12 @@ func (h *webHost) overlayLoop(ctx context.Context) {
 // ---------- сервер і реєстр каналів ----------
 
 type chanRT struct {
-	cancel    context.CancelFunc // зупинити таймери, віджети й підключення каналу
-	ch        *Channel
-	host      *webHost
-	secret    string // віджети
-	donSecret string // колбеки Donatello
+	cancel     context.CancelFunc // зупинити таймери, віджети й підключення каналу
+	ch         *Channel
+	host       *webHost
+	secret     string // віджети
+	donSecret  string // колбеки Donatello
+	viewSecret string // сторінка для глядачів
 }
 
 type webServer struct {
@@ -144,6 +147,7 @@ type webServer struct {
 	chans    map[string]*chanRT
 	bySecret map[string]string
 	byDon    map[string]string
+	byView   map[string]string
 }
 
 func randomHex(n int) string {
@@ -187,7 +191,7 @@ func newWebServer(cfg serverConfig, dbFile string) (*webServer, error) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &webServer{cfg: cfg, base: base, auth: auth, ctx: ctx, cancel: cancel, connect: !cfg.Dev,
-		chans: map[string]*chanRT{}, bySecret: map[string]string{}, byDon: map[string]string{}}, nil
+		chans: map[string]*chanRT{}, bySecret: map[string]string{}, byDon: map[string]string{}, byView: map[string]string{}}, nil
 }
 
 // start — підняти канали, що вже входили (таймери й EventSub працюють і без відкритого браузера)
@@ -223,8 +227,12 @@ func (s *webServer) channel(id string) (*chanRT, error) {
 	if err != nil {
 		return nil, err
 	}
+	viewSecret, err := channelSecret(store, "view_secret:"+id) // у посиланні для глядачів — не нік і не id каналу
+	if err != nil {
+		return nil, err
+	}
 	h := &webHost{chID: id, auth: s.auth, ui: newHub(), ov: newHub(), notifyCh: make(chan struct{}, 1),
-		obsURL: s.cfg.Public + "/w/" + secret, donURL: s.cfg.Public + "/donatello/" + donSecret}
+		obsURL: s.cfg.Public + "/w/" + secret, donURL: s.cfg.Public + "/donatello/" + donSecret, viewURL: s.cfg.Public + "/v/" + viewSecret}
 	ch := newChannel(h)
 	h.ch = ch
 	ch.store = store
@@ -241,8 +249,8 @@ func (s *webServer) channel(id string) (*chanRT, error) {
 	cctx, cancel := context.WithCancel(s.ctx)
 	go ch.ticker(cctx)
 	go h.overlayLoop(cctx)
-	rt := &chanRT{cancel: cancel, ch: ch, host: h, secret: secret, donSecret: donSecret}
-	s.chans[id], s.bySecret[secret], s.byDon[donSecret] = rt, id, id
+	rt := &chanRT{cancel: cancel, ch: ch, host: h, secret: secret, donSecret: donSecret, viewSecret: viewSecret}
+	s.chans[id], s.bySecret[secret], s.byDon[donSecret], s.byView[viewSecret] = rt, id, id, id
 	if s.connect {
 		if tok := s.auth.loadTokens(id); tok != nil {
 			ch.auth = AuthInfo{Status: "checking"}
@@ -327,6 +335,7 @@ func (s *webServer) handler() http.Handler {
 	mux.HandleFunc("/admin/api/", s.serveAdminAPI)
 	mux.HandleFunc("/w/", s.serveWidget)
 	mux.HandleFunc("/donatello/", s.serveDonatello)
+	mux.HandleFunc("/v/", s.serveViewer)
 	mux.HandleFunc("/", s.serveUI)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -728,8 +737,11 @@ func (s *webServer) secretChannel(kind, secret string) *chanRT {
 	}
 	s.mu.Lock()
 	m := s.bySecret
-	if kind == "don_secret" {
+	switch kind {
+	case "don_secret":
 		m = s.byDon
+	case "view_secret":
+		m = s.byView
 	}
 	id, ok := m[secret]
 	s.mu.Unlock()
@@ -743,8 +755,11 @@ func (s *webServer) secretChannel(kind, secret string) *chanRT {
 		return nil
 	}
 	want := rt.secret
-	if kind == "don_secret" {
+	switch kind {
+	case "don_secret":
 		want = rt.donSecret
+	case "view_secret":
+		want = rt.viewSecret
 	}
 	if subtle.ConstantTimeCompare([]byte(want), []byte(secret)) != 1 {
 		return nil

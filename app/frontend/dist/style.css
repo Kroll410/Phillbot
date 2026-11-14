@@ -1083,3 +1083,6 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px soli
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
   .modal,.welcome,.modenote,#toast{transition:opacity .15s ease-out!important}
 }
+/* посилання «↗» у рядку з адресою (сторінка для глядачів) — як маленька кнопка */
+.obsrow a.iconlink{display:inline-flex;align-items:center;justify-content:center;min-width:30px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;color:var(--text);text-decoration:none;background:var(--panel2)}
+.obsrow a.iconlink:hover{border-color:var(--accent)}

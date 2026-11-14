@@ -36,9 +36,10 @@ type Snapshot struct {
 	Log        []LogLine         `json:"log"`
 	Obs        OverlayInfo       `json:"obs"`
 	ChatWindow bool              `json:"chatWindow"`
-	Don        DonStatus         `json:"don"`       // підключення до Donatello
-	Version    string            `json:"version"`   // dev — тестова збірка; у релізі — тег (v1.1.0)
-	SubBadges  map[string]string `json:"subBadges"` // значки підписки каналу: версія ("0", "3", "2012", "3036"…) → картинка // чат відкрито в окремому вікні — вкладка заблокована
+	Don        DonStatus         `json:"don"`            // підключення до Donatello
+	View       string            `json:"view,omitempty"` // вебверсія: публічна сторінка для глядачів /v/<секрет>
+	Version    string            `json:"version"`        // dev — тестова збірка; у релізі — тег (v1.1.0)
+	SubBadges  map[string]string `json:"subBadges"`      // значки підписки каналу: версія ("0", "3", "2012", "3036"…) → картинка // чат відкрито в окремому вікні — вкладка заблокована
 }
 
 // Host — те, що дає каналу оболонка: десктоп (Wails + локальні файли) або вебсервер.

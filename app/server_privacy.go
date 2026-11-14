@@ -25,7 +25,7 @@ import (
 const (
 	historyRetention = 365 * 24 * time.Hour // історія й журнал доступу
 	deauthGrace      = 30 * 24 * time.Hour  // дані каналу без дійсного входу
-	legalUpdated     = "13.11.2026"
+	legalUpdated     = "14.11.2026"
 	anonName         = "видалено"
 )
 
@@ -73,6 +73,7 @@ func (s *webServer) stopChannel(id string) {
 		delete(s.chans, id)
 		delete(s.bySecret, rt.secret)
 		delete(s.byDon, rt.donSecret)
+		delete(s.byView, rt.viewSecret)
 	}
 	s.mu.Unlock()
 	if rt == nil {
@@ -114,7 +115,7 @@ func (s *webServer) deleteChannel(id string) error {
 			return err
 		}
 	}
-	for _, k := range []string{"widget_secret:", "don_secret:", "deauth_since:"} {
+	for _, k := range []string{"widget_secret:", "don_secret:", "view_secret:", "deauth_since:"} {
 		if _, err := tx.Exec(rb(`DELETE FROM meta WHERE key = ?`), k+id); err != nil {
 			return err
 		}

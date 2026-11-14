@@ -1,6 +1,6 @@
 package main
 
-// Подаровані сабки: +1 бал до замовлення СабДею за кожні 3 сабки, які глядач подарував за останні 30 днів (giftPoints).
+// Подаровані сабки: +1 бал до замовлення СабДею за кожні 2 сабки, які глядач подарував за останні 30 днів (giftPoints).
 // Глядач визначається за id Twitch, а не за ніком — перейменування подарунків не губить.
 // Два джерела, береться більше з двох:
 //   1) список активних підписок каналу (Helix /subscriptions): у подарованих вказано, хто подарував.
@@ -88,7 +88,7 @@ func (a *Channel) onGift(ev giftEvent) {
 		a.pruneGiftsLocked()
 		a.refreshEntryGiftsLocked()
 	})
-	a.addLog(LogLine{Text: "Подарував(ла) сабок: " + itoa(ev.Total) + " (кожні 3 за 30 днів — +1 бал до замовлення)", User: ev.UserName, Login: ev.UserLogin})
+	a.addLog(LogLine{Text: "Подарував(ла) сабок: " + itoa(ev.Total) + " (кожні 2 за 30 днів — +1 бал до замовлення)", User: ev.UserName, Login: ev.UserLogin})
 }
 
 // fetchGiftSnapshot — активні подаровані підписки каналу: дарувальник → кількість.

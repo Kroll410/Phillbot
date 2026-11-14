@@ -103,12 +103,13 @@ function viewColl(){ return view ? streamColls().find(c => c.n === view.n) : nul
 function D(){ const c = viewColl(); return c ? {entries: c.entries || [], settings: c.settings || S.settings, live: false, coll: c} : LIVE(); }
 
 /* ---------- бали ---------- */
-function giftPts(n){ n = Math.floor(Number(n) || 0); return n > 0 ? Math.floor(n / 3) : 0; } // 3 подаровані сабки = 1 бал
+function giftPts(n){ n = Math.floor(Number(n) || 0); return n > 0 ? Math.floor(n / 2) : 0; } // 2 подаровані сабки = 1 бал
 function pointsOf(e, st = D().settings){
   if(e.donation) return Number(e.donPoints) || 0; // донат Donatello: бали вже з гривень
-  const gifts = giftPts(e.gifts); // подаровані сабки за 30 днів: 3 сабки = 1 бал, остача не рахується (як у бекенді)
+  const gifts = giftPts(e.gifts); // подаровані сабки за 30 днів: 2 сабки = 1 бал, остача не рахується (як у бекенді)
   if(!e.tier) return (Number(st.nonSubPoints)||0) + gifts;
-  return (Number(st.mult[String(e.tier)])||0) * Math.max(1, Number(e.months)||1) + gifts;
+  const p = (Number(st.mult[String(e.tier)])||0) * Math.max(1, Number(e.months)||1);
+  return (p > 0 ? Math.ceil(p / 3) : 0) + gifts; // підписка: (множник × місяці) / 3, угору (як у бекенді)
 }
 // «діюче» замовлення кожного чатерса (останнє / перше / у «ділити» — усі), включно з прихованими — лише вони є в таблиці
 function effectiveSet(d = D()){
@@ -710,7 +711,7 @@ $("donLink").addEventListener("click", async e => {
   const ok = await call("CopyText", (S.don || {}).url || "");
   const b = e.target.closest("#donCopy"); b.textContent = ok ? "Скопійовано" : "Не вдалося"; setTimeout(() => b.textContent = "Копіювати", 1500);
 });
-// подаровані сабки глядача за 30 днів: 3 сабки = 1 бал (остача не рахується)
+// подаровані сабки глядача за 30 днів: 2 сабки = 1 бал (остача не рахується)
 const GIFT_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11h16v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM3 7h18v4H3zM12 7v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 7c-1.5-3-5-3.6-5.5-1.5S9.5 7 12 7zm0 0c1.5-3 5-3.6 5.5-1.5S14.5 7 12 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`;
 // у колонці «Бали»: скільки з них — за подаровані сабки
 const ptGift = e => giftPts(e.gifts) > 0 && !e.donation ? `<span class="ptgift" title="${e.gifts} подарованих сабок за 30 днів → +${giftPts(e.gifts)}">${GIFT_ICON}+${giftPts(e.gifts)}</span>` : "";

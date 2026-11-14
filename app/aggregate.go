@@ -29,12 +29,21 @@ func normKey(s string) string {
 	return strings.TrimSpace(trailPunct.ReplaceAllString(s, ""))
 }
 
-// giftPoints — бали за подаровані сабки за 30 днів: 3 сабки = 1 бал, остача не рахується (5 → 1, 6 → 2)
+// giftPoints — бали за подаровані сабки за 30 днів: 2 сабки = 1 бал, остача не рахується (2 → 1, 5 → 2)
 func giftPoints(gifts int) int {
 	if gifts < 0 {
 		return 0
 	}
-	return gifts / 3
+	return gifts / 2
+}
+
+// subPoints — бали за підписку: (множник тіру × місяці) / 3 з округленням угору (1 → 1, 4 → 2, 30 → 10, 35 → 12)
+func subPoints(mult, months int) int {
+	p := mult * months
+	if p <= 0 {
+		return 0
+	}
+	return (p + 2) / 3
 }
 
 func pointsOf(s Settings, e Entry) int {
@@ -48,7 +57,7 @@ func pointsOf(s Settings, e Entry) int {
 	if m < 1 {
 		m = 1
 	}
-	return s.Mult[strconv.Itoa(e.Tier)]*m + giftPoints(e.Gifts)
+	return subPoints(s.Mult[strconv.Itoa(e.Tier)], m) + giftPoints(e.Gifts)
 }
 
 func userKey(e Entry) string {

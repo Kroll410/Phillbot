@@ -125,7 +125,7 @@ func (s *webServer) deleteChannel(id string) error {
 		if _, err := tx.Exec(rb(`DELETE FROM web_sessions WHERE login = ?`), login); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(rb(`UPDATE web_users SET twitch_id = NULL, display_name = NULL, last_login_at = NULL WHERE login = ?`), login); err != nil {
+		if _, err := tx.Exec(rb(`UPDATE web_users SET twitch_id = NULL, display_name = NULL, last_login_at = NULL, last_seen_at = NULL WHERE login = ?`), login); err != nil {
 			return err
 		}
 	}

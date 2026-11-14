@@ -63,7 +63,7 @@
     $("rows").innerHTML = d.users.map(u => `<tr class="${u.allowed ? "" : "off"}">
       <td><b>${esc(u.displayName || u.login)}</b> <span class="tag">${u.displayName && u.displayName.toLowerCase() !== u.login ? esc(u.login) : ""}${u.twitchId ? "" : " · ще не входив"}</span></td>
       <td>${u.role === "admin" ? "Адміністратор" : "Стрімер"}</td>
-      <td class="tag">${u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("uk-UA") : "—"}</td>
+      <td class="tag">${(u.lastSeenAt || u.lastLoginAt) ? new Date(Math.max(u.lastSeenAt || 0, u.lastLoginAt || 0)).toLocaleString("uk-UA") : "—"}</td>
       <td style="text-align:right">${u.login === d.me ? "" : u.allowed
         ? `<button data-revoke="${esc(u.login)}">Прибрати</button>`
         : `<button data-allow="${esc(u.login)}">Повернути</button>`}</td></tr>`).join("");

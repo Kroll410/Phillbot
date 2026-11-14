@@ -304,6 +304,7 @@ func (s *webServer) user(r *http.Request) *WebUser {
 	if !ok {
 		return nil
 	}
+	s.auth.touch(u.Login)
 	return &u
 }
 

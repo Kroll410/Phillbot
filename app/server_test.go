@@ -606,3 +606,33 @@ func TestSSENoTransform(t *testing.T) {
 		t.Fatal(cc, rec.Header().Get("Content-Encoding"))
 	}
 }
+
+// «Останній вхід» в /admin — коли стрімер востаннє відкривав застосунок, а не лише вхід через Twitch.
+func TestAuthLastSeen(t *testing.T) {
+	s, err := openStore(filepath.Join(t.TempDir(), "a.db"), "local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if _, err := newAuthStore(s, "k"); err != nil { // друге відкриття — колонка вже є, помилки немає
+		t.Fatal(err)
+	}
+	a, err := newAuthStore(s, "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.allow("streamer_a", "streamer", "test"); err != nil {
+		t.Fatal(err)
+	}
+	a.touch("streamer_a")
+	u, _ := a.user("streamer_a")
+	if u.LastSeenAt == 0 {
+		t.Fatal("last seen not recorded")
+	}
+	first := u.LastSeenAt
+	time.Sleep(5 * time.Millisecond)
+	a.touch("streamer_a") // у межах хвилини — не переписуємо
+	if u2, _ := a.user("streamer_a"); u2.LastSeenAt != first {
+		t.Fatal("touch must be throttled")
+	}
+}

@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -37,12 +38,16 @@ type WebUser struct {
 	Allowed     bool   `json:"allowed"`
 	AddedBy     string `json:"addedBy,omitempty"`
 	AddedAt     int64  `json:"addedAt,omitempty"`
-	LastLoginAt int64  `json:"lastLoginAt,omitempty"`
+	LastLoginAt int64  `json:"lastLoginAt,omitempty"` // останній вхід через Twitch (OAuth)
+	LastSeenAt  int64  `json:"lastSeenAt,omitempty"`  // останнє відкриття застосунку (будь-який запит із сесією)
 }
 
 type authStore struct {
 	s   *Store
 	key []byte // AES-256 для токенів і ключів каналів
+
+	seenMu sync.Mutex
+	seen   map[string]int64 // login → коли востаннє записали last_seen_at (пишемо не частіше ніж раз на хвилину)
 }
 
 func newAuthStore(s *Store, secret string) (*authStore, error) {
@@ -51,8 +56,10 @@ func newAuthStore(s *Store, secret string) (*authStore, error) {
 			return nil, err
 		}
 	}
+	// колонка з'явилася пізніше: у наявних базах додаємо (помилку «вже є» ігноруємо)
+	_, _ = s.db.Exec(`ALTER TABLE web_users ADD COLUMN last_seen_at BIGINT`)
 	k := sha256.Sum256([]byte(secret)) // PHILLBOT_KEY будь-якої довжини → 32 байти
-	return &authStore{s: s, key: k[:]}, nil
+	return &authStore{s: s, key: k[:], seen: map[string]int64{}}, nil
 }
 
 func normLogin(l string) string {
@@ -65,12 +72,12 @@ func (a *authStore) audit(actor, action, details string) {
 
 // ---------- білий список ----------
 
-const userCols = `login, COALESCE(twitch_id, ''), COALESCE(display_name, ''), role, allowed, COALESCE(added_by, ''), COALESCE(added_at, 0), COALESCE(last_login_at, 0)`
+const userCols = `login, COALESCE(twitch_id, ''), COALESCE(display_name, ''), role, allowed, COALESCE(added_by, ''), COALESCE(added_at, 0), COALESCE(last_login_at, 0), COALESCE(last_seen_at, 0)`
 
 func scanUser(r interface{ Scan(...any) error }) (WebUser, error) {
 	var u WebUser
 	var allowed int
-	err := r.Scan(&u.Login, &u.TwitchID, &u.DisplayName, &u.Role, &allowed, &u.AddedBy, &u.AddedAt, &u.LastLoginAt)
+	err := r.Scan(&u.Login, &u.TwitchID, &u.DisplayName, &u.Role, &allowed, &u.AddedBy, &u.AddedAt, &u.LastLoginAt, &u.LastSeenAt)
 	u.Allowed = allowed == 1
 	return u, err
 }
@@ -160,6 +167,19 @@ func (a *authStore) loginOK(u User) (WebUser, bool) {
 	a.audit(login, "login", u.ID)
 	wu, _ = a.user(login)
 	return wu, true
+}
+
+// touch — стрімер відкрив застосунок: оновити «останній вхід» (не частіше ніж раз на хвилину)
+func (a *authStore) touch(login string) {
+	now := time.Now().UnixMilli()
+	a.seenMu.Lock()
+	if now-a.seen[login] < 60000 {
+		a.seenMu.Unlock()
+		return
+	}
+	a.seen[login] = now
+	a.seenMu.Unlock()
+	_, _ = a.s.db.Exec(a.s.rb(`UPDATE web_users SET last_seen_at = ? WHERE login = ?`), now, login)
 }
 
 // ---------- сесії ----------

@@ -684,7 +684,7 @@ document.querySelectorAll("[data-export]").forEach(b => b.onclick = async () => 
 $("subdaySettingsBtn").onclick = () => {
   pendingReward = null; showAllRewards = false;
   dupPending = null; renderDupSeg();
-  $("gameMin").value = S.settings.gameMin || 40; $("voteMin").value = S.settings.voteMin || 3; $("donPerPoint").value = S.settings.donUahPerPoint || 30;
+  $("gameMin").value = S.settings.gameMin || 40; $("voteMin").value = S.settings.voteMin || 3; $("voteRevote").checked = !S.settings.voteFirst; $("donPerPoint").value = S.settings.donUahPerPoint || 30;
   renderRewardGrid(); openModal("subdayModal"); requestAnimationFrame(renderDupSeg);
   if(!(S.rewards||[]).length) withLoading([$("subdayModal").querySelector(".box"), $("rewardRefresh")], () => call("RefreshRewards")).then(() => renderRewardGrid());
 };
@@ -694,7 +694,7 @@ $("subdaySave").onclick = async () => {
     setState(await call("SelectReward", pendingReward, r ? r.title : ""));
     if(r && r.is_user_input_required === false) toast("Увага: ця нагорода не вимагає тексту — замовлення без тексту ігноруються", 4500);
   }
-  await saveSettings({ dupMode: dupPending || S.settings.dupMode || "last", gameMin: Math.min(600, Math.max(1, Math.round(n("gameMin",40)))), voteMin: Math.min(60, Math.max(1, Math.round(n("voteMin",3)))),
+  await saveSettings({ dupMode: dupPending || S.settings.dupMode || "last", gameMin: Math.min(600, Math.max(1, Math.round(n("gameMin",40)))), voteFirst: !$("voteRevote").checked, voteMin: Math.min(60, Math.max(1, Math.round(n("voteMin",3)))),
     donUahPerPoint: Math.min(100000, Math.max(1, Math.round(n("donPerPoint",30)))) });
   pendingReward = null; closeModal("subdayModal"); toast("Налаштування СабДею збережено");
 };
@@ -1024,6 +1024,7 @@ function renderSteps(){
   const g = aggregate(LIVE()).find(x => x.name === S.winner || x.key === norm(S.winner||""));
   $("gUsers").innerHTML = g && g.users.length ? `<span class="gwho">${g.users.length > 1 ? "Замовили:" : "Замовив:"}</span> ` + g.users.map(u => `${userTag(u)} <span class="muted">(${u.p})</span>`).join(" ") : "";
   $("vStart").textContent = `Почати голосування · ${S.settings.voteMin || 3} хв`;
+  $("voteRule").innerHTML = `Чатерси пишуть <b>1</b> або <b>2</b> — від кожного рахується ${S.settings.voteFirst ? "лише перший голос" : "останній голос"}.`;
   renderGameTimer();
 }
 function gameSection(){

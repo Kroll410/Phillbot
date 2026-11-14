@@ -386,3 +386,21 @@ func TestGamePhase(t *testing.T) {
 		t.Fatalf("%+v", s.Phase)
 	}
 }
+
+// Налаштування СабДею «рахувати лише перший голос»: переголосувати в «1 / 2» не можна.
+func TestVoteFirstOnly(t *testing.T) {
+	a := newTestApp(t)
+	a.mu.Lock()
+	a.st.Settings.VoteFirst = true
+	a.st.Phase, a.st.Game.Status = "play", "finished"
+	a.mu.Unlock()
+	if _, err := a.StartVote(); err != nil {
+		t.Fatal(err)
+	}
+	a.onVoteMessage("u1", "1")
+	a.onVoteMessage("u1", "2") // переголосування ігнорується
+	a.onVoteMessage("u2", "2")
+	if v := a.st.Vote; v.Yes != 1 || v.No != 1 {
+		t.Fatalf("votes %+v", v)
+	}
+}

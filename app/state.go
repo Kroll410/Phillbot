@@ -22,8 +22,9 @@ type Settings struct {
 	DupMode      string         `json:"dupMode"` // кілька замовлень від глядача: last — останнє, first — перше, split — бали діляться між усіма
 	ObsPort      int            `json:"obsPort"` // локальний сервер для OBS (127.0.0.1)
 	Chat         ChatSettings   `json:"chat"`
-	GameMin      int            `json:"gameMin"` // хвилин на гру переможця (етап 2)
-	VoteMin      int            `json:"voteMin"` // хвилин на голосування за продовження
+	GameMin      int            `json:"gameMin"`   // хвилин на гру переможця (етап 2)
+	VoteMin      int            `json:"voteMin"`   // хвилин на голосування за продовження
+	VoteFirst    bool           `json:"voteFirst"` // голосування 1/2: true — рахується лише перший голос глядача, false — можна переголосувати (останній)
 	// Донати Donatello через колбеки: тунель ngrok (authtoken, необов'язковий постійний домен) і ключ X-Key з Donatello.
 	// Усе це — лише на цьому ПК (subday_state.json не передається).
 	NgrokToken     string `json:"ngrokToken"`

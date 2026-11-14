@@ -76,6 +76,7 @@
     <div><label>Час на гру (хв)</label><input type="number" id="gameMin" min="1" max="600" step="1"></div>
     <div><label>Голосування (хв)</label><input type="number" id="voteMin" min="1" max="60" step="1"></div>
   </div>
+  <label class="chk"><input type="checkbox" id="voteRevote"> Можна переголосувати в «1 / 2» (рахується останній голос)</label>
   <h3>Донати Donatello</h3>
   <div class="row" style="max-width:360px">
     <div><label>Гривень за 1 бал</label><input type="number" id="donPerPoint" min="1" max="100000" step="1"></div>
@@ -354,7 +355,7 @@
         <div class="vopt v1"><div class="vfill" id="vf1"></div><b>1</b><span>Продовжити гру</span><em id="vn1">0</em></div>
         <div class="vopt v2"><div class="vfill" id="vf2"></div><b>2</b><span>Дроп</span><em id="vn2">0</em></div>
       </div>
-      <div class="gstatus">Чатерси пишуть <b>1</b> або <b>2</b> — від кожного рахується останній голос.</div>
+      <div class="gstatus" id="voteRule">Чатерси пишуть <b>1</b> або <b>2</b> — від кожного рахується останній голос.</div>
       <div class="gctl">
         <button id="vPlus">+1 хв</button>
         <button id="vFinish">Завершити голосування</button>

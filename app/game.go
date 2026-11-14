@@ -198,7 +198,8 @@ func (a *Channel) resolveVoteLocked() {
 	}
 }
 
-// Голос з чату під час голосування: «1» або «2» (від кожного — останній).
+// Голос з чату під час голосування: «1» або «2». Від кожного рахується останній голос,
+// або лише перший, якщо в налаштуваннях СабДею переголосування вимкнено.
 func (a *Channel) onVoteMessage(userID, text string) {
 	t := strings.TrimSpace(text)
 	if t != "1" && t != "2" || userID == "" {
@@ -212,6 +213,10 @@ func (a *Channel) onVoteMessage(userID, text string) {
 	}
 	if v.Votes == nil {
 		v.Votes = map[string]int{}
+	}
+	if _, voted := v.Votes[userID]; voted && a.st.Settings.VoteFirst {
+		a.mu.Unlock() // переголосувати не можна — перший голос лишається
+		return
 	}
 	v.Votes[userID] = int(t[0] - '0')
 	v.Yes, v.No = 0, 0

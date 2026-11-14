@@ -952,7 +952,7 @@ async function holdDone(){
     return;
   }
   if(action === "logout"){ holding = null; call("Logout"); return; }
-  if(action.startsWith("web:")){ holding = null; if(window.webHold) window.webHold(action.slice(4), btn); return; } // вебверсія: web.js
+  if(action && action.startsWith("web:")){ // у «Переможець» data-hold немає (action — undefined) holding = null; if(window.webHold) window.webHold(action.slice(4), btn); return; } // вебверсія: web.js
   if(action === "dellot"){ // видалити лот
     holding = null;
     const l = lotById(btn.dataset.lot);

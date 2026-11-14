@@ -55,6 +55,22 @@
   .vote em{display:block;font-style:normal;color:var(--muted);font-size:13px}
   .empty{color:var(--muted);text-align:center;padding:24px 8px}
   .empty b{display:block;color:var(--text);font-size:16px;margin-bottom:4px}
+  .day{margin-bottom:16px}
+  .day h3{font:600 14px/1.3 var(--ui);color:var(--text);margin:0 0 8px;padding:0 4px}
+  .day h3 small{color:var(--muted);font-weight:400;margin-left:6px}
+  details.hi{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+  details.hi summary{list-style:none;cursor:pointer;padding:12px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center}
+  details.hi summary::-webkit-details-marker{display:none}
+  details.hi summary:focus-visible{outline:2px solid var(--brand-text);outline-offset:-2px;border-radius:12px}
+  .hk{font-size:12px;color:var(--muted)} .hk b{color:var(--brand-text);font-weight:600}
+  .hk.au b{color:#e0952e}
+  .hw{grid-column:1;font-weight:600;font-size:16px;overflow-wrap:anywhere}
+  .hw.none{color:var(--muted);font-weight:400;font-size:14px}
+  .hm{grid-column:2;grid-row:1/3;text-align:right;font-size:12px;color:var(--muted);white-space:nowrap}
+  .hm b{display:block;font:600 15px var(--num);color:var(--text);font-variant-numeric:tabular-nums}
+  details.hi[open] summary{border-bottom:1px solid var(--line)}
+  details.hi ol{padding:8px 16px 12px}
+  details.hi li.row{grid-template-columns:24px minmax(0,1fr) auto;padding:8px 0}
   footer{font-size:12px;color:var(--muted);text-align:center;margin-top:24px}
   footer a{color:var(--muted)}
   .hidden{display:none!important}
@@ -67,12 +83,14 @@
     <div class="chan" id="chan"></div>
     <div class="live" id="live" role="status"><i></i><span id="liveTxt">Підключення…</span></div>
   </header>
-  <div class="tabs hidden" id="tabs" role="tablist">
+  <div class="tabs" id="tabs" role="tablist">
     <button role="tab" id="tabS" aria-selected="true" data-v="subday">СабДей</button>
-    <button role="tab" id="tabA" aria-selected="false" data-v="auction">Аукціон</button>
+    <button role="tab" id="tabA" aria-selected="false" data-v="auction">Переглядовий</button>
+    <button role="tab" id="tabH" aria-selected="false" data-v="history">Історія</button>
   </div>
   <section id="vSubday"></section>
   <section id="vAuction" class="hidden"></section>
+  <section id="vHistory" class="hidden"><div class="empty">Завантаження…</div></section>
   <footer>Оновлюється наживо · <a href="/privacy">Конфіденційність</a></footer>
 </main>
 <script>
@@ -101,8 +119,9 @@
   }
   function setView(v){
     view = v;
-    $("tabS").setAttribute("aria-selected", v === "subday"); $("tabA").setAttribute("aria-selected", v === "auction");
-    $("vSubday").classList.toggle("hidden", v !== "subday"); $("vAuction").classList.toggle("hidden", v !== "auction");
+    $("tabS").setAttribute("aria-selected", v === "subday"); $("tabA").setAttribute("aria-selected", v === "auction"); $("tabH").setAttribute("aria-selected", v === "history");
+    $("vSubday").classList.toggle("hidden", v !== "subday"); $("vAuction").classList.toggle("hidden", v !== "auction"); $("vHistory").classList.toggle("hidden", v !== "history");
+    if(v === "history") loadHistory();
   }
   document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => { chosen = true; setView(b.dataset.v); });
 
@@ -158,12 +177,49 @@
         : `<div class="empty"><b>Лотів поки немає</b>${going(t) ? "Ставте бали каналу на гру — вона з'явиться тут." : "Коли стрімер почне аукціон, лоти з'являться тут."}</div>`}</div>`;
   }
 
+  // ---------- історія: минулі збори й Переглядовий за датами ----------
+  let H = null, hAt = 0, hBusy = false;
+  const dayKey = ms => { const d = new Date(ms); return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate(); };
+  const dayName = ms => new Date(ms).toLocaleDateString("uk-UA", {day: "numeric", month: "long", year: new Date(ms).getFullYear() === new Date().getFullYear() ? undefined : "numeric"});
+  const weekday = ms => new Date(ms).toLocaleDateString("uk-UA", {weekday: "short"});
+  const hhmm = ms => new Date(ms).toLocaleTimeString("uk-UA", {hour: "2-digit", minute: "2-digit"});
+  async function loadHistory(force){
+    if(hBusy || (!force && H && Date.now() - hAt < 60000)) { if(H) renderHistory(); return; }
+    hBusy = true;
+    try{ const r = await fetch(base + "api/history", {cache: "no-store"}); if(r.ok){ H = await r.json(); hAt = Date.now(); } }catch(e){}
+    hBusy = false;
+    renderHistory();
+  }
+  const topList = (top, total, unit) => `<ol>${top.map((g, i) => `<li class="row"><span class="rk">${i + 1}</span><span class="nm">${esc(g.name)}</span>
+    <span class="pt">${fmtN(g.points)}<small>${g.count} ${unit(g.count)}</small></span>
+    <span class="bar"><i style="width:${Math.round(g.points / (top[0].points || 1) * 100)}%"></i></span></li>`).join("")}</ol>`;
+  function renderHistory(){
+    const el = $("vHistory");
+    if(!H){ el.innerHTML = `<div class="card empty"><b>Не вдалося завантажити історію</b>Спробуйте оновити сторінку.</div>`; return; }
+    const items = [...H.subday.map(c => ({...c, k: "s"})), ...H.auctions.map(a => ({...a, k: "a"}))].filter(x => x.at > 0).sort((x, y) => y.at - x.at);
+    if(!items.length){ el.innerHTML = `<div class="card empty"><b>Історії поки немає</b>Тут з'являться завершені збори СабДею й Переглядові.</div>`; return; }
+    const days = [];
+    for(const it of items){ const k = dayKey(it.at); let d = days[days.length - 1]; if(!d || d.k !== k){ d = {k, at: it.at, list: []}; days.push(d); } d.list.push(it); }
+    el.innerHTML = days.map(d => {
+      const subs = d.list.filter(x => x.k === "s").length, aus = d.list.length - subs;
+      const what = [subs ? `СабДей${subs > 1 ? " ×" + subs : ""}` : "", aus ? `Переглядовий${aus > 1 ? " ×" + aus : ""}` : ""].filter(Boolean).join(" · ");
+      return `<div class="day"><h3>${dayName(d.at)}<small>${weekday(d.at)} · ${what}</small></h3>${d.list.map(it => it.k === "s" ? `<details class="hi"><summary>
+          <span class="hk"><b>СабДей</b> · збір №${it.n || 1} · ${hhmm(it.at)}</span>
+          <span class="hw${it.winner ? "" : " none"}">${it.winner ? esc(it.winner) : "Переможця не обрано"}</span>
+          <span class="hm"><b>${fmtN(it.orders)}</b>${plural(it.orders, "замовлення", "замовлення", "замовлень")}</span></summary>
+          ${it.top.length ? topList(it.top, it.points, n => plural(n, "замовлення", "замовлення", "замовлень")) : `<div class="empty">Без замовлень</div>`}</details>`
+        : `<details class="hi"><summary>
+          <span class="hk au"><b>Переглядовий</b> · ${hhmm(it.at)} · ${fmtN(it.lots)} ${plural(it.lots, "лот", "лоти", "лотів")}</span>
+          <span class="hw${it.winner ? "" : " none"}">${it.winner ? esc(it.winner) : "Переможця не обрано"}</span>
+          <span class="hm"><b>${fmtN(it.sum)}</b>балів</span></summary>
+          ${topList(it.top, it.sum, n => plural(n, "ставка", "ставки", "ставок"))}</details>`).join("")}</div>`;
+    }).join("");
+  }
+
   function render(){
     if(!S) return;
     $("chan").innerHTML = S.channel ? `Канал <b>${esc(S.channel)}</b>` : "";
-    const both = (going(S.session) || S.phase === "play" || (S.top || []).length) && (going(S.au.timer) || S.au.lots.length);
-    $("tabs").classList.toggle("hidden", !both);
-    if(!chosen || !both) setView(autoView());
+    if(!chosen) setView(autoView());
     renderSubday(); renderAuction();
   }
   // таймери тікають локально між оновленнями

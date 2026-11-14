@@ -125,10 +125,21 @@
   }
   function bump(el, cls){ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 500); }
   function $(id){ return document.getElementById(id); }
-  OV.connect({ state: s => { S = s; tick(); } });
-  setInterval(tick, 200);
-  // підстраховка: якщо потік подій мовчить (проксі, сон OBS), раз на 10 с беремо стан напряму
-  setInterval(() => { fetch(OV.base + "api/state", {cache: "no-store"}).then(r => r.ok ? r.json() : null).then(s => { if(s){ OV.sync && OV.sync(s); S = s; tick(); } }).catch(() => {}); }, 10000);
+  // новіший стан перемагає: відповідь опитування не має затерти свіжіший кадр із потоку
+  const apply = s => { if(!s || (S && s.serverNow && S.serverNow && s.serverNow < S.serverNow)) return; S = s; tick(); };
+  OV.connect({ state: s => apply(s), offline: () => refresh() });
+  // підстраховка: якщо потік подій мовчить (проксі, сон OBS), беремо стан напряму
+  let lastFetch = 0;
+  function refresh(){
+    const now = Date.now(); if(now - lastFetch < 1000) return; lastFetch = now;
+    fetch(OV.base + "api/state", {cache: "no-store"}).then(r => r.ok ? r.json() : null).then(s => { if(s){ OV.sync && OV.sync(s); apply(s); } }).catch(() => {});
+  }
+  setInterval(() => {
+    tick();
+    const a = active(); // таймер дійшов до 00:00 — одразу питаємо сервер, що далі (кінець гри → голосування)
+    if(a && a.t.status === "running" && remain(a.t) <= 0) refresh();
+  }, 200);
+  setInterval(refresh, 3000);
 })();
 </script>
 </body></html>

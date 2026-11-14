@@ -20,8 +20,8 @@ func TestGiftSubsPoints(t *testing.T) {
 	}
 	// список активних підписок: mira подарувала 3, ira — 1
 	a.applyGiftSnapshot(map[string]int{"mira": 3, "ira": 1})
-	order("1", "mira", "Hades") // не-підписник (без Helix) — 0 балів + 3 за подарунки
-	if e := a.st.Entries[0]; e.Gifts != 3 || pointsOf(a.st.Settings, e) != 3 {
+	order("1", "mira", "Hades") // не-підписник (без Helix) — 0 балів + 1 за 3 подарунки
+	if e := a.st.Entries[0]; e.Gifts != 3 || pointsOf(a.st.Settings, e) != 1 {
 		t.Fatalf("snapshot gifts: %+v", e)
 	}
 	// живий журнал більший за список — береться він; старі (>30 днів) не рахуються; анонімні — теж
@@ -36,13 +36,18 @@ func TestGiftSubsPoints(t *testing.T) {
 	if len(a.st.Gifts) != 1 {
 		t.Fatalf("old gifts not pruned: %+v", a.st.Gifts)
 	}
-	// підписник T2 × 3 міс. = 6 + 1 подарунок = 7
+	// підписник T2 × 3 міс. = 6; 1 подарунок — менше трьох, бал не додає
 	a.mu.Lock()
 	a.st.Entries = append(a.st.Entries, Entry{ID: "x", Ts: time.Now().UnixMilli(), User: "ira", Login: "ira", UserID: "ira", Tier: 2, Months: 3, Text: "Doom"})
 	a.refreshEntryGiftsLocked()
 	a.mu.Unlock()
-	if p := pointsOf(a.st.Settings, a.st.Entries[1]); p != 7 {
-		t.Fatalf("sub + gift = %d, want 7", p)
+	if p := pointsOf(a.st.Settings, a.st.Entries[1]); p != 6 {
+		t.Fatalf("sub + 1 gift = %d, want 6", p)
+	}
+	for gifts, want := range map[int]int{0: 0, 2: 0, 3: 1, 5: 1, 6: 2, 10: 3} { // 3 сабки = 1 бал, вниз
+		if g := giftPoints(gifts); g != want {
+			t.Fatalf("giftPoints(%d) = %d, want %d", gifts, g, want)
+		}
 	}
 	// «ділити»: бали разом із подарунками діляться між замовленнями глядача
 	s := a.st.Settings
@@ -51,7 +56,7 @@ func TestGiftSubsPoints(t *testing.T) {
 		{ID: "a", Ts: 1, UserID: "u", Login: "u", Tier: 1, Months: 2, Gifts: 4, Text: "A"},
 		{ID: "b", Ts: 2, UserID: "u", Login: "u", Tier: 1, Months: 2, Gifts: 4, Text: "B"},
 	}
-	if p := entryPoints(s, es); p["a"] != 3 || p["b"] != 3 { // (1×2 + 4) / 2
+	if p := entryPoints(s, es); p["a"]+p["b"] != 3 || p["a"] != 1 || p["b"] != 2 { // (1×2 + 1 за 4 сабки) = 3 на двох
 		t.Fatalf("split with gifts %v", p)
 	}
 	// донати й ручні замовлення подарунків не мають

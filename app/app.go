@@ -491,7 +491,7 @@ func (a *Channel) onRedemption(ev Redemption, bc User) {
 		defer func() { go a.fillColors() }()
 	}
 	a.mutate(func(st *State) {
-		e.Gifts = a.giftsForLocked(e.UserID) // подаровані сабки за 30 днів — +1 бал за кожну
+		e.Gifts = a.giftsForLocked(e.UserID) // подаровані сабки за 30 днів — 3 сабки = 1 бал (giftPoints)
 		st.Entries = append(st.Entries, e)
 	})
 	sub := "не підписник"

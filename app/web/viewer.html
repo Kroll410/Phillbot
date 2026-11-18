@@ -247,6 +247,9 @@
     es.addEventListener("state", () => { $("live").classList.add("on"); $("liveTxt").textContent = "Наживо"; load(); });
     es.onerror = () => { $("live").classList.remove("on"); $("liveTxt").textContent = "Перепідключення…"; };
   }
+  // пряме посилання на вкладку: …#history, #auction, #subday
+  const hashView = () => { const v = location.hash.slice(1); if(["subday", "auction", "history"].includes(v)){ chosen = true; setView(v); } };
+  window.addEventListener("hashchange", hashView); hashView();
   load(); connect();
   setInterval(load, 15000); // підстраховка, якщо потік подій мовчить
 })();

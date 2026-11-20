@@ -720,6 +720,29 @@ const DON_HEART = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-
 const donChip = uah => `<span class="donchip">${DON_HEART}<i>₴</i><b>${fmtUAH(uah)}</b></span>`;
 const fmtUAH = v => { const x = Number(v) || 0; return x % 1 ? x.toFixed(2).replace(".", ",") : String(x); };
 $("openBase").onclick = () => call("OpenFolder", "");
+// імпорт даних з файлу бази PhillBot (з іншого ПК або з вебверсії)
+let importFile = "";
+$("importData").onclick = async () => {
+  const r = await call("ImportPick").catch(() => null);
+  if(!r || !r.file) return;
+  importFile = r.file;
+  const n = (v, a, b, c) => `${v} ${plural(v, a, b, c)}`;
+  $("importList").innerHTML = r.channels.map(c => `<button class="srow" data-imp="${esc(c.id)}">
+      <span class="sdate">${esc(c.name || ("Канал " + c.id))}</span>
+      <span class="smeta">${n(c.streams, "стрім", "стріми", "стрімів")} · ${n(c.collections, "збір", "збори", "зборів")} · ${c.entries} замовл. · ${n(c.auctions, "аукціон", "аукціони", "аукціонів")}</span></button>`).join("");
+  openModal("importModal");
+};
+$("importList").addEventListener("click", async e => {
+  const b = e.target.closest("[data-imp]"); if(!b || !importFile) return;
+  const name = b.querySelector(".sdate").textContent;
+  if(!(await confirmBox(`Замінити дані на цьому ПК даними «${name}»? Поточні дані збережуться в резервну копію.`, "Імпортувати"))) return;
+  try{
+    const snap = await withLoading($("importModal").querySelector(".box"), () => call("ImportApply", importFile, b.dataset.imp));
+    closeModal("importModal"); closeModal("generalModal");
+    pastStream = null; view = null; setState(snap); loadStreams(); renderAll();
+    toast(`Імпортовано: ${name}`);
+  }catch(err){}
+});
 // експорт за весь час: діалог «Зберегти як», потім програма показує файл у провіднику
 document.querySelectorAll("[data-export]").forEach(b => b.onclick = async () => {
   if(b.classList.contains("is-loading")) return;

@@ -36,7 +36,7 @@
   <div id="viewLink" class="owidget"></div></div>
   <h3>Дані за весь час</h3>
   <div class="row exportrow"><button data-export="subday">СабДей .csv</button><button data-export="auction">Аукціон .csv</button><button data-export="zip">Усе .zip</button></div>
-  <div class="row desktoponly datarow"><button id="openBase">Папка програми</button></div>
+  <div class="row desktoponly datarow"><button id="openBase">Папка програми</button><button id="importData">Імпортувати дані…</button></div>
   <div class="row actions" style="margin-top:20px">
     <button data-close="generalModal">Скасувати</button>
     <button id="generalSave" class="primary">Зберегти</button>
@@ -139,6 +139,16 @@
   <div id="streamList" class="slist"></div>
   <div class="row actions" style="margin-top:18px">
     <button data-close="streamsModal">Закрити</button>
+  </div>
+</div></div>
+
+<!-- імпорт даних (лише на ПК): вибір каналу з файлу бази -->
+<div class="modal" id="importModal"><div class="box settings wide">
+  <h2>Імпорт даних</h2>
+  <div class="hint" style="margin:0 0 12px">Дані з файлу замінять усі стріми, збори й аукціони на цьому ПК. Поточні дані спершу збережуться в резервну копію поруч із програмою. Налаштування OBS, ngrok, Donatello і чату не зміняться.</div>
+  <div id="importList" class="slist"></div>
+  <div class="row actions" style="margin-top:18px">
+    <button data-close="importModal">Скасувати</button>
   </div>
 </div></div>
 
